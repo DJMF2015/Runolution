@@ -2,8 +2,8 @@ import useSWR from 'swr';
 import fetcher from '../utils/fetcher';
 import { useLocation } from 'react-router-dom';
 import React, { useEffect, useState } from 'react';
-import useAuthorizaton from '../utils/useAuth';
 import { getAthleteStats } from '../utils/functions';
+import Login from './Login';
 // import PersonalPbs from './PersonalPbs';
 import styled from 'styled-components';
 import { mediaQueries } from '../utils/mediaQueries';
@@ -16,13 +16,12 @@ import {
   getCurrentYear,
 } from '../utils/conversion';
 const AthleteStats = () => {
-  // const location = useLocation();
   const [payload, setPayload] = useState([]);
   const [user, setUserData] = useState([]);
 
   useEffect(() => {
-    const athlete = localStorage.getItem('athlete');
-    const token = localStorage.getItem('token');
+    const athlete = localStorage.getItem('athlete_id');
+    const token = localStorage.getItem('access_token');
     // parse athlete and token from local storage
     const athleteId = JSON.parse(athlete);
     const accessToken = JSON.parse(token);
@@ -35,12 +34,6 @@ const AthleteStats = () => {
       });
     }
   }, [payload]);
-
-  // const { code } = useAuthorizaton(
-  //   `https://www.strava.com/api/v3/athletes/${process.env.REACT_APP_ATHLETE_ID}/stats?access_token=`
-  // );
-  // const { data: result, error } = useSWR(code, fetcher);
-
   // if (error) return <h1>Something went wrong!</h1>;
   // if (!result) return <h1>Loading...</h1>;
   return (
@@ -55,7 +48,7 @@ const AthleteStats = () => {
       </h2>
 
       {/* check if user and user.data available before rendering */}
-      {user && user?.data && (
+      {user && user?.data ? (
         <Wrapper>
           <CardContainer>
             <CardDetails>
@@ -107,6 +100,8 @@ const AthleteStats = () => {
             </CardDetails>
           </CardContainer>
         </Wrapper>
+      ) : (
+        <Login />
       )}
     </div>
   );

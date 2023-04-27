@@ -24,9 +24,6 @@ const Layout = () => {
           <li>
             <Link to="/club">Athlete Club</Link>
           </li>
-          {/* <li>
-            <Link to="/heatmap">Activity Heatmap</Link>
-          </li> */}
         </ul>
       </nav>
 

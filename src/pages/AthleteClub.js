@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 // import useSWR from 'swr';
 // import fetcher from '../utils/fetcher';
 import styled from 'styled-components';
+import Login from './Login';
 // import useAuthorizaton from '../utils/useAuth';
 // import { useClub } from '../utils/hooks';
 import {
@@ -20,7 +21,7 @@ const AthleteClub = () => {
 
   useEffect(() => {
     async function fetchData() {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('access_token');
       const tokenData = JSON.parse(token);
       getUsersDetails(tokenData).then((response) => {});
       getUsersClubs(tokenData).then((response) => {
@@ -29,7 +30,7 @@ const AthleteClub = () => {
 
       getUsersClubActivities(clubData.id, tokenData).then((response) => {
         console.log({ response });
-        setActivities(response.data);
+        setActivities(response?.data);
       });
     }
     fetchData();
@@ -37,13 +38,20 @@ const AthleteClub = () => {
 
   // if (error || errors) return <h1>Something went wrong!</h1>;
 
-  if (!clubData && !activities) return <h1>No Club Data! Are you a member of a club?</h1>;
-
+  if (!clubData) return <h1>No Club Data! Are you a member of a club?</h1>;
+  // if (!clubData || !activities)
+  //   return (
+  //     <div>
+  //       <Login />
+  //     </div>
+  //   );
   return (
     <>
-      <Header>{clubData?.name}</Header>
-
-      {activities?.length > 0 &&
+      {/* <Header>{clubData?.name}</Header> */}
+      {!clubData ? (
+        <Login />
+      ) : (
+        activities?.length > 0 &&
         activities.map((activity) => (
           <Wrapper
             key={`${activity?.firstname}-${activity?.lastname}-${activity?.moving_time}`}
@@ -58,7 +66,8 @@ const AthleteClub = () => {
               {' mins'}
             </h4>
           </Wrapper>
-        ))}
+        ))
+      )}
     </>
   );
 };

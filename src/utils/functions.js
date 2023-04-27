@@ -12,8 +12,6 @@ export const getAccessToken = async (authCode) => {
     const response = await axios.post(
       `https://www.strava.com/api/v3/oauth/token?client_id=27989&client_secret=183e7360ea130a4ded02e4fb219730c7b42e7e13&code=${authCode}&grant_type=authorization_code`
     );
-    console.log('response', response);
-    localStorage.setItem('token', response.data.access_token);
     return response.data;
   } catch (error) {
     console.log(error);
@@ -31,11 +29,11 @@ export const getAthleteStats = async (userId, accessToken) => {
     console.log(error);
   }
 };
-
-export const getAthleteActivities = async (accessToken) => {
+// default index value is 1 to start from page 1
+export const getAthleteActivities = async (accessToken, per_page, index) => {
   try {
     const response = await axios.get(
-      `https://www.strava.com/api/v3/athlete/activities?per_page=30`,
+      `https://www.strava.com/api/v3/athlete/activities?per_page=${per_page}&page=${index}`,
       {
         headers: { Authorization: `Bearer ${accessToken}` },
       }

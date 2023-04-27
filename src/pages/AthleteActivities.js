@@ -1,6 +1,4 @@
 import React, { Suspense, useState, useEffect } from 'react';
-import useAuthorization from '../utils/useAuth';
-import fetcher from '../utils/fetcher';
 import styled from 'styled-components';
 import { mediaQueries } from '../utils/mediaQueries';
 import { getAthleteActivities } from '../utils/functions';
@@ -8,49 +6,38 @@ import Pagination from '../utils/pagination';
 import DropDown from '../components/ActivityDropDown';
 import Search from '../utils/search';
 import '../App.css';
-import useSWR from 'swr';
 import polyline from '@mapbox/polyline';
 import { Link } from 'react-router-dom';
 
 const AthleteActivities = () => {
-  // const PAGE_SIZE = 30;
   // eslint-disable-next-line no-unused-vars
+  const per_page = 30;
   const [payload, setPayload] = useState([]);
   const [activities, setActivities] = useState([]);
   const [activityName, setActivityName] = useState([]);
   const [searchTxt, setSearchTxt] = useState('');
+  const [pageIndex, setPageIndex] = useState(1);
   const [selectedName, setFilteredName] = useState(null);
-  // let [pageIndex, setPageIndex] = useState(1);
-  // const { code } = useAuthorization(
-  //   `https://www.strava.com/api/v3/athlete/activities?include_all_efforts=true&per_page=${PAGE_SIZE}&page=${pageIndex}&access_token=`
-  // );
-  // console.log(code);
-  // const { data: result, error } = useSWR(code, fetcher, { suspense: true });
+  const [nodes, setNodes] = useState([]);
 
   useEffect(() => {
-    // const athlete = localStorage.getItem('athlete');
-    const token = localStorage.getItem('token');
-    // parse athlete and token from local storage
-    // const athleteId = JSON.parse(athlete);
+    const token = localStorage.getItem('access_token');
     const accessToken = JSON.parse(token);
     setPayload(accessToken);
   }, []);
+
   useEffect(() => {
     if (payload) {
-      getAthleteActivities(payload).then((response) => {
+      getAthleteActivities(payload, per_page, pageIndex).then((response) => {
         console.log('activities: ', response.data);
-        // setPayload(response);
         setActivities(response.data);
       });
     }
-  }, [payload]);
-
-  const [nodes, setNodes] = useState([]);
+  }, [payload, pageIndex]);
   let filteredName = [];
 
   useEffect(() => {
     async function fetchData() {
-      // const stravaActivityResponse = result;
       const stravaActivityResponse = activities;
       let polylines = [];
       for (let i in stravaActivityResponse) {
@@ -74,8 +61,6 @@ const AthleteActivities = () => {
     filteredName = activities;
   }
 
-  // TODO implementing search bar filtering
-
   // if (error) return <h2>Could not fetch activities.</h2>;
   if (!activities) return <Suspense fallback={<div>loading...</div>}></Suspense>;
 
@@ -85,26 +70,11 @@ const AthleteActivities = () => {
       {/* wire up search filter to display output */}
       {/* <Search searchTxt={searchTxt} updateSearchTxt={setSearchTxt} /> */}
       <DropDown setFilteredName={setFilteredName} result={activities} />
-      {/* <Pagination
+      <Pagination
         pageIndex={pageIndex}
         onPageChange={(currentPage) => setPageIndex(currentPage)}
-      /> */}
-      {/* {result.length > 0 &&
-        result.map((activity, index) => (
-          <>
-            <CardDetails>
-              <table>
-                <Link
-                  to="/activity"
-                  state={{ from: activity }}
-                  key={`${activity.id}--${activity.moving_time}--${activity.average_heartrate}`}
-                >
-                  <div>{activity.name}</div>
-                </Link>
-              </div>
-            </CardDetails>
-          </>
-        ))}{' '} */}
+      />
+
       {filteredName.map((activity, i) => (
         <>
           <div key={i}>

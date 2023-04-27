@@ -6,7 +6,7 @@ import Activities from './pages/AthleteActivities';
 import AthleteStats from './pages/AthleteStats';
 import AthleteClub from './pages/AthleteClub';
 import Activity from './components/ActivityCard';
-import Redirect from './utils/Redirect';
+import Redirect from './utils/redirect';
 import Profile from './pages/Profile';
 import Login from './pages/Login';
 import ActivitiesMap from './pages/ActivitiesMap';

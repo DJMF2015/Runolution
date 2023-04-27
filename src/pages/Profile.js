@@ -1,14 +1,9 @@
 import React, { useState, useEffect } from 'react';
-// import useSWR from 'swr';
-// import fetcher from '../utils/fetcher';
-// import useAuthorizaton from '../utils/useAuth';
 import styled from 'styled-components';
-import { useLocation } from 'react-router-dom';
-
+import Login from './Login';
 import { mediaQueries } from '../utils/mediaQueries';
 
 const Profile = () => {
-  // const location = useLocation();
   const [payload, setPayload] = useState([]);
 
   useEffect(() => {
@@ -17,38 +12,31 @@ const Profile = () => {
     setPayload(payloadData);
   }, []);
 
-  // const { code } = useAuthorizaton(
-  //   `https://www.strava.com/api/v3/athletes/${process.env.REACT_APP_ATHLETE_ID}?access_token=`
-  // );
-  // const { data: result, error } = useSWR(code, fetcher);
-
-  // if (error) return <h1>Something went wrong!</h1>;
-  if (!payload) return <h1>Loading...</h1>;
+  // if (!payload) return <h1>Loading...</h1>;
 
   return (
     <>
-      <Wrapper>
-        <CardContainer>
-          <CardDetails>
-            <Header>
-              <h2>Profile</h2>
-            </Header>
-
-            {payload && (
-              <>
-                <img src={payload?.athlete?.profile} alt="David" />
-                <h3>
-                  Name: {payload?.athlete?.firstname} {''}
-                  {payload?.athlete?.lastname}
-                </h3>
-                <h3> Sex: {payload?.athlete?.sex}</h3>
-                <h3>City: {payload?.athlete?.city}</h3>
-                <h3>Country: {payload?.athlete?.state}</h3>
-              </>
-            )}
-          </CardDetails>
-        </CardContainer>
-      </Wrapper>
+      {!payload ? (
+        <Login />
+      ) : (
+        <Wrapper>
+          <CardContainer>
+            <CardDetails>
+              <Header>
+                <h2>Profile</h2>
+              </Header>
+              <img src={payload?.athlete?.profile} alt="David" />
+              <h3>
+                Name: {payload?.athlete?.firstname} {''}
+                {payload?.athlete?.lastname}
+              </h3>
+              <h3> Sex: {payload?.athlete?.sex}</h3>
+              <h3>City: {payload?.athlete?.city}</h3>
+              <h3>Country: {payload?.athlete?.state}</h3>
+            </CardDetails>
+          </CardContainer>
+        </Wrapper>
+      )}
     </>
   );
 };
