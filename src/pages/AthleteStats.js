@@ -1,10 +1,7 @@
-import useSWR from 'swr';
-import fetcher from '../utils/fetcher';
 import { useLocation } from 'react-router-dom';
 import React, { useEffect, useState } from 'react';
 import { getAthleteStats } from '../utils/functions';
 import Login from './Login';
-// import PersonalPbs from './PersonalPbs';
 import styled from 'styled-components';
 import { mediaQueries } from '../utils/mediaQueries';
 import {
@@ -22,17 +19,27 @@ const AthleteStats = () => {
   useEffect(() => {
     const athlete = localStorage.getItem('athlete_id');
     const token = localStorage.getItem('access_token');
+    const payloads = localStorage.getItem('payload');
     // parse athlete and token from local storage
     const athleteId = JSON.parse(athlete);
     const accessToken = JSON.parse(token);
-    setPayload({ athlete: athleteId, access_token: accessToken });
+    const payloadData = JSON.parse(payloads);
+    setPayload({
+      athlete: athleteId,
+      access_token: accessToken,
+      payloadData: payloadData,
+    });
   }, [payload.athlete, payload.access_token]);
+
   useEffect(() => {
-    if (payload.athlete && payload.access_token) {
-      getAthleteStats(payload.athlete, payload.access_token).then((response) => {
-        setUserData(response);
-      });
+    async function fetchData() {
+      if (payload.athlete && payload.access_token) {
+        await getAthleteStats(payload.athlete, payload.access_token).then((response) => {
+          setUserData(response);
+        });
+      }
     }
+    fetchData();
   }, [payload]);
   // if (error) return <h1>Something went wrong!</h1>;
   // if (!result) return <h1>Loading...</h1>;
@@ -53,7 +60,9 @@ const AthleteStats = () => {
           <CardContainer>
             <CardDetails>
               <Image
-                src="https://dgtzuqphqg23d.cloudfront.net/-a_juN9lrTxQKEXlCARYLetB_7J5KgbGrHfJfkvGDK8-1152x2048.jpg"
+                src={payload?.payloadData?.athlete?.profile}
+                width={250}
+                height={300}
                 alt="DavidF"
               />
 
