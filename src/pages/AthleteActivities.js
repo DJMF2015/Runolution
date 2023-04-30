@@ -1,8 +1,9 @@
 import React, { Suspense, useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { mediaQueries } from '../utils/mediaQueries';
-import { getAthleteActivities } from '../utils/functions';
+import { getAthleteActivities, getUserActivityLaps } from '../utils/functions';
 import Pagination from '../utils/pagination';
+import { catchErrors } from '../utils/helpers';
 import DropDown from '../components/ActivityDropDown';
 import Search from '../utils/search';
 import '../App.css';
@@ -27,12 +28,15 @@ const AthleteActivities = () => {
   }, []);
 
   useEffect(() => {
-    if (payload) {
-      getAthleteActivities(payload, per_page, pageIndex).then((response) => {
-        console.log('activities: ', response.data);
-        setActivities(response.data);
-      });
+    async function fetchData() {
+      if (payload) {
+        await getAthleteActivities(payload, per_page, pageIndex).then((response) => {
+          console.log('activities: ', response.data);
+          setActivities(response.data);
+        });
+      }
     }
+    catchErrors(fetchData());
   }, [payload, pageIndex]);
   let filteredName = [];
 
@@ -51,7 +55,7 @@ const AthleteActivities = () => {
       }
       setNodes(polylines);
     }
-    fetchData();
+    catchErrors(fetchData());
   }, [activities]);
 
   if (selectedName) {
