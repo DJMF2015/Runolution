@@ -1,10 +1,7 @@
 import React, { useState, useEffect } from 'react';
-// import useSWR from 'swr';
-// import fetcher from '../utils/fetcher';
 import styled from 'styled-components';
 import Login from './Login';
-// import useAuthorizaton from '../utils/useAuth';
-// import { useClub } from '../utils/hooks';
+import { catchErrors } from '../utils/helpers';
 import {
   getUsersClubs,
   getUsersDetails,
@@ -13,43 +10,46 @@ import {
 const AthleteClub = () => {
   const [clubData, setClubData] = useState([]);
   const [activities, setActivities] = useState([]);
-  // const { code } = useAuthorizaton(
-  //   `https://www.strava.com/api/v3/clubs/${process.env.REACT_APP_CLUB_ID}/activities?page=1&per_page=200&access_token=`
-  // );
-  // const { data: result, error } = useSWR(code, fetcher);
-  // const { props, errors } = useClub();
-
   useEffect(() => {
     async function fetchData() {
       const token = localStorage.getItem('access_token');
       const tokenData = JSON.parse(token);
-      getUsersDetails(tokenData).then((response) => {});
-      getUsersClubs(tokenData).then((response) => {
-        setClubData(response.data[0]);
-      });
-
-      getUsersClubActivities(clubData.id, tokenData).then((response) => {
-        console.log({ response });
-        setActivities(response?.data);
+      await getUsersDetails(tokenData).then((response) => {
+        console.log(response.data);
+        setClubData(response.data);
       });
     }
-    fetchData();
-  }, [clubData.id]);
+    catchErrors(fetchData());
+  }, []);
 
-  // if (error || errors) return <h1>Something went wrong!</h1>;
+  useEffect(() => {
+    if (
+      clubData.clubs === undefined ||
+      clubData.clubs.length === 0 ||
+      clubData.clubs[0].id === undefined ||
+      clubData.clubs[0].id === 0
+    ) {
+      console.log('No club data');
+    } else {
+      const token = localStorage.getItem('access_token');
+      const tokenData = JSON.parse(token);
+      catchErrors(
+        getUsersClubActivities(clubData.clubs[0].id, tokenData).then((response) => {
+          console.log({ response });
+          setActivities(response?.data);
+        })
+      );
+    }
+  }, [clubData]);
 
-  if (!clubData) return <h1>No Club Data! Are you a member of a club?</h1>;
-  // if (!clubData || !activities)
-  //   return (
-  //     <div>
-  //       <Login />
-  //     </div>
-  //   );
   return (
     <>
-      {/* <Header>{clubData?.name}</Header> */}
-      {!clubData ? (
-        <Login />
+      {/* <Header>{clubData && clubData?.clubs[0]?.name}</Header> */}
+      {!clubData ||
+      clubData.clubs === undefined ||
+      clubData.clubs.length === 0 ||
+      clubData.clubs[0].id === undefined ? (
+        <h2>Looks like you aren't a member of any Clubs yet!</h2>
       ) : (
         activities?.length > 0 &&
         activities.map((activity) => (
