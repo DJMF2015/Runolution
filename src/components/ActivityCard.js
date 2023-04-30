@@ -1,8 +1,13 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import styled from 'styled-components';
 import { getSufferScore, getMilesToKms, getMetresToFeet } from '../utils/conversion';
 import ControllingGroup from './ControllingGroup';
+import {
+  getUserActivityLaps,
+  getCommentsByActivityId,
+  getKudoersByActivityId,
+} from '../utils/functions';
 import Map, { Source, Layer } from 'react-map-gl';
 import polyline from '@mapbox/polyline';
 import {
@@ -32,7 +37,25 @@ export default function Activity() {
   const { from } = location.state;
   const coordinates = from?.map.summary_polyline;
   const activity_line = polyline.decode(coordinates);
-
+  const [kudosoers, setKudosoers] = React.useState([]);
+  const [comments, setComments] = React.useState([]);
+  const [laps, setLaps] = React.useState([]);
+  const accessToken = localStorage.getItem('access_token');
+  const token = JSON.parse(accessToken);
+  useEffect(() => {
+    async function fetchData() {
+      await getUserActivityLaps(from.id, token).then((response) => {
+        setLaps(response.data);
+      });
+      await getKudoersByActivityId(from.id, token).then((response) => {
+        setKudosoers(response.data);
+      });
+      await getCommentsByActivityId(from.id, token).then((response) => {
+        setComments(response.data);
+      });
+    }
+    fetchData();
+  }, [from.id, token]);
   const layers = [
     {
       name: 'Osm Mapnik',
@@ -78,8 +101,33 @@ export default function Activity() {
           </ActivityCard>
           <h3>{`Average Heart Rate: ${from.average_heartrate}`}</h3>
           <h3>Kudos: {from.kudos_count} </h3>
-          <h3>Distance: {getMilesToKms(from.distance)}</h3>
-          <h3>Total Elevation: {getMetresToFeet(from.total_elevation_gain)}</h3>
+          {kudosoers.length > 0 && (
+            <div>
+              {kudosoers.map((kudoer, index) => {
+                return <span key={index}>{kudoer.firstname + ', '}</span>;
+              })}
+              <h3>Comments: {from.comment_count}</h3>
+              {comments.length > 0 && (
+                <div>
+                  {comments.map((comment, index) => {
+                    return (
+                      <>
+                        <span key={index}>
+                          {comment.athlete.firstname + ' '}{' '}
+                          {comment.athlete.lastname + ' '}{' '}
+                        </span>
+                        <p>
+                          <i> {comment.text}</i>
+                        </p>
+                      </>
+                    );
+                  })}
+                </div>
+              )}
+              <h3>Distance: {getMilesToKms(from.distance)}</h3>
+              <h3>Total Elevation: {getMetresToFeet(from.total_elevation_gain)}</h3>
+            </div>
+          )}
         </article>
       </Wrapper>
 
