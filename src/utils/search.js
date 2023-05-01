@@ -1,15 +1,14 @@
 import React from 'react';
 import { useState, useEffect } from 'react';
 import styled from 'styled-components';
-const Search = ({ searchText, setUpdateSearchTerm }) => {
+const Search = ({ searchText, updateSearchTxt }) => {
   const [searchInput, setSearchTerm] = useState('');
 
   const handleChange = (e) => {
-    console.log(e.target.value);
-    setSearchTerm(e.target.value);
-    if (e >= 0) {
-      setUpdateSearchTerm(e.target.value);
+    if (e.target.value.length >= 0) {
+      setSearchTerm(e.target.value);
     }
+    updateSearchTxt(searchInput);
   };
   return (
     <>
@@ -18,7 +17,7 @@ const Search = ({ searchText, setUpdateSearchTerm }) => {
           <SearchInput
             type="text"
             placeholder="Search..."
-            value={searchInput}
+            value={searchText}
             onChange={handleChange}
           />
         </StyledInput>
