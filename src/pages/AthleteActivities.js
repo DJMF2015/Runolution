@@ -1,7 +1,7 @@
 import React, { Suspense, useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { mediaQueries } from '../utils/mediaQueries';
-import { getAthleteActivities, getUserActivityLaps } from '../utils/functions';
+import { getAthleteActivities } from '../utils/functions';
 import Pagination from '../utils/pagination';
 import { catchErrors } from '../utils/helpers';
 import DropDown from '../components/ActivityDropDown';
@@ -12,12 +12,12 @@ import { Link } from 'react-router-dom';
 
 const AthleteActivities = () => {
   // eslint-disable-next-line no-unused-vars
-  const per_page = 30;
   const [payload, setPayload] = useState([]);
   const [activities, setActivities] = useState([]);
   const [activityName, setActivityName] = useState([]);
   const [searchTxt, setSearchTxt] = useState('');
   const [pageIndex, setPageIndex] = useState(1);
+  const [loading, setLoading] = useState(false);
   const [selectedName, setFilteredName] = useState(null);
   const [nodes, setNodes] = useState([]);
 
@@ -30,15 +30,14 @@ const AthleteActivities = () => {
   useEffect(() => {
     async function fetchData() {
       if (payload) {
-        await getAthleteActivities(payload, per_page, pageIndex).then((response) => {
-          console.log('activities: ', response.data);
+        setLoading(true);
+        await getAthleteActivities(payload, 100, pageIndex).then((response) => {
           setActivities(response.data);
         });
       }
     }
     catchErrors(fetchData());
   }, [payload, pageIndex]);
-  let filteredName = [];
 
   useEffect(() => {
     async function fetchData() {
@@ -54,25 +53,34 @@ const AthleteActivities = () => {
         });
       }
       setNodes(polylines);
+      setLoading(false);
     }
     catchErrors(fetchData());
   }, [activities]);
 
-  if (selectedName) {
-    filteredName = activities.filter((activity, i) => activity.name === selectedName);
-    console.log(filteredName);
-  } else {
-    filteredName = activities;
-  }
+  // if (selectedName) {
+  //   filteredName = activities.filter((activity, i) => activity.name === selectedName);
+  //   console.log(filteredName);
+  // } else {
+  //   filteredName = activities;
+  // }
 
-  // if (error) return <h2>Could not fetch activities.</h2>;
+  const filteredName = activities.filter((activity) => {
+    return activity.name.toLowerCase().includes(searchTxt.toLowerCase());
+  });
+  if (loading)
+    return (
+      <h2>
+        <Suspense>Fetching Activities...</Suspense>
+      </h2>
+    );
   if (!activities) return <Suspense fallback={<div>loading...</div>}></Suspense>;
 
   return (
     <>
       <br></br>
       {/* wire up search filter to display output */}
-      {/* <Search searchTxt={searchTxt} updateSearchTxt={setSearchTxt} /> */}
+      <Search searchTxt={searchTxt} updateSearchTxt={setSearchTxt} />
       <DropDown setFilteredName={setFilteredName} result={activities} />
       <Pagination
         pageIndex={pageIndex}
