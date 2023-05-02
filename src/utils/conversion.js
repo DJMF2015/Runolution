@@ -1,16 +1,27 @@
 const getKmsToMiles = (distance) => {
   const miles = distance / 1610;
-  return Math.round(miles) + ` miles`;
+  return miles.toPrecision(3) + ` miles`;
 };
 
 const getMilesToKms = (distance) => {
   const kms = distance / 1000;
-  return Math.round(kms) + ` kms`;
+  return kms.toPrecision(3) + ` kms`;
 };
 
 const getMetresToFeet = (data) => {
   const mtrsToFt = data * 3.28084;
-  return getUnitsWithCommas(Math.round(mtrsToFt) + ' ft');
+  return getUnitsWithCommas(mtrsToFt.toPrecision(5) + ' ft');
+};
+
+const getSecondstoMinutes = (seconds) => {
+  const time = seconds / 60;
+  return time.toPrecision(3) + ` mins`;
+};
+
+// convert to kms/per hour as strava api only gives back speed & velocity in units of mtrs/sec
+const getMstoKmHr = (mtrs) => {
+  const kmHr = (mtrs * 60 * 60) / 1000;
+  return kmHr.toFixed(2) + ` km/hr`;
 };
 
 const getSufferScore = (score) => {
@@ -45,7 +56,9 @@ export {
   getKmsToMiles,
   getMilesToKms,
   getMetresToFeet,
+  getMstoKmHr,
   getSufferScore,
+  getSecondstoMinutes,
   getNoOfMtEverests,
   getUnitsWithCommas,
   getCurrentYear,
