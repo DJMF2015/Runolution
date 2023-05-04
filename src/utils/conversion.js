@@ -1,16 +1,16 @@
 const getKmsToMiles = (distance) => {
   const miles = distance / 1610;
-  return miles.toPrecision(3) + ` miles`;
+  return miles.toFixed(2) + ` miles`;
 };
 
 const getMilesToKms = (distance) => {
   const kms = distance / 1000;
-  return kms.toPrecision(3) + ` kms`;
+  return kms.toFixed(2) + ` kms`;
 };
 
 const getMetresToFeet = (data) => {
   const mtrsToFt = data * 3.28084;
-  return getUnitsWithCommas(mtrsToFt.toPrecision(5) + ' ft');
+  return getUnitsWithCommas(mtrsToFt.toFixed(2) + ' ft');
 };
 
 const getSecondstoMinutes = (seconds) => {
@@ -25,6 +25,7 @@ const getMstoKmHr = (mtrs) => {
 };
 
 const getSufferScore = (score) => {
+  console.log({ score });
   switch (true) {
     case score >= 150:
       return `${score}  Tough - watch out for overtraining.`;
@@ -52,6 +53,11 @@ const getCurrentYear = () => {
   return currentYear.getUTCFullYear();
 };
 
+const formattedDate = (date) => {
+  const formatted = date.split('T')[0];
+  console.log({ formatted });
+  return formatted;
+};
 export {
   getKmsToMiles,
   getMilesToKms,
@@ -59,6 +65,7 @@ export {
   getMstoKmHr,
   getSufferScore,
   getSecondstoMinutes,
+  formattedDate,
   getNoOfMtEverests,
   getUnitsWithCommas,
   getCurrentYear,
