@@ -1,18 +1,23 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, createRef } from 'react';
 import polyline from '@mapbox/polyline';
+import * as htmlToImage from 'html-to-image';
 import { getAthleteActivities } from '../utils/functions';
-import { authenticateWithStrava, catchErrors } from '../utils/helpers';
+import { authenticateWithStrava, catchErrors, useScreenShot } from '../utils/helpers';
 import { formattedDate } from '../utils/conversion';
 import Login from './Login';
-import SearchBar from '../utils/search';
 import styled from 'styled-components';
 import { MapContainer, TileLayer, FeatureGroup, Polyline, Popup } from 'react-leaflet';
 
 const ActivitiesMap = () => {
+  const ref = createRef(null);
+  const { takeScreenShot, download } = useScreenShot(ref);
   const [nodes, setNodes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTxt, setSearchTxt] = useState('');
   const [activityLoadingState, setActivityLoadingState] = useState(null);
+
+  const downloadScreenshot = () => takeScreenShot(ref.current).then(download);
+
   useEffect(() => {
     async function fetchData() {
       const stravaAuthResponse = await authenticateWithStrava();
@@ -21,13 +26,12 @@ const ActivitiesMap = () => {
       let looper_num = 1;
       // Looping until data is fetched from Strava API
       setLoading(true);
-      while (looper_num || stravaActivityResponse.length !== 0) {
+      while (looper_num || stravaActivityResponse.length === 0) {
         let stravaActivityResponse_single = await getAthleteActivities(
           stravaAuthResponse[0].data?.access_token,
           200,
           looper_num
         );
-
         if (
           stravaActivityResponse_single.data.length === 0 ||
           stravaActivityResponse_single.data.errors
@@ -63,7 +67,7 @@ const ActivitiesMap = () => {
       setNodes(polylines);
     }
 
-    fetchData();
+    catchErrors(fetchData());
     // eslint-disable-next-line
   }, []);
 
@@ -71,7 +75,7 @@ const ActivitiesMap = () => {
     return activity.activityName.toLowerCase().includes(searchTxt.toLowerCase());
   });
 
-  if (!nodes.length === 0 && loading)
+  if (loading)
     return (
       <div style={{ body: 'black' }}>
         <h1 style={{ color: 'red', textAlign: 'center' }}>
@@ -79,16 +83,31 @@ const ActivitiesMap = () => {
         </h1>
       </div>
     );
+  if (!nodes && nodes.length === 0)
+    return (
+      <div style={{ body: 'black' }}>
+        <h1 style={{ color: 'red', textAlign: 'center' }}>Please login to Strava</h1>
+      </div>
+    );
 
   console.log(nodes);
   return (
     <>
-      <SearchBar searchTxt={searchTxt} updateSearchTxt={setSearchTxt} />
       {!nodes && nodes.length === 0 ? (
         <Login />
       ) : (
         <>
           <SideNavigation>
+            <input
+              className="search__input"
+              type="text"
+              placeholder="Search by activity name..."
+              aria-label="Search"
+              onChange={(e) => setSearchTxt(e.target.value)}
+            />
+            <button className="screenshot__button" onClick={downloadScreenshot}>
+              Download screenshot
+            </button>
             {filteredName &&
               filteredName.map((activity, i) => (
                 <a
@@ -103,7 +122,8 @@ const ActivitiesMap = () => {
                 </a>
               ))}
           </SideNavigation>
-          <div>
+
+          <div ref={ref} style={{ height: '100vh', width: '100vw', zIndex: 0 }}>
             <MapContainer
               style={{ height: '100vh', width: '100vw', zIndex: 0 }}
               center={[55.89107, -3.21698]}
@@ -118,6 +138,7 @@ const ActivitiesMap = () => {
                 attribution='Powered by <a href="https://www.geoapify.com/" target="_blank">Geoapify</a> | <a href="https://openmaptiles.org/" target="_blank">© OpenMapTiles</a> <a href="https://www.openstreetmap.org/copyright" target="_blank">© OpenStreetMap</a> contributors'
                 maxZoom={20}
                 id="osm-bright"
+                // url="https://maps.geoapify.com/v1/tile/maptiler-3d/{z}/{x}/{y}.png?apiKey=d94e4561c3c649a9bbf06a2ef3f445fb"
                 url="https://maps.geoapify.com/v1/tile/dark-matter-brown/{z}/{x}/{y}.png?apiKey=d94e4561c3c649a9bbf06a2ef3f445fb"
               />
 
@@ -160,7 +181,7 @@ export default ActivitiesMap;
 const SideNavigation = styled.div`
   height: 100%;
   margin-top: 100px;
-  width: 200px;
+  width: 230px;
   display: block;
   position: fixed;
   z-index: 1;
@@ -170,9 +191,49 @@ const SideNavigation = styled.div`
   overflow-y: scroll;
   padding-top: 20px;
   background-color: #111;
-  opacity: 0.5;
-  color: #f1f1f1;
+  opacity: 0.8;
+  color: white;
 
+  .search__input {
+    width: 90%;
+    height: 20px;
+    font-size: 1rem;
+    display: inline-block;
+    margin: 0px 0px 0px 5px;
+    margin-bottom: 0.5em;
+    border-radius: 0.5em;
+    border: 1px solid white;
+    padding: 5px;
+    outline: none;
+  }
+
+  .search__input:focus {
+    border: 1px solid red;
+  }
+  .search__input::placeholder {
+    color: gray;
+    align-items: center;
+  }
+
+  .screenshot__button {
+    margin-left: 1.5vw;
+    margin-top: 3px;
+    margin-bottom: 10px;
+    color: red;
+    font-size: 0.9rem;
+    font-weight: bold;
+    background-color: ghostwhite;
+    border: 2px solid white;
+    border-radius: 10px;
+    width: 175px;
+    height: 30px;
+  }
+
+  .screenshot__button:hover {
+    background-color: red;
+    color: white;
+    border: 2px solid red;
+  }
   /* customise scrollbar for modern browser except firefox*/
   ::-webkit-scrollbar {
     width: 10px;
@@ -203,25 +264,37 @@ const SideNavigation = styled.div`
   }
 
   a {
-    padding: 4px 3px 4px 20px;
+    padding: 5px 3px 3px 20px;
     line-break: 2px;
+    margin-top: 2px;
     text-decoration: none;
     font-size: 12px;
-    color: #f1f1f1;
+    color: white;
     display: block;
   }
 
   a:hover {
-    color: #f1f1f1;
+    color: white;
     text-decoration: underline;
   }
 
   @media screen and (max-width: 750px) {
-    width: 125px;
-    font-size: 10px;
+    width: 150px;
+    font-size: 12px;
     a {
-      font-size: 10px;
-      color: #f1f1f1;
+      font-size: 12px;
+      color: white;
+    }
+    .search__input {
+      width: 80%;
+      height: 20px;
+      display: inline-block;
+      margin: 50px 5px 20px 15px;
+      margin-bottom: 20px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+      padding: 5px;
+      outline: none;
     }
   }
 `;
