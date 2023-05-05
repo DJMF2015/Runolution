@@ -1,8 +1,7 @@
 import React, { useState, useEffect, createRef } from 'react';
 import polyline from '@mapbox/polyline';
-import * as htmlToImage from 'html-to-image';
 import { getAthleteActivities } from '../utils/functions';
-import { authenticateWithStrava, catchErrors, useScreenShot } from '../utils/helpers';
+import { catchErrors, useScreenShot } from '../utils/helpers';
 import { formattedDate } from '../utils/conversion';
 import Login from './Login';
 import styled from 'styled-components';
@@ -20,18 +19,20 @@ const ActivitiesMap = () => {
 
   useEffect(() => {
     async function fetchData() {
-      const stravaAuthResponse = await authenticateWithStrava();
+      // const stravaAuthResponse = await authenticateWithStrava();
+      let access_token = JSON.parse(localStorage.getItem('access_token'));
       let polylines = [];
       let stravaActivityResponse;
       let looper_num = 1;
       // Looping until data is fetched from Strava API
       setLoading(true);
-      while (looper_num || stravaActivityResponse.length === 0) {
+      while (looper_num < 2) {
         let stravaActivityResponse_single = await getAthleteActivities(
-          stravaAuthResponse[0].data?.access_token,
-          200,
+          // stravaAuthResponse[0].data?.access_token,
+          access_token,
+          150,
           looper_num
-        );
+        ); //|| stravaActivityResponse.length === 0
         if (
           stravaActivityResponse_single.data.length === 0 ||
           stravaActivityResponse_single.data.errors
@@ -180,7 +181,7 @@ export default ActivitiesMap;
 
 const SideNavigation = styled.div`
   height: 100%;
-  margin-top: 100px;
+  margin-top: 120px;
   width: 230px;
   display: block;
   position: fixed;
@@ -202,6 +203,7 @@ const SideNavigation = styled.div`
     margin: 0px 0px 0px 5px;
     margin-bottom: 0.5em;
     border-radius: 0.5em;
+    margin-top: 15px;
     border: 1px solid white;
     padding: 5px;
     outline: none;
@@ -280,21 +282,80 @@ const SideNavigation = styled.div`
 
   @media screen and (max-width: 750px) {
     width: 150px;
-    font-size: 12px;
+    font-size: 10px;
     a {
       font-size: 12px;
       color: white;
     }
     .search__input {
-      width: 80%;
+      width: 75%;
       height: 20px;
+      font-size: 0.8rem;
       display: inline-block;
-      margin: 50px 5px 20px 15px;
-      margin-bottom: 20px;
+      margin: 20px 5px 20px 10px;
+      margin-bottom: 0px;
+      margin-top: 70px;
       border-radius: 5px;
       border: 1px solid #ccc;
       padding: 5px;
       outline: none;
+    }
+
+    .screenshot__button {
+      margin-left: 1.25vw;
+      margin-top: 15px;
+      margin-bottom: 10px;
+      width: 190px;
+      color: red;
+      font-size: 0.7rem;
+      font-weight: bold;
+      background-color: ghostwhite;
+      border: 2px solid white;
+      border-radius: 10px;
+      width: 120px;
+      height: 30px;
+    }
+  }
+
+  @media screen and (max-width: 450px) {
+    width: 150px;
+    font-size: 10px;
+    a {
+      font-size: 12px;
+      color: white;
+    }
+    .search__input {
+      width: 75%;
+      height: 20px;
+      font-size: 0.8rem;
+      display: inline-block;
+      margin: 20px 5px 20px 10px;
+      margin-bottom: 0px;
+      margin-top: 100px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+      padding: 5px;
+      outline: none;
+
+      .screenshot__button {
+        margin-left: 1.25vw;
+        margin-top: 19px;
+        margin-bottom: 10px;
+        width: 190px;
+        color: red;
+        font-size: 0.7rem;
+        font-weight: bold;
+        background-color: ghostwhite;
+        border: 2px solid white;
+        border-radius: 10px;
+        width: 120px;
+        height: 30px;
+      }
+      .screenshot__button:hover {
+        background-color: red;
+        color: white;
+        border: 2px solid red;
+      }
     }
   }
 `;
