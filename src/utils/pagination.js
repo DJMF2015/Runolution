@@ -6,7 +6,6 @@ import { ArrowLeft } from '@styled-icons/bootstrap/ArrowLeft';
 const Pagination = ({ onPageChange, pageIndex }) => {
   // previous
   const handleBackArrow = () => {
-    console.log(pageIndex);
     if (pageIndex === 1) {
       return onPageChange(1);
     }
@@ -50,21 +49,26 @@ const Pagination = ({ onPageChange, pageIndex }) => {
 };
 const ArrowIconRight = styled(ArrowRight)`
   color: black;
-  margin-left: 75vw;
-  margin-top: -5em;
-  margin-bottom: 2rem;
+  display: inline;
 `;
 const ArrowIconBack = styled(ArrowLeft)`
   color: black;
-  margin-left: 15vw;
-  margin-bottom: 1rem;
+  display: inline;
+  margin-left: 10rem;
 `;
 
 const Wrapper = styled.div`
+  background-color: ghostwhite;
+  position: relative;
+  margin-top: 1rem;
+  margin-left: 25rem;
+  gap: 20rem;
+  display: inline-flex;
+  flex-direction: row;
   ${ArrowIconRight} ,${ArrowIconBack} {
     &:hover,
     &:focus {
-      box-shadow: 0 10px 20px -5px rgba(0.7, 1, 1, 0.35);
+      box-shadow: 0 1px 10px -5px rgba(0.7, 1, 1, 0.35);
       border-radius: 100px;
       background-color: ghostwhite;
     }
