@@ -55,7 +55,6 @@ const getCurrentYear = () => {
 
 const formattedDate = (date) => {
   const formatted = date.split('T')[0];
-  console.log({ formatted });
   return formatted;
 };
 export {
