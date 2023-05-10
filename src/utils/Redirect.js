@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getExchangeCodeFromURL, getAccessToken } from './functions';
+import { getExchangeCodeFromURL, getAccessToken } from './helpers';
 const Redirect = () => {
   const navigate = useNavigate();
   const [payload, setPayload] = useState([]);
@@ -32,7 +32,7 @@ const Redirect = () => {
   });
 
   useEffect(() => {
-    if (payload && payload?.access_token) {
+    if (payload?.access_token) {
       navigate('/');
     }
   }, [payload, navigate]);
