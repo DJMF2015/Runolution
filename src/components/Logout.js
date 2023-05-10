@@ -39,22 +39,32 @@ const Logout = () => {
 };
 export default Logout;
 const StyledLoginButton = styled.a`
-  display: inline-block;
-  min-width: 100px;
+  display: inline;
+  min-width: 60px;
   background-color: #fc5200;
   height: 40px;
   width: 6%;
   text-align: center;
   margin-top: -7em;
+  margin-left: 15rem;
   line-height: 40px;
-  padding: 6px 12px;
+  padding: 20px 20px;
   font-size: 12px;
-  border-radius: 4px;
+  border-radius: 10px;
   color: #fff;
   font-weight: 700;
   &:hover,
   &:focus {
     text-decoration: none;
     filter: brightness(1.1);
+  }
+
+  @media (max-width: 768px) {
+    display: none;
+    margin-left: 0;
+  }
+  @media (max-width: 425px) {
+    display: none;
+    margin-left: 0;
   }
 `;
