@@ -14,25 +14,22 @@ const ActivitiesMap = () => {
   const [loading, setLoading] = useState(true);
   const [searchTxt, setSearchTxt] = useState('');
   const [activityLoadingState, setActivityLoadingState] = useState(null);
-
   const downloadScreenshot = () => takeScreenShot(ref.current).then(download);
 
   useEffect(() => {
     async function fetchData() {
-      // const stravaAuthResponse = await authenticateWithStrava();
       let access_token = JSON.parse(localStorage.getItem('access_token'));
       let polylines = [];
       let stravaActivityResponse;
       let looper_num = 1;
       // Looping until data is fetched from Strava API
       setLoading(true);
-      while (looper_num < 2) {
+      while (looper_num || stravaActivityResponse.length === 0) {
         let stravaActivityResponse_single = await getAthleteActivities(
-          // stravaAuthResponse[0].data?.access_token,
           access_token,
-          150,
+          200,
           looper_num
-        ); //|| stravaActivityResponse.length === 0
+        );
         if (
           stravaActivityResponse_single.data.length === 0 ||
           stravaActivityResponse_single.data.errors
@@ -91,7 +88,6 @@ const ActivitiesMap = () => {
       </div>
     );
 
-  console.log(nodes);
   return (
     <>
       {!nodes && nodes.length === 0 ? (
@@ -124,7 +120,13 @@ const ActivitiesMap = () => {
               ))}
           </SideNavigation>
 
-          <div ref={ref} style={{ height: '100vh', width: '100vw', zIndex: 0 }}>
+          <div
+            style={{
+              position: 'relative',
+              width: '100%',
+              height: '600px',
+            }}
+          >
             <MapContainer
               style={{ height: '100vh', width: '100vw', zIndex: 0 }}
               center={[55.89107, -3.21698]}
@@ -136,7 +138,7 @@ const ActivitiesMap = () => {
               scrollWheelZoom={true}
             >
               <TileLayer
-                attribution='Powered by <a href="https://www.geoapify.com/" target="_blank">Geoapify</a> | <a href="https://openmaptiles.org/" target="_blank">© OpenMapTiles</a> <a href="https://www.openstreetmap.org/copyright" target="_blank">© OpenStreetMap</a> contributors'
+                attribution='Powered by <a href="https://www.geoapify.com/" target="_blank">Geoapify</a> '
                 maxZoom={20}
                 id="osm-bright"
                 // url="https://maps.geoapify.com/v1/tile/maptiler-3d/{z}/{x}/{y}.png?apiKey=d94e4561c3c649a9bbf06a2ef3f445fb"
@@ -181,7 +183,7 @@ export default ActivitiesMap;
 
 const SideNavigation = styled.div`
   height: 100%;
-  margin-top: 120px;
+  margin-top: 80px;
   width: 230px;
   display: block;
   position: fixed;
@@ -292,9 +294,9 @@ const SideNavigation = styled.div`
       height: 20px;
       font-size: 0.8rem;
       display: inline-block;
-      margin: 20px 5px 20px 10px;
+      margin: 90px 5px 20px 10px;
       margin-bottom: 0px;
-      margin-top: 70px;
+      margin-top: 40px;
       border-radius: 5px;
       border: 1px solid #ccc;
       padding: 5px;
@@ -329,7 +331,7 @@ const SideNavigation = styled.div`
       height: 20px;
       font-size: 0.8rem;
       display: inline-block;
-      margin: 20px 5px 20px 10px;
+      margin: 40px 5px 20px 10px;
       margin-bottom: 0px;
       margin-top: 100px;
       border-radius: 5px;
