@@ -10,7 +10,6 @@ import {
   getMetresToFeet,
   getNoOfMtEverests,
   getUnitsWithCommas,
-  getCurrentYear,
 } from '../utils/conversion';
 const AthleteStats = () => {
   const [payload, setPayload] = useState([]);
@@ -41,76 +40,70 @@ const AthleteStats = () => {
     }
     fetchData();
   }, [payload]);
-  // if (error) return <h1>Something went wrong!</h1>;
   // if (!result) return <h1>Loading...</h1>;
   return (
     <div>
-      <h2
-        style={{
-          textAlign: 'center',
-          color: 'brown',
-        }}
-      >
-        {getCurrentYear()}
-      </h2>
-
       {/* check if user and user.data available before rendering */}
-      {user && user?.data ? (
-        <Wrapper>
-          <CardContainer>
-            <CardDetails>
-              <Image
-                src={payload?.payloadData?.athlete?.profile}
-                width={250}
-                height={300}
-                alt="DavidF"
-              />
-
-              <StatDetails>
-                <h3 style={{ color: '#FF4500' }}>All Time Total</h3>
-                {getKmsToMiles(user?.data?.all_run_totals?.distance)}
-              </StatDetails>
-              <StatDetails>
-                {getMilesToKms(user?.data?.all_run_totals?.distance)}
-              </StatDetails>
-              <StatDetails>{'Runs: ' + user?.data?.all_run_totals?.count} </StatDetails>
-              <StatDetails>
-                {getUnitsWithCommas(user?.data.all_run_totals.elevation_gain).concat(
-                  ' mtrs'
-                )}
-              </StatDetails>
-              <StatDetails>
-                {getMetresToFeet(user?.data.all_run_totals.elevation_gain)}
-              </StatDetails>
-              <StatDetails>
-                {'Mnt. Everests: ' +
-                  getNoOfMtEverests(user?.data.all_run_totals.elevation_gain)}
-              </StatDetails>
-              <StatDetails>
-                <h3 style={{ color: '#FF4500' }}>Year To Date</h3>
-                {getKmsToMiles(user?.data.ytd_run_totals.distance)}
-              </StatDetails>
-              <StatDetails>
-                {getMilesToKms(user?.data.ytd_run_totals.distance)}
-              </StatDetails>
-              <StatDetails>{'Runs: ' + user?.data.ytd_run_totals.count}</StatDetails>
-              <StatDetails>
-                {getUnitsWithCommas(user?.data.ytd_run_totals.elevation_gain).concat(
-                  ' mtrs'
-                )}
-              </StatDetails>
-              <StatDetails>
-                {'Mnt. Everests: ' +
-                  getNoOfMtEverests(user?.data.ytd_run_totals.elevation_gain)}
-              </StatDetails>
-              <StatDetails>
-                {getMetresToFeet(user?.data.ytd_run_totals.elevation_gain)}
-              </StatDetails>
-            </CardDetails>
-          </CardContainer>
-        </Wrapper>
-      ) : (
+      {!user?.data ? (
         <Login />
+      ) : (
+        <CardDetails>
+          <Header>
+            {payload?.payloadData?.athlete?.firstname +
+              ' ' +
+              payload?.payloadData?.athlete?.lastname +
+              ' | '}
+
+            {payload?.payloadData?.athlete?.city +
+              ' | ' +
+              payload?.payloadData?.athlete?.state}
+          </Header>
+
+          <Image
+            src={payload?.payloadData?.athlete?.profile}
+            width={250}
+            height={300}
+            alt="DavidF"
+          />
+
+          <h3 style={{ color: '#FF4500' }}>All Time Total</h3>
+          <h4>{getKmsToMiles(user?.data?.all_run_totals?.distance)}</h4>
+
+          <h4> {getMilesToKms(user?.data?.all_run_totals?.distance)}</h4>
+          <h4> {'Runs: ' + user?.data?.all_run_totals?.count}</h4>
+
+          <h4>
+            {' '}
+            {getUnitsWithCommas(user?.data.all_run_totals.elevation_gain).concat(' mtrs')}
+          </h4>
+
+          <h4>{getMetresToFeet(user?.data.all_run_totals.elevation_gain)}</h4>
+
+          <h4>
+            {' '}
+            {'Mnt. Everests: ' +
+              getNoOfMtEverests(user?.data.all_run_totals.elevation_gain)}
+          </h4>
+
+          <h3 style={{ color: '#FF4500' }}>Year To Date</h3>
+          <h4>{getKmsToMiles(user?.data.ytd_run_totals.distance)} </h4>
+
+          <h4> {getMilesToKms(user?.data.ytd_run_totals.distance)} </h4>
+          <h4> {'Runs: ' + user?.data.ytd_run_totals.count}</h4>
+
+          <h4>
+            {' '}
+            {getUnitsWithCommas(user?.data.ytd_run_totals.elevation_gain).concat(' mtrs')}
+          </h4>
+
+          <h4>
+            {' '}
+            {'Mnt. Everests: ' +
+              getNoOfMtEverests(user?.data.ytd_run_totals.elevation_gain)}
+          </h4>
+
+          <h4> {getMetresToFeet(user?.data.ytd_run_totals.elevation_gain)}</h4>
+        </CardDetails>
       )}
     </div>
   );
@@ -120,102 +113,76 @@ const Image = styled.img`
   max-width: 225px;
   object-fit: contain;
   position: relative;
-  margin-left: 10em;
+  margin-left: 1em;
+
   top: 1rem;
   ${mediaQueries('md')` 
  height: 150px;
  width: 250px;
    object-fit: contain;
   display: flex;
-  flex-shrink: 1; 
-  margin-top: 5rem;
+  flex-shrink: 1;  
   position: relative;
-  margin: 25px;
+  margin: 55px 25px 25px 25px;
+  margin-left: 5em;
 `}
-`;
 
-const CardContainer = styled.div`
-  position: relative;
-  margin: auto;
-  display: grid;
-  /* columns: 2; */
-  column-count: 2;
-  top: 2em;
-  padding: 20px;
-  color: #ffff;
-  background-color: ghostwhite;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  box-shadow: 10px 10px 25px -16px rgba(0, 0, 0, 0.75);
-  width: 50vw;
-  height: 90vh;
-  border-radius: 20px;
-  border: darkgrey solid;
-  ${mediaQueries('md')`  
-  position: relative;
-  text-align: left;
-  margin: auto; 
-  top: 0em;
-  padding: 20px;
-  color: #ffff;
-  background-color: ghostwhite;
-  width: 65vw;
-  height: 70vh;
-  border-radius: 20px;
-`}
-`;
-
-const StatDetails = styled.h4`
-  position: relative;
-  margin-left: -5em;
-  bottom: 20em;
-`;
-const Wrapper = styled.div`
-  display: grid;
-  /* columns: 2; */
-  column-count: 2;
-  ${CardContainer} {
-    cursor: pointer;
-    &:hover,
-    &:focus {
-      box-shadow: 0 10px 20px -5px rgba(5, 5, 0, 0.75);
-    }
-    ${mediaQueries('md')`  
-    width: 85vw;
-    height: 70vh;
-    border-radius: 20px;
-
-`}
-  }
-`;
-const CardDetails = styled.div`
-  display: inline-block;
-  color: black;
-  font-size: 18px;
-  margin-top: 4rem;
-  justify-content: center;
-  margin-left: 10rem;
-  margin-right: 10rem;
-  ${mediaQueries('md')` 
-  display: inline; 
-  justify-content: center; 
-   margin-left: 8rem;
-   font-size:.9rem; 
-  
-`}
-`;
-const Header = styled.div`
-  color: black;
-  margin-bottom: 4rem;
-  margin-left: 5rem;
-  font-size: 2em;
+  ${mediaQueries('lg')`
+  height: 150px;
+  width: 250px;
+  object-fit: contain;
   display: flex;
+  flex-shrink: 1; 
+  position: relative;
+  margin: 55px 25px 25px 25px;
+  margin-left: 5em;
+`}
+`;
+
+const CardDetails = styled.div`
+  display: flex;
+  flex-direction: column;
   align-items: center;
+  float: right;
+  margin-right: 1rem;
+  text-align: center;
+  color: black;
+  width: 40%;
+  margin-top: 1rem;
+  justify-content: center;
+  background-color: white;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+  border-radius: 5px;
+  /* padding: 1rem; */
+
+  h3 {
+    color: black;
+    margin: 0;
+  }
+  ${mediaQueries('md')`
+    display: inline-block;
+    margin-left: 1rem;
+    width: 40%;
+    font-size: 0.9rem;
+  `}
+
+  ${mediaQueries('lg')`
+    width: 30%;
+  `}
+`;
+
+const Header = styled.div`
+  color: red;
+  flex-wrap: wrap;
+  flex-direction: row;
+  align-items: left;
+  justify-content: left;
   ${mediaQueries('md')`
   color: black;
   font-weight: 200;
   display: flex;
   align-items: center;
   justify-content: space-between;
-`}
+`};
 `;
 export default AthleteStats;
