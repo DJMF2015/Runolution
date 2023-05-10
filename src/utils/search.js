@@ -1,5 +1,5 @@
 import React from 'react';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import styled from 'styled-components';
 const Search = ({ searchText, updateSearchTxt }) => {
   const [searchInput, setSearchTerm] = useState('');
@@ -28,10 +28,12 @@ const Search = ({ searchText, updateSearchTxt }) => {
 const SearchInput = styled.input`
   height: 3rem;
   font-size: 25px;
-  width: 80%;
+  background-color: ghostwhite;
+  width: 100%;
   border: 1px solid #aaa;
   border-radius: 4px;
   margin: 0 auto;
+  margin-top: 1rem;
   outline: none;
   padding: 8px;
   box-sizing: border-box;
@@ -42,13 +44,13 @@ const SearchInput = styled.input`
   cursor: pointer;
   margin-bottom: 1.5rem;
   &:hover {
-    /* border-color: black; */
     box-shadow: 5px 2px 7px 2px grey;
   }
 `;
 
 const StyledInput = styled.div`
-  &.inputWithIcon {
+  width: 100%;
+  / &.inputWithIcon {
     position: relative;
   }
 `;
