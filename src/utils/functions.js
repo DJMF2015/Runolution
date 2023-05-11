@@ -13,7 +13,6 @@ export const getAthleteStats = async (userId, accessToken) => {
 };
 
 export const getAthleteActivities = async (accessToken, per_page, index) => {
-  console.log('getAthleteActivities', accessToken, per_page, index);
   try {
     const response = await axios.get(
       `https://www.strava.com/api/v3/athlete/activities?per_page=${per_page}&page=${index}`,
@@ -63,18 +62,6 @@ export const getUsersClubActivities = async (clubId, accessToken) => {
   }
 };
 
-export const getAthleteRoutes = async (athleteId, accessToken) => {
-  try {
-    const response = await axios.get(
-      `https://www.strava.com/api/v3/athletes/${athleteId}/routes`,
-      { headers: { Authorization: `Bearer ${accessToken}` } }
-    );
-    return response;
-  } catch (error) {
-    console.log(error);
-  }
-};
-
 export const getAthleteRoutesByGPX = async (Id, accessToken) => {
   try {
     const response = await axios.get(
@@ -110,16 +97,6 @@ export const getCommentsByActivityId = async (activityId, accessToken) => {
     console.log(error);
   }
 };
-export const getUsersGearByGearId = async (gearId, accessToken) => {
-  try {
-    const response = await axios.get(`https://www.strava.com/api/v3/gear/${gearId}`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-    return response;
-  } catch (error) {
-    console.log(error);
-  }
-};
 
 export const getUserActivityLaps = async (activityId, accessToken) => {
   try {
@@ -127,17 +104,6 @@ export const getUserActivityLaps = async (activityId, accessToken) => {
       `https://www.strava.com/api/v3/activities/${activityId}/laps`,
       { headers: { Authorization: `Bearer ${accessToken}` } }
     );
-    return response;
-  } catch (error) {
-    console.log(error);
-  }
-};
-
-export const getAthleteZones = async (accessToken) => {
-  try {
-    const response = await axios.get(`https://www.strava.com/api/v3/athlete/zones`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
     return response;
   } catch (error) {
     console.log(error);
