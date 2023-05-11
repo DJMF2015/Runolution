@@ -113,9 +113,8 @@ const Image = styled.img`
   max-width: 225px;
   object-fit: contain;
   position: relative;
-  margin-left: 1em;
-
-  top: 1rem;
+  margin: 1rem 2rem -1rem 3rem;
+  margin-top: -2rem;
   ${mediaQueries('md')` 
  height: 150px;
  width: 250px;
@@ -140,24 +139,28 @@ const Image = styled.img`
 `;
 
 const CardDetails = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-gap: 0.3rem;
+  position: sticky;
   float: right;
-  margin-right: 1rem;
-  text-align: center;
+  margin-right: -20rem;
+  text-align: left;
   color: black;
-  width: 40%;
+  width: 30%;
   margin-top: 1rem;
   justify-content: center;
   background-color: white;
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
   border-radius: 5px;
-  /* padding: 1rem; */
+  padding: 0.5rem 0rem 0rem 1rem;
 
   h3 {
     color: black;
-    margin: 0;
+    margin: 1rem 2rem 1rem 3rem;
+  }
+  h4 {
+    margin: 1rem 2rem 1rem 3rem;
   }
   ${mediaQueries('md')`
     display: inline-block;
@@ -175,7 +178,10 @@ const Header = styled.div`
   color: red;
   flex-wrap: wrap;
   flex-direction: row;
+  font-size: 1.25rem;
   align-items: left;
+  margin: 1rem 2rem 1rem 3rem;
+  margin-top: 2em;
   justify-content: left;
   ${mediaQueries('md')`
   color: black;
