@@ -6,10 +6,10 @@ import Pagination from '../utils/pagination';
 import { catchErrors } from '../utils/helpers';
 import { ArrowUpCircleFill } from '@styled-icons/bootstrap/ArrowUpCircleFill';
 import { getKmsToMiles, getSecondstoMinutes, formattedDate } from '../utils/conversion';
-import DropDown from '../components/ActivityDropDown';
 import polyline from '@mapbox/polyline';
 import Login from './Login';
 import Profile from './AthleteStats';
+import Navbar from '../components/MobileNav';
 import Search from '../utils/search';
 import '../App.css';
 import { Link } from 'react-router-dom';
@@ -22,7 +22,7 @@ const AthleteActivities = () => {
   const [searchTxt, setSearchTxt] = useState('');
   const [pageIndex, setPageIndex] = useState(1);
   const [loading, setLoading] = useState(false);
-  // const [selectedName, setFilteredName] = useState(null);
+  const [totalpages, setTotalPages] = useState(0);
   const [nodes, setNodes] = useState([]);
 
   useEffect(() => {
@@ -35,7 +35,7 @@ const AthleteActivities = () => {
     async function fetchData() {
       if (payload && pageIndex) {
         setLoading(true);
-        await getAthleteActivities(payload, 50, pageIndex).then((response) => {
+        await getAthleteActivities(payload, 150, pageIndex).then((response) => {
           setActivities(response.data);
         });
       }
@@ -56,22 +56,13 @@ const AthleteActivities = () => {
           activityName: activityName,
         });
       }
+      setTotalPages(activities.length);
       setNodes(polylines);
       setLoading(false);
     }
     catchErrors(fetchData());
   }, [activities]);
-  console.log({ nodes });
 
-  // if (selectedName) {
-  //   filteredName = activities.filter((activity, i) => activity.name === selectedName);
-  //   console.log(filteredName);
-  // } else {
-  //   filteredName = activities;
-  // }
-  // map activity coordinates to GeoJSON from [0][1] to [1][0]
-  // const mapCoordinates = nodes.flatMap((node) => node.activityPositions.coordinates);
-  // console.log({ mapCoordinates });
   const toggleVisibility = () => {
     if (window.pageYOffset > 300) {
       setIsVisible(true);
@@ -98,17 +89,21 @@ const AthleteActivities = () => {
   });
 
   if (!activities) return <Suspense fallback={<div>loading...</div>}></Suspense>;
-  console.log(activities);
+
   return (
     <>
-      {/* <Pagination
-        pageIndex={pageIndex}
-        onPageChange={(currentPage) => setPageIndex(currentPage)}
-      /> */}
       {!payload && <Login />}
-      {payload && <Profile />}
-      {/* <DropDown setFilteredName={setFilteredName} result={activities} /> */}
-
+      {payload && (
+        <>
+          <Navbar />
+          <Profile />
+        </>
+      )}
+      {/* <Pagination
+            totalPages={totalpages}
+            pageIndex={pageIndex}
+            onPageChange={(currentPage) => setPageIndex(currentPage)}
+          /> */}
       {isVisible && (
         <div onClick={scrollToTop}>
           <ScrollToTop alt="Go to top"></ScrollToTop>
@@ -165,7 +160,6 @@ const SideNavigation = styled.div`
   height: 100%;
   width: 250px;
   font-size: 0.8rem;
-
   padding: 10px;
   display: block;
   position: fixed;
@@ -226,11 +220,12 @@ const SideNavigation = styled.div`
 `;
 
 const CardDetails = styled.div`
-  display: inline-flex;
+  display: flex;
+  flex-direction: row;
   flex-wrap: wrap;
   margin-left: 250px;
   justify-content: center;
-  max-width: 40vw;
+  max-width: 59vw;
   /* margin-top: -20px; */
   background-color: ghostwhite;
   position: relative;
