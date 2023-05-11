@@ -20,9 +20,9 @@ Clone the repository and install its dependencies running:
     Note: after being directed to the Strava login you will be asked to authorise the application
 
 <p align="left">
-  <img src="heatmap.png"  title="activity">
+  <img src="heatmap.png"  title="heatmap">
 
-  <img src="activity.png"  title="heatmap">
+  <img src="activity.png"  title="activity">
  
 </p>
 
