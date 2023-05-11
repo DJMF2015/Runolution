@@ -1,13 +1,8 @@
-import React, { createRef, useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { ArrowUpCircleFill } from '@styled-icons/bootstrap/ArrowUpCircleFill';
 import styled from 'styled-components';
-import {
-  getSufferScore,
-  getMilesToKms,
-  getMetresToFeet,
-  formattedDate,
-} from '../utils/conversion';
+import { getSufferScore, getMilesToKms, getMetresToFeet } from '../utils/conversion';
 
 import 'mapbox-gl/dist/mapbox-gl.css';
 import Map, {
@@ -39,8 +34,7 @@ export default function Activity() {
 
   const accessToken = localStorage.getItem('access_token');
   const token = JSON.parse(accessToken);
-  const TOKEN =
-    'pk.eyJ1IjoiZGptZjIwMTUiLCJhIjoiY2p1YjE2emV2MDgwazQ0cGlwZm91OXdmNSJ9.jTBvVcPyilJhSuAPsX_rmw';
+  const TOKEN = process.env.REACT_APP_MAPBOX_KEY;
 
   const map = useRef();
   useEffect(() => {
@@ -114,11 +108,8 @@ export default function Activity() {
       coordinates: mapCoordinates,
     },
   };
-  // animate a white dash along the path of the route to show the route
-  // console.log({ detailedActivity });
   return (
     <>
-      {/* <ScrollToTop /> */}
       {isVisible && (
         <div onClick={scrollToTop}>
           <ScrollToTop alt="Go to top"></ScrollToTop>
@@ -134,7 +125,7 @@ export default function Activity() {
               </Link>
             </LinkText>
             <LinkText>
-              <Link style={{ color: 'white' }} to="/activities">
+              <Link style={{ color: 'white' }} to="/">
                 Go Back
               </Link>
             </LinkText>
@@ -190,7 +181,6 @@ export default function Activity() {
         </SideNavigation>
         <div
           style={{
-            // position: 'relative',
             width: '99vw',
             height: '100vh',
             border: '1px solid black',
