@@ -1,6 +1,6 @@
 import { Outlet, Link } from 'react-router-dom';
 // import LogoutButton from '../components/Logout';
-import '../App.css';
+import '../styles/Nav.module.css';
 const Layout = () => {
   return (
     <>

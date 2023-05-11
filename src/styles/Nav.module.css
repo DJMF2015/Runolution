@@ -1,0 +1,39 @@
+ nav {
+
+     justify-content: space-between;
+     align-items: right;
+     background-color: black;
+     border-bottom: 1px solid #e7e7e7;
+     padding: 1rem;
+     position: sticky;
+     opacity: 0.7;
+     top: 0;
+     max-height: 9vh;
+     z-index: 2;
+ }
+
+ ul {
+     list-style-type: none;
+     margin: 0;
+     background-color: black;
+     text-align: right;
+     align-items: right;
+     max-height: 10vh;
+     overflow: hidden;
+ }
+
+ li {
+     display: inline;
+ }
+
+ li a {
+     display: inline-flex;
+     gap: 1rem;
+
+     font: bold 18px sans-serif;
+     color: white;
+     text-align: right;
+     font-family: Verdana, Geneva, Tahoma, sans-serif;
+     margin: 10px 100px;
+     text-decoration: none;
+ }
