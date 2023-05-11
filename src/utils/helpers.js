@@ -1,6 +1,6 @@
 import axios from 'axios';
-import * as htmlToImage from 'html-to-image';
-import { client_secret, client_id, refresh_token, auth_link } from './config';
+
+// get exchange code from URL to retrieve the access token
 export const getExchangeCodeFromURL = (token) => {
   if (token && window.location.href.includes('code')) {
     const authToken = window.location.href.split('=code')[0].split('&')[1].split('=')[1];
@@ -8,6 +8,7 @@ export const getExchangeCodeFromURL = (token) => {
   }
 };
 
+// get access token from local storage if it exists and is not expired and set to local storage
 export const getAccessToken = async (authCode) => {
   try {
     const response = await axios.post(
@@ -22,6 +23,11 @@ export const getAccessToken = async (authCode) => {
   }
 };
 
+/**
+ *
+ * @param { json array} payload  an async function
+ * @returns {function}
+ */
 const storePayloadToLocalStorage = (payload) => {
   const keysToStore = {
     payload,
@@ -37,16 +43,6 @@ const storePayloadToLocalStorage = (payload) => {
   });
 };
 
-//
-export async function authenticateWithStrava() {
-  const authResponse = await Promise.all([
-    axios.post(
-      `${auth_link}?client_id=${client_id}&client_secret=${client_secret}&refresh_token=${refresh_token}&grant_type=refresh_token`
-    ),
-  ]);
-  return authResponse;
-}
-
 /**
  * Higher-order function for async/await error handling
  * @param {function} fn an async function
@@ -58,29 +54,4 @@ export const catchErrors = (fn) => {
       console.error(err);
     });
   };
-};
-
-const createFileName = (extension = '', ...names) => {
-  if (!extension) {
-    return '';
-  }
-
-  return `${names.join('')}.${extension}`;
-};
-
-export const useScreenShot = (node) => {
-  const takeScreenShot = async (node) => {
-    const dataURI = await htmlToImage.toJpeg(node);
-    return dataURI;
-  };
-
-  const download = (image, { name = 'img', extension = 'jpg' } = {}) => {
-    const a = document.createElement('a');
-    a.href = image;
-    a.download = createFileName(extension, name);
-    a.click();
-  };
-
-  return { takeScreenShot, download };
-  // const downloadScreenshot = () => takeScreenShot(ref.current).then(download);
 };
