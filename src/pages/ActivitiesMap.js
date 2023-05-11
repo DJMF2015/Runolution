@@ -1,10 +1,13 @@
 import React, { useState, useEffect, createRef } from 'react';
 import polyline from '@mapbox/polyline';
 import { getAthleteActivities } from '../utils/functions';
-import { catchErrors, useScreenShot } from '../utils/helpers';
+import * as htmlToImage from 'html-to-image';
+import { useScreenShot } from '../utils/hooks';
+import { catchErrors } from '../utils/helpers';
 import { formattedDate } from '../utils/conversion';
 import Login from './Login';
 import styled from 'styled-components';
+import LoadingWheel from '../styles/Loading.module.css';
 import { MapContainer, TileLayer, FeatureGroup, Polyline, Popup } from 'react-leaflet';
 
 const ActivitiesMap = () => {
@@ -29,7 +32,7 @@ const ActivitiesMap = () => {
           access_token,
           200,
           looper_num
-        );
+        ); //|| stravaActivityResponse.length === 0
         if (
           stravaActivityResponse_single.data.length === 0 ||
           stravaActivityResponse_single.data.errors
@@ -78,6 +81,7 @@ const ActivitiesMap = () => {
       <div style={{ body: 'black' }}>
         <h1 style={{ color: 'red', textAlign: 'center' }}>
           Wait - Plotting {activityLoadingState} activities...
+          <div className={LoadingWheel.loading}>...</div>
         </h1>
       </div>
     );
@@ -119,7 +123,6 @@ const ActivitiesMap = () => {
                 </a>
               ))}
           </SideNavigation>
-
           <div
             style={{
               position: 'relative',
