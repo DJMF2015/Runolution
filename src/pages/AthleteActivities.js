@@ -24,10 +24,7 @@ const AthleteActivities = () => {
   const [searchTxt, setSearchTxt] = useState('');
   const [pageIndex, setPageIndex] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [totalpages, setTotalPages] = useState(0);
   const [nodes, setNodes] = useState([]);
-  const [isSelected, setIsSelected] = useState(false);
-  const [fileSelected, setFileSelected] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem('access_token');
@@ -47,25 +44,43 @@ const AthleteActivities = () => {
   //   catchErrors(fetchData());
   // }, [payload, pageIndex]);
 
-  const fetchData = useCallback(async () => {
+  const fetchMoreData = useCallback(async () => {
     setLoading(true);
     try {
-      if (payload && pageIndex) {
-        const response = await getAthleteActivities(payload, 150, pageIndex); // fetch data from strava api
-        const newData = response.data || []; // get data from response
+      if (payload) {
+        const response = await getAthleteActivities(payload, 200, pageIndex); // fetch data from strava api
+        if (response.data.length === 0) {
+          //store activities in local storage for later retrieveal in activity details page
+          localStorage.setItem('activities', JSON.stringify(activities));
+          // if no data is returned, stop fetching
+          return;
+        }
+        const newData = response.data || [];
         setActivities((prevItems) => [...prevItems, ...newData]); // append new data to old data array in state variable
+        // store activities in local storage for later retrieveal in activity details page
       }
       setPageIndex((prevPage) => prevPage + 1); // increment page index
     } catch (error) {
-      catchErrors(error); // catch errors
+      catchErrors(error);
     } finally {
       setLoading(false);
     }
   }, [payload, pageIndex]);
-  // // useeffect to fetch data from strava api but prevent infinite loop
+
+  // useEffect(() => {
+
+  // if no data is returned, stop fetching
+  // const data = localStorage.setItem('activities', JSON.stringify(activities));
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    const data = localStorage.getItem('activities');
+    if (data) {
+      setActivities(JSON.parse(data));
+    } else {
+      fetchMoreData();
+    }
+  }, []);
+  // store activities in local storage for later retrieveal in activity details page
+  // check if activities in localstorage and use them, otherwise call fetchMoreData
 
   useEffect(() => {
     setLoading(true);
@@ -88,7 +103,6 @@ const AthleteActivities = () => {
           activityName: activityName,
         });
       }
-      setTotalPages(activities.length);
       setNodes(polylines);
       setLoading(false);
     }
@@ -102,22 +116,6 @@ const AthleteActivities = () => {
       setIsVisible(false);
     }
   };
-  // for infinite scrolling of activities
-  const handleScroll = () => {
-    if (
-      window.innerHeight + document.documentElement.scrollTop !==
-        document.documentElement.offsetHeight || //
-      loading
-    ) {
-      return;
-    }
-    fetchData();
-  };
-
-  useEffect(() => {
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [loading]);
   // Set top coordinate to 0
   // for smooth scrolling
   const scrollToTop = () => {
@@ -130,6 +128,8 @@ const AthleteActivities = () => {
   useEffect(() => {
     window.addEventListener('scroll', toggleVisibility);
   }, []);
+
+  // if activities are not in localstroage then storage them
 
   const filteredName = activities.filter((activity) => {
     return activity.name.toLowerCase().includes(searchTxt.toLowerCase());
@@ -165,26 +165,43 @@ const AthleteActivities = () => {
         </div>
       )}
       <SideNavigation>
-        {/* <button onClick={fetchData}>Load More</button> */}
-
         <Search searchTxt={searchTxt} updateSearchTxt={setSearchTxt} />
-
-        {filteredName.map((activity, i) => (
-          <>
-            <div key={i}>
-              <Link
-                style={{ color: 'white' }}
-                to="/testcard"
-                state={{ from: activity }}
-                key={`${activity.id}--${activity.moving_time}--${activity.average_heartrate}`}
-              >
-                <h2>
-                  {i + 1}. {activity.name}
-                </h2>
-              </Link>
-            </div>
-          </>
-        ))}
+        {/* check if activities are in local storage and use them, otherwise call fetchMoreData */}
+        {JSON.parse(localStorage.getItem('activities')) ? (
+          <div>
+            {filteredName.map((activity, i) => (
+              <div key={i}>
+                <Link
+                  style={{ color: 'white' }}
+                  to="/testcard"
+                  state={{ from: activity }}
+                  key={`${activity.id}--${activity.moving_time}--${activity.average_heartrate}`}
+                >
+                  <h2>
+                    {i + 1}. {activity.name}
+                  </h2>
+                </Link>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div>
+            {filteredName.map((activity, i) => (
+              <div key={i}>
+                <Link
+                  style={{ color: 'white' }}
+                  to="/testcard"
+                  state={{ from: activity }}
+                  key={`${activity.id}--${activity.moving_time}--${activity.average_heartrate}`}
+                >
+                  <h2>
+                    {i + 1}. {activity.name}
+                  </h2>
+                </Link>
+              </div>
+            ))}
+          </div>
+        )}
       </SideNavigation>
 
       <CardDetails>
