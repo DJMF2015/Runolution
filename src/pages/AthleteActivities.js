@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { mediaQueries } from '../utils/mediaQueries';
-import { getAthleteActivities, getDetailedAthleteData } from '../utils/functions';
-import { getNewAccessToken } from '../utils/helpers';
+import { getAthleteActivities } from '../utils/functions';
+import { checkIfTokenExpired } from '../utils/helpers';
+import { useGetWindowWidth } from '../utils/hooks';
 import { catchErrors } from '../utils/helpers';
 import LoadingWheel from '../styles/Loading.module.css';
 import { ArrowUpCircleFill } from '@styled-icons/bootstrap/ArrowUpCircleFill';
@@ -17,7 +17,6 @@ import { Link } from 'react-router-dom';
 import AthleteStats from './AthleteStats';
 
 const AthleteActivities = () => {
-  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
   const [payload, setPayload] = useState([]);
   const [activities, setActivities] = useState([]);
   const [isVisible, setIsVisible] = useState(false);
@@ -26,9 +25,7 @@ const AthleteActivities = () => {
   const [pageIndex, setPageIndex] = useState(1);
   const [loading, setLoading] = useState(false);
   const [nodes, setNodes] = useState([]);
-
-  const mapboxApiUrl =
-    'https://api.mapbox.com/styles/v1/mapbox/light-v10/static/path-3+ff0000(kdfuIvujRADDNX`@N^b@l@^p@VZ~@~AZb@z@v@Zl@PNp@z@J@^Mh@GKXQvAW^CxA]b@Gr@Ud@E`@MzAKn@MTAf@L^Br@JZNh@Lr@ZVRVf@Hf@BhCH`AXfBTbA^nAPtA@l@AzAIdCClCAJM`@u@vA_@x@g@hB_@jAg@lBWr@e@n@IFII?z@Lz@TbARn@v@hDt@vDHl@jAp@rDv@nDHn@\fBXnBRnAv@bGXrBRlAl@xC`@zAZxAp@bEl@zCRpAr@vCPtAX|Ap@~CVz@Ff@ZrAtAbHXbAV~A`@tBd@zBbA~Dx@vD|@zCj@|BRbAhBjGvA`E@VM~BEXs@lBa@x@o@`BOVMDG?EEM_@mAqGY{@YsA_aDMkBKw@a@{AQu@YuCs@wDMmAKiBKm@Y{CM}@UaCu@{DIq@WsAU{AIaAqAyHQeB]wBa@wBm@{BKo@AON_AFUZa@Pi@r@aC^eB`@yAs@VY^]JOHU@UCwBFcB?_EGk@i@aCEk@[{AMqAK_CEYUi@QU_Ak@]EIEs@OeAMOEs@AaAHo@NaBRSHIHUDYHU?UFGAMHU@EJKFe@D}@NSF}BZME[YcBeCe@g@kAkBa@w@eA_Bc@i@USMBm@|@YTmAVi@?y@JK@AA)/auto/400x200?access_token=pk.eyJ1IjoiZGptZjIwMTUiLCJhIjoiY2xoZW5qbjN6MDBnNzNydGUzZzByd201ZiJ9._GLfwhRi2H3__7Hb1ZQAow';
+  const { windowWidth } = useGetWindowWidth();
   useEffect(() => {
     const token = localStorage.getItem('access_token');
     const accessToken = JSON.parse(token);
@@ -46,16 +43,9 @@ const AthleteActivities = () => {
   //   }
   //   catchErrors(fetchData());
   // }, [payload, pageIndex]);
-
   useEffect(() => {
-    const handleResize = () => {
-      setWindowWidth(window.innerWidth);
-    };
-
-    window.addEventListener('resize', handleResize);
-
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+    checkIfTokenExpired();
+  });
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -85,21 +75,6 @@ const AthleteActivities = () => {
       catchErrors(fetchData());
     }
   }, [fetchData]);
-
-  useEffect(() => {
-    async function checkIfTokenExpired() {
-      const expires_at = localStorage.getItem('expires_at');
-      const expires_in = localStorage.getItem('expires_in');
-      if (expires_in && expires_at) {
-        const timeElapsed = Date.now() - expires_at;
-        if (timeElapsed / 1000 > expires_in) {
-          const res = await getNewAccessToken();
-          // navigate('/login');
-        }
-      }
-    }
-    checkIfTokenExpired();
-  });
 
   useEffect(() => {
     setLoading(true);
