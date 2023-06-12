@@ -1,42 +1,52 @@
-import React, { useState, useEffect, createRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import polyline from '@mapbox/polyline';
 import { getAthleteActivities } from '../utils/functions';
-import * as htmlToImage from 'html-to-image';
-import { useScreenShot } from '../utils/hooks';
 import { catchErrors } from '../utils/helpers';
 import { formattedDate } from '../utils/conversion';
 import Login from './Login';
 import styled from 'styled-components';
+import SearchBar from '../utils/search';
+import Layers from '../components/layers';
+import { useGetWindowWidth } from '../utils/hooks';
 import LoadingWheel from '../styles/Loading.module.css';
-import { MapContainer, TileLayer, FeatureGroup, Polyline, Popup } from 'react-leaflet';
+import {
+  MapContainer,
+  TileLayer,
+  FeatureGroup,
+  LayersControl,
+  Polyline,
+  Popup,
+} from 'react-leaflet';
 
 const ActivitiesMap = () => {
-  const ref = createRef(null);
-  const { takeScreenShot, download } = useScreenShot(ref);
   const [nodes, setNodes] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [searchTxt, setSearchTxt] = useState('');
+  const { windowWidth } = useGetWindowWidth();
   const [activityLoadingState, setActivityLoadingState] = useState(null);
-  const downloadScreenshot = () => takeScreenShot(ref.current).then(download);
+  const expires_in = localStorage.getItem('expires_in');
+  let access_token = JSON.parse(localStorage.getItem('access_token'));
 
   useEffect(() => {
+    setLoading(true);
     async function fetchData() {
-      let access_token = JSON.parse(localStorage.getItem('access_token'));
       let polylines = [];
       let stravaActivityResponse;
       let looper_num = 1;
-      // Looping until data is fetched from Strava API
+
       setLoading(true);
-      while (looper_num || stravaActivityResponse.length === 0) {
+      while (looper_num < 2) {
         let stravaActivityResponse_single = await getAthleteActivities(
           access_token,
           200,
           looper_num
         ); //|| stravaActivityResponse.length === 0
         if (
+          !stravaActivityResponse_single.data ||
           stravaActivityResponse_single.data.length === 0 ||
           stravaActivityResponse_single.data.errors
         ) {
+          setLoading(false);
           break;
         } else if (stravaActivityResponse) {
           setActivityLoadingState(stravaActivityResponse.length);
@@ -65,9 +75,9 @@ const ActivitiesMap = () => {
         });
       }
       setLoading(false);
+
       setNodes(polylines);
     }
-
     catchErrors(fetchData());
     // eslint-disable-next-line
   }, []);
@@ -76,25 +86,22 @@ const ActivitiesMap = () => {
     return activity.activityName.toLowerCase().includes(searchTxt.toLowerCase());
   });
 
-  if (loading)
+  if (loading && access_token) {
     return (
-      <div style={{ body: 'black' }}>
+      <div>
         <h1 style={{ color: 'red', textAlign: 'center' }}>
-          Wait - Plotting {activityLoadingState} activities...
-          <div className={LoadingWheel.loading}>...</div>
+          <div className={LoadingWheel.loading} style={{ color: 'darkorange' }}>
+            ...
+          </div>
+          Wait. Loading {activityLoadingState} activities......
         </h1>
       </div>
     );
-  if (!nodes && nodes.length === 0)
-    return (
-      <div style={{ body: 'black' }}>
-        <h1 style={{ color: 'red', textAlign: 'center' }}>Please login to Strava</h1>
-      </div>
-    );
+  }
 
   return (
     <>
-      {!nodes && nodes.length === 0 ? (
+      {!access_token || expires_in === '0' ? (
         <Login />
       ) : (
         <>
@@ -106,9 +113,7 @@ const ActivitiesMap = () => {
               aria-label="Search"
               onChange={(e) => setSearchTxt(e.target.value)}
             />
-            <button className="screenshot__button" onClick={downloadScreenshot}>
-              Download screenshot
-            </button>
+
             {filteredName &&
               filteredName.map((activity, i) => (
                 <a
@@ -123,6 +128,15 @@ const ActivitiesMap = () => {
                 </a>
               ))}
           </SideNavigation>
+          {windowWidth < 785 && (
+            <SearchBar
+              searchTxt={searchTxt}
+              updateSearchTxt={setSearchTxt}
+              width={'75%'}
+              fontSize="1rem"
+              placeholder="Search by activity name..."
+            />
+          )}
           <div
             style={{
               position: 'relative',
@@ -137,44 +151,49 @@ const ActivitiesMap = () => {
               zoomControl={false}
               bounds={nodes.map((node) => node.activityPositions)} //
               boundsOptions={{ padding: [50, 50] }}
-              maxBoundsViscosity={1.0}
+              maxBoundsViscosity={0}
               scrollWheelZoom={true}
             >
-              <TileLayer
-                attribution='Powered by <a href="https://www.geoapify.com/" target="_blank">Geoapify</a> '
-                maxZoom={20}
-                id="osm-bright"
-                // url="https://maps.geoapify.com/v1/tile/maptiler-3d/{z}/{x}/{y}.png?apiKey=d94e4561c3c649a9bbf06a2ef3f445fb"
-                url="https://maps.geoapify.com/v1/tile/dark-matter-brown/{z}/{x}/{y}.png?apiKey=d94e4561c3c649a9bbf06a2ef3f445fb"
-              />
-
-              {filteredName &&
-                filteredName.map((activity, i) => (
-                  <div>
-                    <FeatureGroup>
-                      <Polyline
-                        positions={activity.activityPositions}
-                        key={i}
-                        weight={3}
-                        color="red"
-                        smoothFactor={0.7}
-                        vectorEffect="non-scaling-stroke"
-                        opacity={0.5}
-                        zoom={12}
-                      />
-                      <Popup>
-                        {activity.activityName + ' ' + activity.activityDate}{' '}
-                        <a
-                          href={`https://www.strava.com/activities/${activity.activityId}`}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          View on Strava
-                        </a>
-                      </Popup>
-                    </FeatureGroup>
-                  </div>
-                ))}
+              <LayersControl position="topright" collapsed={false}>
+                {Layers.map((layer, index) => {
+                  return (
+                    <LayersControl.BaseLayer
+                      key={index}
+                      checked={index === 0 ? true : false}
+                      name={layer.name}
+                    >
+                      <TileLayer attribution={layer.attribution} url={layer.url} />
+                    </LayersControl.BaseLayer>
+                  );
+                })}
+                {filteredName &&
+                  filteredName.map((activity, i) => (
+                    <div>
+                      <FeatureGroup>
+                        <Polyline
+                          positions={activity.activityPositions}
+                          key={i}
+                          weight={3}
+                          color="red"
+                          smoothFactor={0.7}
+                          vectorEffect="non-scaling-stroke"
+                          opacity={0.5}
+                          zoom={12}
+                        />
+                        <Popup>
+                          {activity.activityName + ' ' + activity.activityDate}{' '}
+                          <a
+                            href={`https://www.strava.com/activities/${activity.activityId}`}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            View on Strava
+                          </a>
+                        </Popup>
+                      </FeatureGroup>
+                    </div>
+                  ))}
+              </LayersControl>
             </MapContainer>
           </div>
         </>
@@ -186,7 +205,7 @@ export default ActivitiesMap;
 
 const SideNavigation = styled.div`
   height: 100%;
-  margin-top: 80px;
+  margin-top: 40px;
   width: 230px;
   display: block;
   position: fixed;
@@ -200,6 +219,10 @@ const SideNavigation = styled.div`
   opacity: 0.8;
   color: white;
 
+  @media screen and (max-width: 785px) {
+    display: none;
+  }
+
   .search__input {
     width: 90%;
     height: 20px;
@@ -208,7 +231,7 @@ const SideNavigation = styled.div`
     margin: 0px 0px 0px 5px;
     margin-bottom: 0.5em;
     border-radius: 0.5em;
-    margin-top: 15px;
+    margin-top: 10px;
     border: 1px solid white;
     padding: 5px;
     outline: none;
@@ -285,8 +308,9 @@ const SideNavigation = styled.div`
     text-decoration: underline;
   }
 
-  @media screen and (max-width: 750px) {
+  /* @media screen and (max-width: 750px) {
     width: 150px;
+    display: block;
     font-size: 10px;
     a {
       font-size: 12px;
@@ -320,10 +344,11 @@ const SideNavigation = styled.div`
       width: 120px;
       height: 30px;
     }
-  }
+  } */
 
-  @media screen and (max-width: 450px) {
-    width: 150px;
+  /* @media screen and (max-width: 450px) {
+ 
+    display: none;
     font-size: 10px;
     a {
       font-size: 12px;
@@ -361,6 +386,6 @@ const SideNavigation = styled.div`
         color: white;
         border: 2px solid red;
       }
-    }
-  }
+    } */
+  /* } */
 `;
