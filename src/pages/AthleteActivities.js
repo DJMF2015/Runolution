@@ -1,22 +1,23 @@
-import React, { Suspense, useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { mediaQueries } from '../utils/mediaQueries';
-import { getAthleteActivities } from '../utils/functions';
-import Pagination from '../utils/pagination';
-import axios from 'axios';
+import { getAthleteActivities, getDetailedAthleteData } from '../utils/functions';
+import { getNewAccessToken } from '../utils/helpers';
 import { catchErrors } from '../utils/helpers';
 import LoadingWheel from '../styles/Loading.module.css';
 import { ArrowUpCircleFill } from '@styled-icons/bootstrap/ArrowUpCircleFill';
 import { getKmsToMiles, getSecondstoMinutes, formattedDate } from '../utils/conversion';
 import polyline from '@mapbox/polyline';
 import Login from './Login';
-import Profile from './AthleteStats';
-import Navbar from '../components/MobileNav';
+import AthleteProfile from './Profile';
 import Search from '../utils/search';
 import '../App.css';
 import { Link } from 'react-router-dom';
+import AthleteStats from './AthleteStats';
 
 const AthleteActivities = () => {
+  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
   const [payload, setPayload] = useState([]);
   const [activities, setActivities] = useState([]);
   const [isVisible, setIsVisible] = useState(false);
@@ -26,6 +27,8 @@ const AthleteActivities = () => {
   const [loading, setLoading] = useState(false);
   const [nodes, setNodes] = useState([]);
 
+  const mapboxApiUrl =
+    'https://api.mapbox.com/styles/v1/mapbox/light-v10/static/path-3+ff0000(kdfuIvujRADDNX`@N^b@l@^p@VZ~@~AZb@z@v@Zl@PNp@z@J@^Mh@GKXQvAW^CxA]b@Gr@Ud@E`@MzAKn@MTAf@L^Br@JZNh@Lr@ZVRVf@Hf@BhCH`AXfBTbA^nAPtA@l@AzAIdCClCAJM`@u@vA_@x@g@hB_@jAg@lBWr@e@n@IFII?z@Lz@TbARn@v@hDt@vDHl@jAp@rDv@nDHn@\fBXnBRnAv@bGXrBRlAl@xC`@zAZxAp@bEl@zCRpAr@vCPtAX|Ap@~CVz@Ff@ZrAtAbHXbAV~A`@tBd@zBbA~Dx@vD|@zCj@|BRbAhBjGvA`E@VM~BEXs@lBa@x@o@`BOVMDG?EEM_@mAqGY{@YsA_aDMkBKw@a@{AQu@YuCs@wDMmAKiBKm@Y{CM}@UaCu@{DIq@WsAU{AIaAqAyHQeB]wBa@wBm@{BKo@AON_AFUZa@Pi@r@aC^eB`@yAs@VY^]JOHU@UCwBFcB?_EGk@i@aCEk@[{AMqAK_CEYUi@QU_Ak@]EIEs@OeAMOEs@AaAHo@NaBRSHIHUDYHU?UFGAMHU@EJKFe@D}@NSF}BZME[YcBeCe@g@kAkBa@w@eA_Bc@i@USMBm@|@YTmAVi@?y@JK@AA)/auto/400x200?access_token=pk.eyJ1IjoiZGptZjIwMTUiLCJhIjoiY2xoZW5qbjN6MDBnNzNydGUzZzByd201ZiJ9._GLfwhRi2H3__7Hb1ZQAow';
   useEffect(() => {
     const token = localStorage.getItem('access_token');
     const accessToken = JSON.parse(token);
@@ -44,20 +47,27 @@ const AthleteActivities = () => {
   //   catchErrors(fetchData());
   // }, [payload, pageIndex]);
 
-  const fetchMoreData = useCallback(async () => {
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowWidth(window.innerWidth);
+    };
+
+    window.addEventListener('resize', handleResize);
+
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       if (payload) {
         const response = await getAthleteActivities(payload, 200, pageIndex); // fetch data from strava api
         if (response.data.length === 0) {
-          //store activities in local storage for later retrieveal in activity details page
           localStorage.setItem('activities', JSON.stringify(activities));
-          // if no data is returned, stop fetching
           return;
         }
         const newData = response.data || [];
-        setActivities((prevItems) => [...prevItems, ...newData]); // append new data to old data array in state variable
-        // store activities in local storage for later retrieveal in activity details page
+        setActivities((prevItems) => [...prevItems, ...newData]);
       }
       setPageIndex((prevPage) => prevPage + 1); // increment page index
     } catch (error) {
@@ -67,20 +77,29 @@ const AthleteActivities = () => {
     }
   }, [payload, pageIndex]);
 
-  // useEffect(() => {
-
-  // if no data is returned, stop fetching
-  // const data = localStorage.setItem('activities', JSON.stringify(activities));
   useEffect(() => {
-    const data = localStorage.getItem('activities');
-    if (data) {
+    const data = localStorage.getItem('activities'); // get data from local storage
+    if (data !== null && data !== undefined) {
       setActivities(JSON.parse(data));
     } else {
-      fetchMoreData();
+      catchErrors(fetchData());
     }
-  }, []);
-  // store activities in local storage for later retrieveal in activity details page
-  // check if activities in localstorage and use them, otherwise call fetchMoreData
+  }, [fetchData]);
+
+  useEffect(() => {
+    async function checkIfTokenExpired() {
+      const expires_at = localStorage.getItem('expires_at');
+      const expires_in = localStorage.getItem('expires_in');
+      if (expires_in && expires_at) {
+        const timeElapsed = Date.now() - expires_at;
+        if (timeElapsed / 1000 > expires_in) {
+          const res = await getNewAccessToken();
+          // navigate('/login');
+        }
+      }
+    }
+    checkIfTokenExpired();
+  });
 
   useEffect(() => {
     setLoading(true);
@@ -99,7 +118,7 @@ const AthleteActivities = () => {
         }
         setActivityName(activityName);
         polylines.push({
-          activityPositions: polyline.decode(activity_polyline),
+          activityPositions: polyline.toGeoJSON(activity_polyline),
           activityName: activityName,
         });
       }
@@ -116,8 +135,7 @@ const AthleteActivities = () => {
       setIsVisible(false);
     }
   };
-  // Set top coordinate to 0
-  // for smooth scrolling
+
   const scrollToTop = () => {
     window.scrollTo({
       top: 0,
@@ -129,13 +147,11 @@ const AthleteActivities = () => {
     window.addEventListener('scroll', toggleVisibility);
   }, []);
 
-  // if activities are not in localstroage then storage them
-
   const filteredName = activities.filter((activity) => {
     return activity.name.toLowerCase().includes(searchTxt.toLowerCase());
   });
 
-  if (loading && activities.length !== 0)
+  if (!activities || loading)
     return (
       <div style={{ body: 'black' }}>
         <h1 style={{ color: 'red', textAlign: 'center' }}>
@@ -146,82 +162,87 @@ const AthleteActivities = () => {
     );
   return (
     <>
-      {!payload ? (
-        <Login />
-      ) : (
-        <>
-          <Navbar />
-          <Profile />
-        </>
-      )}
-      {/* <Pagination
-        totalPages={totalpages}
-        pageIndex={pageIndex}
-        onPageChange={(currentPage) => setPageIndex(currentPage)}
-      /> */}
+      {!payload ? <Login /> : <>{/* <AthleteProfile /> */}</>}
+
       {isVisible && (
         <div onClick={scrollToTop}>
           <ScrollToTop alt="Go to top"></ScrollToTop>
         </div>
       )}
       <SideNavigation>
-        <Search searchTxt={searchTxt} updateSearchTxt={setSearchTxt} />
-        {/* check if activities are in local storage and use them, otherwise call fetchMoreData */}
-        {JSON.parse(localStorage.getItem('activities')) ? (
-          <div>
-            {filteredName.map((activity, i) => (
-              <div key={i}>
-                <Link
-                  style={{ color: 'white' }}
-                  to="/testcard"
-                  state={{ from: activity }}
-                  key={`${activity.id}--${activity.moving_time}--${activity.average_heartrate}`}
-                >
-                  <h2>
-                    {i + 1}. {activity.name}
-                  </h2>
-                </Link>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div>
-            {filteredName.map((activity, i) => (
-              <div key={i}>
-                <Link
-                  style={{ color: 'white' }}
-                  to="/testcard"
-                  state={{ from: activity }}
-                  key={`${activity.id}--${activity.moving_time}--${activity.average_heartrate}`}
-                >
-                  <h2>
-                    {i + 1}. {activity.name}
-                  </h2>
-                </Link>
-              </div>
-            ))}
-          </div>
-        )}
+        <Search
+          searchTxt={searchTxt}
+          updateSearchTxt={setSearchTxt}
+          placeholder="search activities..."
+        />
+        <div>
+          {filteredName.map((activity, i) => (
+            <>
+              {activity.map?.summary_polyline ? (
+                <div key={i}>
+                  <Link
+                    style={{ color: 'white' }}
+                    to="/testcard"
+                    state={{ from: activity }}
+                    key={`${activity.id}--${activity.moving_time}--${activity.average_heartrate}`}
+                  >
+                    <h2>
+                      {i + 1}. {activity.name}
+                    </h2>
+                  </Link>
+                </div>
+              ) : (
+                <div key={i}>
+                  <h3>
+                    {i + 1}. {activity?.name}
+                  </h3>
+                </div>
+              )}
+            </>
+          ))}
+        </div>
       </SideNavigation>
 
+      {windowWidth < 600 && (
+        <Search
+          searchTxt={searchTxt}
+          updateSearchTxt={setSearchTxt}
+          placeholder={'Search Activities'}
+        />
+      )}
+      {/* <AthleteStats /> */}
       <CardDetails>
         {filteredName.map((activity, i) => (
           <>
-            <Cardborder>
+            {activity.map?.summary_polyline ? (
+              <Cardborder>
+                <div key={i}>
+                  <Link
+                    to="/testcard"
+                    state={{ from: activity }}
+                    key={`${activity.id}--${activity.moving_time}--${activity.average_heartrate}`}
+                  >
+                    <h2>{activity.name}</h2>
+                  </Link>
+                  <p>{getKmsToMiles(activity.distance)}</p>
+                  <p>{getSecondstoMinutes(activity.moving_time)} </p>
+                  <p>Date: {formattedDate(activity.start_date)}</p>
+                  <p>kudos: {activity.kudos_count}</p>
+                </div>
+              </Cardborder>
+            ) : (
               <div key={i}>
-                <Link
-                  to="/testcard"
-                  state={{ from: activity }}
-                  key={`${activity.id}--${activity.moving_time}--${activity.average_heartrate}`}
-                >
-                  <h2>{activity.name}</h2>
-                </Link>
-                <p>{getKmsToMiles(activity.distance)}</p>
-                <p>{getSecondstoMinutes(activity.moving_time)} </p>
-                <p>Date: {formattedDate(activity.start_date)}</p>
-                <p>kudos: {activity.kudos_count}</p>
+                <Cardborder>
+                  <div key={i}>
+                    <h2>{activity?.name}</h2>
+                    <p>{getKmsToMiles(activity?.distance)}</p>
+                    <p>{getSecondstoMinutes(activity?.moving_time)} </p>
+                    <p>Date: {formattedDate(activity?.start_date)}</p>
+                    <p>kudos: {activity?.kudos_count}</p>
+                  </div>
+                </Cardborder>
               </div>
-            </Cardborder>
+            )}
           </>
         ))}
       </CardDetails>
@@ -290,6 +311,12 @@ const SideNavigation = styled.div`
     color: white;
     text-decoration: underline;
   }
+
+  /* media queries here */
+
+  @media screen and (max-width: 600px) {
+    display: none;
+  }
 `;
 
 const CardDetails = styled.div`
@@ -303,6 +330,13 @@ const CardDetails = styled.div`
   background-color: ghostwhite;
   position: relative;
   font-family: 'Roboto', sans-serif;
+
+  @media screen and (max-width: 600px) {
+    display: flex;
+    flex-direction: column;
+    flex-wrap: wrap;
+    margin-left: 50px;
+  }
 `;
 
 const Cardborder = styled.div`
