@@ -1,12 +1,12 @@
 import React from 'react';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import styled from 'styled-components';
-const Search = ({ searchText, updateSearchTxt }) => {
+const Search = ({ placeholder, updateSearchTxt }) => {
   const [searchInput, setSearchTerm] = useState('');
-
+  const ref = useRef();
   const handleChange = (e) => {
-    if (e.target.value.length >= 0) {
-      setSearchTerm(e.target.value);
+    if (ref.current.value !== searchInput) {
+      setSearchTerm(ref.current.value);
     }
     updateSearchTxt(searchInput);
   };
@@ -16,8 +16,9 @@ const Search = ({ searchText, updateSearchTxt }) => {
         <StyledInput className={'inputWithIcon'}>
           <SearchInput
             type="text"
-            placeholder="Search..."
-            value={searchText}
+            ref={ref}
+            placeholder={placeholder}
+            value={searchInput}
             onChange={handleChange}
           />
         </StyledInput>
@@ -27,9 +28,9 @@ const Search = ({ searchText, updateSearchTxt }) => {
 };
 const SearchInput = styled.input`
   height: 3rem;
-  font-size: 25px;
+  font-size: 18px;
   background-color: ghostwhite;
-  width: 100%;
+  width: 75%;
   border: 1px solid #aaa;
   border-radius: 4px;
   margin: 0 auto;
@@ -46,11 +47,24 @@ const SearchInput = styled.input`
   &:hover {
     box-shadow: 5px 2px 7px 2px grey;
   }
+
+  @media screen and (max-width: 600px) {
+    display: flex;
+    height: 3rem;
+    border: 1px solid #aaa;
+    background-color: ghostwhite;
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 18px;
+    width: 75%;
+    padding: 8px;
+    margin-bottom: 0rem;
+  }
 `;
 
 const StyledInput = styled.div`
   width: 100%;
-  / &.inputWithIcon {
+  &.inputWithIcon {
     position: relative;
   }
 `;
