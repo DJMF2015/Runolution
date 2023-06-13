@@ -1,16 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import styled from 'styled-components';
 import { mediaQueries } from '../utils/mediaQueries';
-import { getAthleteActivities } from '../utils/functions';
+import { getAthleteActivities, getUsersDetails } from '../utils/functions';
 import { checkIfTokenExpired } from '../utils/helpers';
-import { useGetWindowWidth } from '../utils/hooks';
+import { useGetWindowWidth, useScroll } from '../utils/hooks';
 import { catchErrors } from '../utils/helpers';
 import LoadingWheel from '../styles/Loading.module.css';
 import { ArrowUpCircleFill } from '@styled-icons/bootstrap/ArrowUpCircleFill';
 import { getKmsToMiles, getSecondstoMinutes, formattedDate } from '../utils/conversion';
 import polyline from '@mapbox/polyline';
 import Login from './Login';
-import AthleteProfile from './Profile';
 import Search from '../utils/search';
 import '../App.css';
 import { Link } from 'react-router-dom';
@@ -19,35 +18,34 @@ import AthleteStats from './AthleteStats';
 const AthleteActivities = () => {
   const [payload, setPayload] = useState([]);
   const [activities, setActivities] = useState([]);
-  const [isVisible, setIsVisible] = useState(false);
+  // const [isVisible, setIsVisible] = useState(false);
   const [activityName, setActivityName] = useState([]);
   const [searchTxt, setSearchTxt] = useState('');
   const [pageIndex, setPageIndex] = useState(1);
   const [loading, setLoading] = useState(false);
   const [nodes, setNodes] = useState([]);
   const { windowWidth } = useGetWindowWidth();
+  const { isVisible, scrollToTop } = useScroll();
+
   useEffect(() => {
     const token = localStorage.getItem('access_token');
     const accessToken = JSON.parse(token);
     setPayload(accessToken);
   }, []);
 
-  // useEffect(() => {
-  //   async function fetchData() {
-  //     if (payload && pageIndex) {
-  //       setLoading(true);
-  //       await getAthleteActivities(payload, 150, pageIndex).then((response) => {
-  //         setActivities(response.data);
-  //       });
-  //     }
-  //   }
-  //   catchErrors(fetchData());
-  // }, [payload, pageIndex]);
   useEffect(() => {
-    checkIfTokenExpired();
-  });
+    async function fetchData() {
+      const user = await getUsersDetails(payload);
+      console.log({ user });
+    }
+    fetchData();
+  }, [payload]);
 
-  const fetchData = useCallback(async () => {
+  // useEffect(() => {
+  //   checkIfTokenExpired();
+  // });
+
+  const fetchData = async (pageIndex) => {
     setLoading(true);
     try {
       if (payload) {
@@ -65,6 +63,10 @@ const AthleteActivities = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  useEffect(() => {
+    fetchData(pageIndex);
   }, [payload, pageIndex]);
 
   useEffect(() => {
@@ -72,55 +74,33 @@ const AthleteActivities = () => {
     if (data !== null && data !== undefined) {
       setActivities(JSON.parse(data));
     } else {
-      catchErrors(fetchData());
+      catchErrors(() => fetchData(pageIndex));
     }
-  }, [fetchData]);
+  }, [pageIndex, payload]);
 
   useEffect(() => {
     setLoading(true);
-    async function fetchData() {
-      const stravaActivityResponse = activities;
-      let polylines = [];
-      for (let i in stravaActivityResponse) {
-        const activityName = stravaActivityResponse[i]?.name;
-        let activity_polyline = stravaActivityResponse?.[i]?.map?.summary_polyline;
-        if (
-          !activities ||
-          stravaActivityResponse === undefined ||
-          stravaActivityResponse === null
-        ) {
-          setLoading(false);
-        }
-        setActivityName(activityName);
-        polylines.push({
-          activityPositions: polyline.toGeoJSON(activity_polyline),
-          activityName: activityName,
-        });
+    const stravaActivityResponse = activities;
+    let polylines = [];
+    for (let i in stravaActivityResponse) {
+      const activityName = stravaActivityResponse[i]?.name;
+      let activity_polyline = stravaActivityResponse?.[i]?.map?.summary_polyline;
+      if (
+        !activities ||
+        stravaActivityResponse === undefined ||
+        stravaActivityResponse === null
+      ) {
+        setLoading(false);
       }
-      setNodes(polylines);
-      setLoading(false);
+      setActivityName(activityName);
+      polylines.push({
+        activityPositions: polyline.toGeoJSON(activity_polyline),
+        activityName: activityName,
+      });
     }
-    catchErrors(fetchData());
+    setNodes(polylines);
+    setLoading(false);
   }, [activities]);
-
-  const toggleVisibility = () => {
-    if (window.pageYOffset > 300) {
-      setIsVisible(true);
-    } else {
-      setIsVisible(false);
-    }
-  };
-
-  const scrollToTop = () => {
-    window.scrollTo({
-      top: 0,
-      behavior: 'smooth',
-    });
-  };
-
-  useEffect(() => {
-    window.addEventListener('scroll', toggleVisibility);
-  }, []);
 
   const filteredName = activities.filter((activity) => {
     return activity.name.toLowerCase().includes(searchTxt.toLowerCase());
@@ -146,6 +126,7 @@ const AthleteActivities = () => {
       )}
       <SideNavigation>
         <Search
+          key={searchTxt}
           searchTxt={searchTxt}
           updateSearchTxt={setSearchTxt}
           placeholder="search activities..."
@@ -157,7 +138,7 @@ const AthleteActivities = () => {
                 <div key={i}>
                   <Link
                     style={{ color: 'white' }}
-                    to="/testcard"
+                    to="/activity"
                     state={{ from: activity }}
                     key={`${activity.id}--${activity.moving_time}--${activity.average_heartrate}`}
                   >
@@ -193,7 +174,7 @@ const AthleteActivities = () => {
               <Cardborder>
                 <div key={i}>
                   <Link
-                    to="/testcard"
+                    to="/activity"
                     state={{ from: activity }}
                     key={`${activity.id}--${activity.moving_time}--${activity.average_heartrate}`}
                   >
@@ -234,7 +215,7 @@ const SideNavigation = styled.div`
   position: fixed;
   border-right: 3px solid grey;
   z-index: 1000;
-  top: 0;
+  top: calc(10% - 20px);
   left: 0;
   scroll-behavior: smooth;
   padding-top: 20px;
@@ -300,9 +281,7 @@ const CardDetails = styled.div`
   flex-wrap: wrap;
   margin-left: 250px;
   justify-content: center;
-  /* max-width: 59vw; */
-  /* margin-top: -20px; */
-  background-color: ghostwhite;
+  background-color: #111;
   position: relative;
   font-family: 'Roboto', sans-serif;
 
@@ -311,6 +290,8 @@ const CardDetails = styled.div`
     flex-direction: column;
     flex-wrap: wrap;
     margin-left: 50px;
+    background-color: #fff;
+    /* background-color: #111; */
   }
 `;
 
@@ -324,16 +305,16 @@ const Cardborder = styled.div`
   width: 400px;
   height: 300px;
   font-family: comic sans ms;
-  background-color: #fff;
+  background-color: white;
   color: #333;
   font-size: 1.2rem;
   font-weight: 500;
   text-align: center;
-  opacity: 0.5;
+  opacity: 0.7;
   transition: all 0.3s ease-in-out;
 
   &:hover {
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 0 10px white;
     transform: scale(1.05);
     opacity: 1;
     /* make card fade as scroll out of view */
@@ -342,13 +323,14 @@ const Cardborder = styled.div`
 
 const ScrollToTop = styled(ArrowUpCircleFill)`
   height: 3em;
+  color: ${(props) => props.theme.colour.strava};
   display: flex;
   z-index: 1;
   justify-content: center;
   align-items: center;
   flex-wrap: wrap;
   position: fixed;
-  margin: 0px 10px 40px 95vw;
+  margin: 0px 10px 40px 90vw;
 `;
 
 export default AthleteActivities;
