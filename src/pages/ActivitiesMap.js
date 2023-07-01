@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import polyline from '@mapbox/polyline';
+import { ArrowUpCircleFill } from '@styled-icons/bootstrap/ArrowUpCircleFill';
 import { getAthleteActivities } from '../utils/functions';
 import { catchErrors } from '../utils/helpers';
 import { formattedDate } from '../utils/conversion';
@@ -7,7 +8,8 @@ import Login from './Login';
 import styled from 'styled-components';
 import SearchBar from '../utils/search';
 import Layers from '../components/layers';
-import { useGetWindowWidth } from '../utils/hooks';
+import { useGetWindowWidth, useScroll } from '../utils/hooks';
+import AthleteStats from '../pages/AthleteStats';
 import LoadingWheel from '../styles/Loading.module.css';
 import {
   MapContainer,
@@ -23,6 +25,7 @@ const ActivitiesMap = () => {
   const [loading, setLoading] = useState(false);
   const [searchTxt, setSearchTxt] = useState('');
   const { windowWidth } = useGetWindowWidth();
+  const { isVisible, scrollToTop } = useScroll();
   const [activityLoadingState, setActivityLoadingState] = useState(null);
   const expires_in = localStorage.getItem('expires_in');
   let access_token = JSON.parse(localStorage.getItem('access_token'));
@@ -35,12 +38,12 @@ const ActivitiesMap = () => {
       let looper_num = 1;
 
       setLoading(true);
-      while (looper_num < 2) {
+      while (looper_num || stravaActivityResponse.length === 0) {
         let stravaActivityResponse_single = await getAthleteActivities(
           access_token,
           200,
           looper_num
-        ); //|| stravaActivityResponse.length === 0
+        );
         if (
           !stravaActivityResponse_single.data ||
           stravaActivityResponse_single.data.length === 0 ||
@@ -106,6 +109,11 @@ const ActivitiesMap = () => {
       ) : (
         <>
           <SideNavigation>
+            {isVisible && (
+              <div onClick={scrollToTop}>
+                <ScrollToTop alt="Go to top"></ScrollToTop>
+              </div>
+            )}
             <input
               className="search__input"
               type="text"
@@ -203,9 +211,21 @@ const ActivitiesMap = () => {
 };
 export default ActivitiesMap;
 
+const ScrollToTop = styled(ArrowUpCircleFill)`
+  height: 3em;
+  color: ${(props) => props.theme.colour.strava};
+  display: flex;
+  z-index: 1100;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  position: fixed;
+  margin: 0px 10px 40px 90vw;
+`;
+
 const SideNavigation = styled.div`
   height: 100%;
-  margin-top: 40px;
+  margin-top: 50px;
   width: 230px;
   display: block;
   position: fixed;
