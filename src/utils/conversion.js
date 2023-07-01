@@ -1,3 +1,5 @@
+import { type } from '@testing-library/user-event/dist/type';
+
 const getKmsToMiles = (distance) => {
   const miles = distance / 1610;
   return miles.toFixed(2) + ` miles`;
@@ -15,7 +17,7 @@ const getMetresToFeet = (data) => {
 
 const getSecondstoMinutes = (seconds) => {
   const time = seconds / 60;
-  return time.toPrecision(3) + ` mins`;
+  return Math.round(time.toFixed(2)) + ` mins`;
 };
 
 // convert to kms/per hour as strava api only gives back speed & velocity in units of mtrs/sec
@@ -25,7 +27,6 @@ const getMstoKmHr = (mtrs) => {
 };
 
 const getSufferScore = (score) => {
-  console.log({ score });
   switch (true) {
     case score >= 150:
       return `${score}  Tough - watch out for overtraining.`;
@@ -64,6 +65,7 @@ export {
   getMstoKmHr,
   getSufferScore,
   getSecondstoMinutes,
+  maxHeartRate,
   formattedDate,
   getNoOfMtEverests,
   getUnitsWithCommas,
