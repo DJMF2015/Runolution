@@ -13,7 +13,7 @@ const Search = ({ placeholder, updateSearchTxt }) => {
   return (
     <>
       <div>
-        <StyledInput className={'inputWithIcon'}>
+        <StyledInput>
           <SearchInput
             type="text"
             ref={ref}
@@ -30,7 +30,7 @@ const SearchInput = styled.input`
   height: 3rem;
   font-size: 18px;
   background-color: ghostwhite;
-  width: 75%;
+  width: 50%;
   border: 1px solid #aaa;
   border-radius: 4px;
   margin: 0 auto;
