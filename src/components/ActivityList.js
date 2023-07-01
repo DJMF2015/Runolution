@@ -7,20 +7,23 @@ import {
   maxHeartRate,
 } from '../utils/conversion';
 import { getDetailedAthleteData } from '../utils/functions';
+import { useScroll } from '../utils/hooks';
+import StravaEmbed from '../components/StravaEmbed';
 import PaceZoneBarChart from './BarChart';
-// import Elevation from './ElevationChart';
 import ElevationChart from './ElevationBarChart';
 import { useEffect, useState } from 'react';
+import { ArrowUpCircleFill } from '@styled-icons/bootstrap/ArrowUpCircleFill';
 export default function ActivityList() {
   const location = useLocation();
   const [detailedActivity, setDetailedActivity] = useState([]);
+  const { isVisible, scrollToTop } = useScroll();
   const navigate = useNavigate();
   const { from } = location.state;
 
   if (!location.state) {
     navigate('/activities');
   }
-
+  console.log({ from });
   const handleGoBack = () => {
     navigate(-1);
   };
@@ -35,8 +38,16 @@ export default function ActivityList() {
   console.log({ from });
   return (
     <>
+      {isVisible && (
+        <div onClick={scrollToTop}>
+          <ScrollToTop alt="Go to top"></ScrollToTop>
+        </div>
+      )}
+
       <PaceZoneBarChart props={detailedActivity} />
+
       <ElevationChart props={detailedActivity} />
+
       <Container>
         <Heading>
           <th>Splits</th>
@@ -99,14 +110,15 @@ export default function ActivityList() {
                     <TableData>{segment.segment.average_grade}</TableData>
                     <TableData>{segment.elapsed_time}</TableData>
                     <TableData>{segment.average_heartrate}</TableData>
-                    {/* <TableData>{maxHeartRate(segment.average_heartrate)}</TableData> */}
                     <TableData>{segment.segment.elevation_high}</TableData>
                   </tr>
                 );
               })}
           </tbody>
         </Table>
+        <StravaEmbed id={from?.id} />
       </Container>
+
       <StyledBackButton
         onClick={handleGoBack}
         style={{ textAlign: 'center', marginLeft: '49vw', paddingBottom: '1em' }}
@@ -301,4 +313,17 @@ const TableData = styled.td`
     padding: 0.15em;
     text-align: left;
   }
+`;
+
+const ScrollToTop = styled(ArrowUpCircleFill)`
+  height: 3em;
+  display: flex;
+  z-index: 1000;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  position: fixed;
+  opacity: 0.7;
+  color: ${(props) => props.theme.colour.strava};
+  margin: 60px 0px 200px 90vw;
 `;
