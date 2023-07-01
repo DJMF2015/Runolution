@@ -1,6 +1,7 @@
 import axios from 'axios';
+import { auth_link } from './config';
 
-// get exchange code from URL to retrieve the access token
+// get exchange token from URL to retrieve the access token
 export const getExchangeCodeFromURL = (token) => {
   if (token && window.location.href.includes('code')) {
     const authToken = window.location.href.split('=code')[0].split('&')[1].split('=')[1];
@@ -8,7 +9,7 @@ export const getExchangeCodeFromURL = (token) => {
   }
 };
 
-// get access token from local storage if it exists and is not expired and set to local storage
+// get new access token  from local storage if it exists and if not expired set to local storage
 export const getAccessToken = async (authCode) => {
   try {
     const response = await axios.post(
@@ -23,10 +24,27 @@ export const getAccessToken = async (authCode) => {
   }
 };
 
+//get new access token using refresh token if the current access token has expired and set to local storage
+export const getNewAccessToken = async () => {
+  const refreshToken = JSON.parse(localStorage.getItem('refresh_token'));
+
+  try {
+    const response = await axios.post(
+      `${auth_link}?client_id=27989&client_secret=183e7360ea130a4ded02e4fb219730c7b42e7e13&refresh_token=${refreshToken}&grant_type=refresh_token`
+    );
+    if (response.data) {
+      storePayloadToLocalStorage(response.data);
+    }
+    return response.data;
+  } catch (error) {
+    console.log(error);
+  }
+};
+
 /**
  *
  * @param { json array} payload  an async function
- * @returns {function}
+ * @returns {function} store payload to local storage
  */
 const storePayloadToLocalStorage = (payload) => {
   const keysToStore = {
@@ -35,9 +53,7 @@ const storePayloadToLocalStorage = (payload) => {
     refresh_token: payload.refresh_token,
     expires_in: payload.expires_in,
     expires_at: payload.expires_at,
-    athlete_id: payload.athlete.id,
   };
-
   Object.entries(keysToStore).forEach(([key, value]) => {
     localStorage.setItem(key, JSON.stringify(value));
   });
@@ -54,4 +70,17 @@ export const catchErrors = (fn) => {
       console.error(err);
     });
   };
+};
+
+export const checkIfTokenExpired = async (expires_in, expires_at) => {
+  console.log(expires_in, expires_at);
+  if (expires_in && expires_at) {
+    const expirationTime = new Date(expires_at * 1000); // Convert to milliseconds
+    const currentTime = new Date();
+    if (currentTime > expirationTime) {
+      const res = await getNewAccessToken(); // Call API to get a new access token
+    } else {
+      console.log('Token not expired');
+    }
+  }
 };
