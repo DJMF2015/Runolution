@@ -65,7 +65,6 @@ export {
   getMstoKmHr,
   getSufferScore,
   getSecondstoMinutes,
-  maxHeartRate,
   formattedDate,
   getNoOfMtEverests,
   getUnitsWithCommas,
