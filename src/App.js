@@ -8,22 +8,21 @@ import Redirect from './utils/redirect';
 import Login from './pages/Login';
 import ActivitiesMap from './pages/ActivitiesMap';
 import ActivitiesCard from './components/ActivitiesCard';
-
+// import Activity from './components/ActivityCard';
 function App() {
   return (
-    <div className="App">
-      <BrowserRouter>
-        <Layout />
-        <Routes>
-          <Route path="/" element={<Activities />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/redirect" element={<Redirect />} />
-          <Route path="/activity" element={<ActivitiesCard />} />
-          <Route path="/splits" element={<ActivityList />} />
-          <Route path="/map" element={<ActivitiesMap />} />
-        </Routes>
-      </BrowserRouter>
-    </div>
+    <BrowserRouter>
+      <Layout />
+      <Routes>
+        <Route path="/" element={<Activities />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/redirect" element={<Redirect />} />
+        <Route path="/activity" element={<ActivitiesCard />} />
+        {/* <Route path="/activities" element={<Activity />} /> */}
+        <Route path="/splits" element={<ActivityList />} />
+        <Route path="/map" element={<ActivitiesMap />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
 
