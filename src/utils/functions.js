@@ -31,6 +31,7 @@ export const getUsersDetails = async (accessToken) => {
     const response = await axios.get(`https://www.strava.com/api/v3/athlete`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
+    localStorage.setItem('athlete', JSON.stringify(response.data));
     return response;
   } catch (error) {
     console.log(error);
@@ -110,6 +111,7 @@ export const getUserActivityLaps = async (activityId, accessToken) => {
   }
 };
 
+/*  get detailed activity data */
 export const getDetailedAthleteData = async (id, accessToken) => {
   try {
     const response = await axios.get(`https://www.strava.com/api/v3/activities/${id}`, {
