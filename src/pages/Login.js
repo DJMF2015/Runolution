@@ -1,20 +1,23 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import StravaConnectBtn from '../strava_connect_orange.svg';
 import styled from 'styled-components';
 const Login = () => {
+  const [logout, setLoggedOut] = useState(true);
   const redirectUrl = 'http://localhost:3000/redirect';
 
   const handleLogin = () => {
     localStorage.clear();
-    window.location = `http://www.strava.com/oauth/authorize?client_id=27989&response_type=code&redirect_uri=${redirectUrl}&approval_prompt=force&scope=read_all,activity:read_all,profile:read_all`;
+    setLoggedOut(!logout);
+    window.location = `http://www.strava.com/oauth/authorize?client_id=27989&response_type=code&redirect_uri=${redirectUrl}&approval_prompt=force&scope=read_all,activity:read_all,profile:read_all,activity:write`;
   };
 
   return (
     <>
-      <StyledLoginContainer>
-        <StyledLoginButton className="strava-button" onClick={handleLogin}>
-          Login
-        </StyledLoginButton>
-      </StyledLoginContainer>
+      {logout && (
+        <StyledLoginContainer>
+          <img src={StravaConnectBtn} alt="Strava Connect Button" onClick={handleLogin} />
+        </StyledLoginContainer>
+      )}
     </>
   );
 };
