@@ -9,7 +9,6 @@ import styled from 'styled-components';
 import SearchBar from '../utils/search';
 import Layers from '../components/layers';
 import { useGetWindowWidth, useScroll } from '../utils/hooks';
-import AthleteStats from '../pages/AthleteStats';
 import LoadingWheel from '../styles/Loading.module.css';
 import {
   MapContainer,
@@ -327,85 +326,4 @@ const SideNavigation = styled.div`
     color: white;
     text-decoration: underline;
   }
-
-  /* @media screen and (max-width: 750px) {
-    width: 150px;
-    display: block;
-    font-size: 10px;
-    a {
-      font-size: 12px;
-      color: white;
-    }
-    .search__input {
-      width: 75%;
-      height: 20px;
-      font-size: 0.8rem;
-      display: inline-block;
-      margin: 90px 5px 20px 10px;
-      margin-bottom: 0px;
-      margin-top: 40px;
-      border-radius: 5px;
-      border: 1px solid #ccc;
-      padding: 5px;
-      outline: none;
-    }
-
-    .screenshot__button {
-      margin-left: 1.25vw;
-      margin-top: 15px;
-      margin-bottom: 10px;
-      width: 190px;
-      color: red;
-      font-size: 0.7rem;
-      font-weight: bold;
-      background-color: ghostwhite;
-      border: 2px solid white;
-      border-radius: 10px;
-      width: 120px;
-      height: 30px;
-    }
-  } */
-
-  /* @media screen and (max-width: 450px) {
- 
-    display: none;
-    font-size: 10px;
-    a {
-      font-size: 12px;
-      color: white;
-    }
-    .search__input {
-      width: 75%;
-      height: 20px;
-      font-size: 0.8rem;
-      display: inline-block;
-      margin: 40px 5px 20px 10px;
-      margin-bottom: 0px;
-      margin-top: 100px;
-      border-radius: 5px;
-      border: 1px solid #ccc;
-      padding: 5px;
-      outline: none;
-
-      .screenshot__button {
-        margin-left: 1.25vw;
-        margin-top: 19px;
-        margin-bottom: 10px;
-        width: 190px;
-        color: red;
-        font-size: 0.7rem;
-        font-weight: bold;
-        background-color: ghostwhite;
-        border: 2px solid white;
-        border-radius: 10px;
-        width: 120px;
-        height: 30px;
-      }
-      .screenshot__button:hover {
-        background-color: red;
-        color: white;
-        border: 2px solid red;
-      }
-    } */
-  /* } */
 `;
