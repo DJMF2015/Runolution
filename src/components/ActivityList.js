@@ -23,7 +23,7 @@ export default function ActivityList() {
   if (!location.state) {
     navigate('/activities');
   }
-  console.log({ from });
+
   const handleGoBack = () => {
     navigate(-1);
   };
@@ -35,7 +35,7 @@ export default function ActivityList() {
       setDetailedActivity(response.data);
     });
   }, [from]);
-  console.log({ from });
+
   return (
     <>
       {isVisible && (
