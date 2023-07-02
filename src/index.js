@@ -19,7 +19,7 @@ html, body{
 const theme = {
   colour: {
     red: 'hsl(357, 100%, 60%)',
-    strava: 'hsl(147, 50%, 47%)',
+    strava: '#fc4c02',
     ghostwhite: 'hsl(240, 100, 99)',
     yellow: 'hsl(47, 100%, 50%)',
     green: 'hsl(100, 66%, 46%)',
