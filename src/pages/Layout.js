@@ -4,11 +4,10 @@ import LogoutButton from '../components/Logout';
 import PoweredByStrava from '../pwrdBy_strava_light.svg';
 import styled from 'styled-components';
 import '../styles/Navbar.css';
-import AthleteStats from './AthleteStats';
 const Layout = () => {
   const athlete = JSON.parse(localStorage.getItem('athlete'));
   const [isNavExpanded, setIsNavExpanded] = useState(false);
-  console.log({ athlete });
+
   return (
     <>
       <nav className="navigation">
