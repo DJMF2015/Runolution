@@ -5,6 +5,7 @@ import { Mountain } from '@styled-icons/fa-solid/Mountain';
 import { Ruler } from '@styled-icons/fa-solid/Ruler';
 import styled from 'styled-components';
 import { useScroll } from '../utils/hooks';
+import MapCoordinatesHelper from '../utils/mapCoordinates';
 import { getSufferScore, getMilesToKms, getMetresToFeet } from '../utils/conversion';
 import mapboxgl from 'mapbox-gl';
 import * as turf from '@turf/turf';
@@ -13,7 +14,6 @@ import {
   getCommentsByActivityId,
   getDetailedAthleteData,
   getKudoersByActivityId,
-  getRunningRaces,
 } from '../utils/functions';
 import polyline from '@mapbox/polyline';
 export default function ActivitiesCard() {
@@ -46,9 +46,6 @@ export default function ActivitiesCard() {
       await getKudoersByActivityId(from.id, token).then((response) => {
         setAthleteData((prevState) => ({ ...prevState, kudosoers: response.data }));
       });
-      await getRunningRaces(token).then((response) => {
-        console.log(response);
-      });
       await getCommentsByActivityId(from.id, token).then((response) => {
         setAthleteData((prevState) => ({ ...prevState, comments: response.data }));
       });
@@ -63,21 +60,7 @@ export default function ActivitiesCard() {
     fetchData();
   }, [from.id, token]);
 
-  const mapCoordinates = activity_toGEOJSON?.coordinates.map((item) => {
-    return item.map((coords) => {
-      return coords;
-    });
-  });
-
-  const data = {
-    type: 'Feature',
-    properties: { name: 'activity' },
-
-    geometry: {
-      type: 'LineString',
-      coordinates: mapCoordinates,
-    },
-  };
+  const data = MapCoordinatesHelper(activity_toGEOJSON);
   let center = turf.center(data);
 
   const endLocation = {
@@ -86,6 +69,7 @@ export default function ActivitiesCard() {
     bearing: 0,
     pitch: 45,
   };
+
   const layers = [
     {
       name: 'Satellite',
