@@ -73,7 +73,6 @@ export const catchErrors = (fn) => {
 };
 
 export const checkIfTokenExpired = async (expires_in, expires_at) => {
-  console.log(expires_in, expires_at);
   if (expires_in && expires_at) {
     const expirationTime = new Date(expires_at * 1000); // Convert to milliseconds
     const currentTime = new Date();
