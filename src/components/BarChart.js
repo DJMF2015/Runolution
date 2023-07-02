@@ -58,18 +58,17 @@ export const options = {
 };
 
 export default function PaceZoneChart(props) {
-  console.log(props);
   const heartRate = props.props.splits_standard
     ? props.props.splits_standard.map((lap) => lap.average_heartrate)
     : [];
-  console.log(heartRate);
+
   const elevation = props.props.splits_standard
     ? props.props.splits_standard.map((lap) => lap.elevation_difference)
     : [];
   const lapNameLabels = props.props.splits_standard
     ? props.props.splits_standard.map((lap) => lap.split)
     : [];
-  console.log(elevation);
+
   const average_watts = props.props.laps
     ? props.props.laps.map((segment) => segment.average_watts)
     : [];
