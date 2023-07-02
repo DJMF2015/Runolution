@@ -3,6 +3,7 @@ import styled from 'styled-components';
 import Login from './Login';
 import { mediaQueries } from '../utils/mediaQueries';
 
+// NOTE: This file is no longer used in the app. It is here for reference only.
 const Profile = () => {
   const [payload, setPayload] = useState([]);
 
@@ -12,7 +13,7 @@ const Profile = () => {
     setPayload(payloadData);
   }, []);
 
-  // if (!payload) return <h1>Loading...</h1>;
+  if (!payload) return <h1>Loading...</h1>;
 
   return (
     <>
@@ -42,10 +43,15 @@ const Profile = () => {
 };
 export default Profile;
 
+const Wrapper = styled.div`
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+`;
+
 const CardContainer = styled.div`
-  position: relative;
-  margin: 20px auto;
-  top: 6em;
+  margin: 20px;
   padding: 20px;
   color: #ffff;
   background-color: ghostwhite;
@@ -55,58 +61,49 @@ const CardContainer = styled.div`
   height: 60vh;
   border-radius: 20px;
   border: darkgrey solid;
-  ${mediaQueries('md')`  
-  position: relative;
-  margin: 20px auto;
-  top: 6em;
-  padding: 20px;
-  color: #ffff;
-  background-color: ghostwhite;
-    width: 35vw;
-  height: 60vh;
-  border-radius: 20px;
-`}
-`;
 
-const Wrapper = styled.div`
-  ${CardContainer} {
-    cursor: pointer;
-    &:hover,
-    &:focus {
-      box-shadow: 0 10px 20px -5px rgba(5, 5, 0, 0.75);
-    }
-    ${mediaQueries('md')`  
-      width: 35vw;
-    height: 60vh;
-    border-radius: 20px;
-`}
+  @media (max-width: 768px) {
+    width: 80vw;
+    height: 50vh;
   }
 `;
+
 const CardDetails = styled.div`
   display: inline-block;
   color: black;
   font-weight: 300;
   justify-content: center;
   margin-left: 10rem;
-  ${mediaQueries('md')` 
-  display: inline; 
-  justify-content: center; 
-   margin-left: 10rem;
-   font-size:.9rem; 
-  
-`}
+
+  @media (max-width: 768px) {
+    margin-left: 0;
+    text-align: center;
+
+    img {
+      width: 50%;
+    }
+  }
+  @media (max-width: 450px) {
+    margin-left: 0;
+    text-align: center;
+
+    img {
+      /* width: 50%;
+       */
+      display: none;
+    }
+  }
 `;
+
 const Header = styled.div`
   color: black;
   font-weight: 300;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  ${mediaQueries('md')`
-  color: black;
-  font-weight: 300;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-`}
+
+  @media (max-width: 768px) {
+    flex-direction: column;
+    align-items: center;
+  }
 `;
