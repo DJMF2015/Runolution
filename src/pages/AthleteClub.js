@@ -2,11 +2,9 @@ import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import Login from './Login';
 import { catchErrors } from '../utils/helpers';
-import {
-  getUsersClubs,
-  getUsersDetails,
-  getUsersClubActivities,
-} from '../utils/functions';
+import { getUsersDetails, getUsersClubActivities } from '../utils/functions';
+
+// Note: This file is no longer used and is here for reference only. May be used at a later stage or else removed'
 const AthleteClub = () => {
   const [clubData, setClubData] = useState([]);
   const [activities, setActivities] = useState([]);
@@ -15,7 +13,6 @@ const AthleteClub = () => {
       const token = localStorage.getItem('access_token');
       const tokenData = JSON.parse(token);
       await getUsersDetails(tokenData).then((response) => {
-        console.log(response.data);
         setClubData(response.data);
       });
     }
@@ -29,7 +26,7 @@ const AthleteClub = () => {
       clubData.clubs[0].id === undefined ||
       clubData.clubs[0].id === 0
     ) {
-      console.log('No club data');
+      console.log('No club data available');
     } else {
       const token = localStorage.getItem('access_token');
       const tokenData = JSON.parse(token);
@@ -44,12 +41,14 @@ const AthleteClub = () => {
 
   return (
     <>
-      {/* <Header>{clubData && clubData?.clubs[0]?.name}</Header> */}
       {!clubData ||
       clubData.clubs === undefined ||
       clubData.clubs.length === 0 ||
       clubData.clubs[0].id === undefined ? (
-        <h2>Looks like you aren't a member of any Clubs yet!</h2>
+        <>
+          <h2>Looks like you aren't a member of any Clubs yet!</h2>
+          <Login />
+        </>
       ) : (
         activities?.length > 0 &&
         activities.map((activity) => (
