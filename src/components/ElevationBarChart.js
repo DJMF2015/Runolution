@@ -41,7 +41,7 @@ export const options = {
 
 export default function PaceZoneChart(props) {
   const labelNames = props?.props?.best_efforts?.map((effort) => effort.name);
-  console.log(props);
+
   const elapsedTime = props.props.best_efforts
     ? props.props.laps.map((effort) => effort.elapsed_time)
     : [];
@@ -52,7 +52,6 @@ export default function PaceZoneChart(props) {
       return parseFloat(mins);
     })
     .sort((a, b) => a - b);
-  console.log('formattedElapsedTime', formattedElapsedTime);
 
   const segment_efforts = props.props.segment_efforts
     ? props.props.segment_efforts.map((segment) => segment.average_watts)
