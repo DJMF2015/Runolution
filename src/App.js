@@ -8,7 +8,7 @@ import Redirect from './utils/redirect';
 import Login from './pages/Login';
 import ActivitiesMap from './pages/ActivitiesMap';
 import ActivitiesCard from './components/ActivitiesCard';
-// import Activity from './components/ActivityCard';
+
 function App() {
   return (
     <BrowserRouter>
@@ -18,7 +18,6 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/redirect" element={<Redirect />} />
         <Route path="/activity" element={<ActivitiesCard />} />
-        {/* <Route path="/activities" element={<Activity />} /> */}
         <Route path="/splits" element={<ActivityList />} />
         <Route path="/map" element={<ActivitiesMap />} />
       </Routes>
