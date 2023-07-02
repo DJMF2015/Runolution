@@ -140,7 +140,7 @@ const AthleteActivities = () => {
           placeholder="search activities..."
         />
       )}
-      <AthleteStats />
+      {/* <AthleteStats /> */}
       <SideNavigation>
         <div>
           {filteredName.map((activity, i) => (
