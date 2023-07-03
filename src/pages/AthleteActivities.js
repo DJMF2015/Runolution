@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import '../styles/AthleteStyles.css';
 import { getAthleteActivities, getUsersDetails } from '../utils/functions';
 import { useGetWindowWidth, useScroll } from '../utils/hooks';
 import { catchErrors, checkIfTokenExpired } from '../utils/helpers';
