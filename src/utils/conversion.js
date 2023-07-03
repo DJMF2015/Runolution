@@ -7,7 +7,7 @@ const getKmsToMiles = (distance) => {
 
 const getMilesToKms = (distance) => {
   const kms = distance / 1000;
-  return kms.toFixed(2) + ` kms`;
+  return kms.toFixed(2);
 };
 
 const getMetresToFeet = (data) => {
