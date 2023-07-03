@@ -1,6 +1,3 @@
-import mapboxgl from 'mapbox-gl';
-import * as turf from '@turf/turf';
-
 const MapCoordinates = (activity_toGEOJSON) => {
   console.log({ activity_toGEOJSON });
   const mapCoordinates = activity_toGEOJSON?.coordinates.map((item) => {
