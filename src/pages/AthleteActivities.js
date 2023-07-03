@@ -126,7 +126,7 @@ const AthleteActivities = () => {
 
   return (
     <>
-      {!payload ? <Login /> : <> </>}
+      {!payload && <Login />}
 
       {isVisible && (
         <div onClick={scrollToTop}>
@@ -140,7 +140,7 @@ const AthleteActivities = () => {
           placeholder="search activities..."
         />
       )}
-      {/* <AthleteStats /> */}
+      <AthleteStats />
       <SideNavigation>
         <div>
           {filteredName.map((activity, i) => (
@@ -301,24 +301,6 @@ const SideNavigation = styled.div`
   }
 `;
 
-const RightHandSideProfile = styled.div`
-  height: 100%;
-  width: calc(14% - 50px);
-  display: inline-block;
-  color: 'red';
-  text-align: cente;
-  justify-content: center;
-  font-size: 1rem;
-  /* background-color: #111; */
-  position: fixed;
-  border-left: 3px solid grey;
-  z-index: 1000;
-  top: calc(11vh - 14px);
-  right: 0;
-  scroll-behavior: smooth;
-  padding-top: 20px;
-  margin: 0 auto;
-`;
 const CardDetails = styled.div`
   display: flex;
   flex-direction: column;
@@ -337,7 +319,6 @@ const CardDetails = styled.div`
     flex-wrap: wrap;
     margin-left: 50px;
     background-color: #fff;
-    /* background-color: #111; */
   }
 `;
 
