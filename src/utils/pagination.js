@@ -2,7 +2,7 @@ import React from 'react';
 import styled from 'styled-components';
 import { ArrowRight } from '@styled-icons/bootstrap/ArrowRight';
 import { ArrowLeft } from '@styled-icons/bootstrap/ArrowLeft';
-
+// NOTE: This component is not used but ,may be used in the future
 const Pagination = ({ onPageChange, pageIndex }) => {
   // previous
   const handleBackArrow = () => {
