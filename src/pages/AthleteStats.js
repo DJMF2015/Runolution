@@ -116,7 +116,7 @@ const AthleteStats = () => {
             <Column>
               <TableHeading></TableHeading>
               <BikeIcon />
-              <TableData>{'Runs: ' + user?.data.ytd_run_totals.count}</TableData>
+              <TableData>{'Rides: ' + user?.data.ytd_run_totals.count}</TableData>
 
               <TableData>
                 {' Miles: '}
@@ -202,6 +202,11 @@ const AvatarImage = styled.img`
   align-items: flex-end;
   position: absolute;
   right: 3rem;
+
+  &:hover {
+    cursor: pointer;
+    transform: scale(1.1);
+  }
 
   @media screen and (max-width: 1048px) {
     display: none;
