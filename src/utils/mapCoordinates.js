@@ -1,5 +1,4 @@
 const MapCoordinates = (activity_toGEOJSON) => {
-  console.log({ activity_toGEOJSON });
   const mapCoordinates = activity_toGEOJSON?.coordinates.map((item) => {
     return item.map((coords) => {
       return coords;
