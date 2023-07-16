@@ -1,7 +1,6 @@
 import React, { useEffect } from 'react';
 import { Helmet } from 'react-helmet';
-// import Styled from 'styled-components';
-//
+
 function StravaEmbed({ id }) {
   useEffect(() => {
     const script = document.createElement('script');
