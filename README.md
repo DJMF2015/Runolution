@@ -1,5 +1,4 @@
- 
- #  Strava Personal Dashboard
+#  Strava Personal Dashboard
 
 ### This application is built using 
 - React
@@ -9,6 +8,9 @@
 - Styled Components & styled-icons
 
 ### Dependencies  
+- Turfjs
+- Chartjs & Nivo
+- Styled Components
 
 - axios, mapbox-gl, react router,
 
