@@ -4,9 +4,13 @@
 ### This application is built using 
 - React
 - React-Map-gl & React Leaflet
+- Turfjs
+- Chartjs & Nivo
+- Styled Components & styled-icons
 
-### Dependencies:  
--  axios, react-map-gl, styled-icons, styled components, html-to-image, react router
+### Dependencies  
+
+- axios, mapbox-gl, react router,
 
 ##### Authorization Code flow 
 * This application uses the Authorization code workflow (OAuth2.0) - see for more info https://developers.strava.com/docs/authentication/#introduction
@@ -22,13 +26,12 @@ Clone the repository and install its dependencies running:
 <p align="left">
   <img src="heatmap.png"  title="heatmap">
 
-  <img src="activity.png"  title="activity">
+  <img src="flythrough.png"  title="3d flythrough">
  
 </p>
 
-##### TO-DO  
- - Clean-up styling and refactor inline and css-in-jsx to styled components
- - 
+https://github.com/DJMF2015/strava-personal-dashboard/assets/14128581/f2b9a787-ac7b-46ab-846b-a0356187a191
 
- 
- 
+https://github.com/DJMF2015/strava-personal-dashboard/assets/14128581/68b44145-b5db-40b7-90a9-95542d1de157
+
+##### TO-DO  
