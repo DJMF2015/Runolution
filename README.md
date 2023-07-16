@@ -31,7 +31,13 @@ Clone the repository and install its dependencies running:
   <img src="flythrough.png"  title="3d flythrough">
  
 </p>
+ 
 
+https://github.com/DJMF2015/strava-personal-dashboard/assets/14128581/664be2b6-feaa-4e8c-9393-3ab28826a603
+
+
+https://github.com/DJMF2015/strava-personal-dashboard/assets/14128581/2313fd0e-a71c-4ef8-a40c-45cebed61c6c
 
 
 ##### TO-DO  
+
