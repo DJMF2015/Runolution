@@ -2,7 +2,7 @@ import { type } from '@testing-library/user-event/dist/type';
 
 const getKmsToMiles = (distance) => {
   const miles = distance / 1610;
-  return miles.toFixed(2) + ` miles`;
+  return miles.toFixed(2);
 };
 
 const getMilesToKms = (distance) => {
@@ -58,6 +58,16 @@ const formattedDate = (date) => {
   const formatted = date.split('T')[0];
   return formatted;
 };
+
+const getCurrentDate = () => {
+  const currentDate = new Date();
+  const currentYear = currentDate.getFullYear();
+  const currentMonth = currentDate.getMonth();
+  const currentDay = currentDate.getDate();
+  const date = new Date(currentYear, currentMonth, currentDay);
+  return { date, currentDate, currentYear, currentMonth, currentDay };
+};
+
 export {
   getKmsToMiles,
   getMilesToKms,
@@ -66,6 +76,7 @@ export {
   getSufferScore,
   getSecondstoMinutes,
   formattedDate,
+  getCurrentDate,
   getNoOfMtEverests,
   getUnitsWithCommas,
   getCurrentYear,
