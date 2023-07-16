@@ -8,7 +8,6 @@ import { useScroll } from '../utils/hooks';
 import MapCoordinatesHelper from '../utils/mapCoordinates';
 import { getSufferScore, getMilesToKms, getMetresToFeet } from '../utils/conversion';
 import mapboxgl from 'mapbox-gl';
-import * as turf from '@turf/turf';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import {
   getCommentsByActivityId,
@@ -16,9 +15,10 @@ import {
   getKudoersByActivityId,
 } from '../utils/functions';
 import polyline from '@mapbox/polyline';
+
 export default function ActivitiesCard() {
   const [selectedLayer, setSelectedLayer] = useState(
-    'mapbox://styles/mapbox/outdoors-v11'
+    'mapbox://styles/mapbox/satellite-v9'
   );
   const { isVisible, scrollToTop } = useScroll();
   const [athleteData, setAthleteData] = React.useState([
@@ -28,10 +28,6 @@ export default function ActivitiesCard() {
       detailedActivity: [],
     },
   ]);
-  const [queryData, setQueryData] = useState({
-    distance: [],
-    elevation: [],
-  });
 
   const location = useLocation();
   const { from } = location.state;
@@ -40,6 +36,14 @@ export default function ActivitiesCard() {
   const accessToken = localStorage.getItem('access_token');
   const token = JSON.parse(accessToken);
   const mapContainer = useRef(null);
+  const data = MapCoordinatesHelper(activity_toGEOJSON);
+
+  const endLocation = {
+    center: [from?.end_latlng[1], from?.end_latlng[0]],
+    zoom: 12,
+    bearing: 0,
+    pitch: 40,
+  };
 
   useEffect(() => {
     async function fetchData() {
@@ -50,7 +54,6 @@ export default function ActivitiesCard() {
         setAthleteData((prevState) => ({ ...prevState, comments: response.data }));
       });
       await getDetailedAthleteData(from.id, token).then((response) => {
-        console.log(response.data);
         setAthleteData((prevState) => ({
           ...prevState,
           detailedActivity: response.data,
@@ -59,16 +62,6 @@ export default function ActivitiesCard() {
     }
     fetchData();
   }, [from.id, token]);
-
-  const data = MapCoordinatesHelper(activity_toGEOJSON);
-  let center = turf.center(data);
-
-  const endLocation = {
-    center: center.geometry.coordinates,
-    zoom: 14,
-    bearing: 0,
-    pitch: 45,
-  };
 
   const layers = [
     {
@@ -86,8 +79,9 @@ export default function ActivitiesCard() {
       antialias: true, // create the gl context with MSAA antialiasing, so custom layers are antialiased
       ...endLocation,
       // zoom - zoom in closer when the route is only 5kms long or less and if not zoom to 10
-      zoom: from.distance < 10000 ? 13.5 : 11.5,
-      pitch: 50,
+      // zoom: from.distance < 10000 ? 13.5 : 11.5,
+      zoom: 1,
+      pitch: 35,
       bearing: 0,
       interactive: true,
       hash: false,
@@ -121,7 +115,7 @@ export default function ActivitiesCard() {
         paint: {
           'sky-type': 'atmosphere',
           'sky-atmosphere-sun': [0.0, 0.0],
-          'sky-atmosphere-sun-intensity': 15,
+          'sky-atmosphere-sun-intensity': 10,
         },
       });
       map.addLayer({
@@ -179,72 +173,29 @@ export default function ActivitiesCard() {
         .addTo(map)
         .togglePopup();
       map.addSource('trace', { type: 'geojson', data: data });
-
-      const animateMarker = () => {
-        // The total animation duration, in milliseconds
-        const animationDuration = 12000;
-        const path = turf.lineString(pinRoute);
-        // Get the total line distance
-        const pathDistance = turf.lineDistance(path);
-        let start;
-        function frame(time) {
-          if (!start) start = time;
-          const animationPhase = (time - start) / animationDuration;
-          if (animationPhase > 1) {
-            return;
-          }
-
-          // Get the new latitude and longitude by sampling along the path
-          const alongPath = turf.along(path, pathDistance * animationPhase).geometry
-            .coordinates;
-          const lngLat = {
-            lng: alongPath[0],
-            lat: alongPath[1],
-          };
-          // get the current distance along the path from the total length of the route
-          const currentDistance = pathDistance * animationPhase;
-          const distance = currentDistance.toFixed(2);
-          // Sample the terrain elevation. We rou nd to an integer value to
-          // prevent showing a lot of digits during the animation
-          const elevation = Math.floor(
-            // Do not use terrain exaggeration to get actual meter values
-            map.queryTerrainElevation(lngLat, { exaggerated: false })
-          );
-
-          setQueryData({ elevation, distance });
-
-          // Update the popup altitude value and marker location
-          popup.setHTML(from.name);
-          marker.setLngLat(lngLat);
-
-          // Rotate the camera at a slightly lower speed to give some parallax effect in the background
-          const rotation = 150 - animationPhase * pathDistance * 4;
-          map.setBearing(rotation % 360);
-          window.requestAnimationFrame(frame);
-        }
-        map.fitBounds([
-          // southwestern corner of the bounds
-          [data.geometry.coordinates[0][0], data.geometry.coordinates[0][1]],
-          // northeastern corner of the bounds
-          [data.geometry.coordinates[1][0], data.geometry.coordinates[1][1]],
-        ]);
-        // //zoom to bounds when animation completes
-        map.once('idle', () => {
-          map.fitBounds(data.geometry.coordinates, {
-            zoom: 14,
-            pitch: 65,
-            bearing: 200,
-            duration: 1000,
-            rotate: 200 * (Math.PI / 180), //start rotation of animation
-            //end location of animation
-            center: pinRoute[pinRoute.length - 1],
-          });
-        });
-        window.requestAnimationFrame(frame);
-      };
-      animateMarker();
     });
+    function rotateAndFlyTo(endLocation) {
+      // Get the map instance
+      // Rotate the map 360 degrees in 3 seconds
+      var bearing = map.getBearing(); // Get the current bearing
+      var start = null;
+      function animate(timestamp) {
+        if (!start) start = timestamp;
+        var progress = timestamp - start;
+        map.rotateTo((bearing + (360 * progress) / 3000) % 360, { duration: 0 });
 
+        if (progress < 3000) {
+          // Continue rotating
+          requestAnimationFrame(animate);
+        } else {
+          // Stop rotating and fly to the end location
+          map.rotateTo(bearing);
+          map.flyTo(endLocation);
+        }
+      }
+      requestAnimationFrame(animate);
+    }
+    rotateAndFlyTo(endLocation);
     return () => map.remove();
   }, [selectedLayer]);
 
@@ -358,62 +309,7 @@ export default function ActivitiesCard() {
             height: '100vh',
             position: 'relative',
           }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            <MountainIcon
-              style={{
-                marginRight: '10px',
-                color:
-                  selectedLayer === 'mapbox://styles/mapbox/outdoors-v11'
-                    ? 'black'
-                    : 'white',
-              }}
-            />
-            <h1
-              style={{
-                position: 'relative',
-                display: 'inline-block',
-                marginTop: '1rem',
-                color:
-                  selectedLayer === 'mapbox://styles/mapbox/outdoors-v11'
-                    ? 'black'
-                    : 'white',
-                fontSize: '1.5rem',
-                zIndex: '1000',
-              }}
-            >
-              {queryData.elevation} mtrs
-            </h1>
-          </div>
-
-          <div style={{ display: 'inline', alignItems: 'center' }}>
-            <RulerIcon
-              style={{
-                marginRight: '10px',
-                color:
-                  selectedLayer === 'mapbox://styles/mapbox/outdoors-v11'
-                    ? 'black'
-                    : 'white',
-              }}
-            />
-            <h1
-              style={{
-                position: 'relative',
-                display: 'inline-block',
-                marginTop: '1rem',
-                color:
-                  selectedLayer === 'mapbox://styles/mapbox/outdoors-v11'
-                    ? 'black'
-                    : 'white',
-                fontSize: '1.5rem',
-                zIndex: '1000',
-              }}
-            >
-              {' '}
-              {queryData.distance} {' km'}
-            </h1>
-          </div>
-        </div>
+        ></div>
       </div>
     </>
   );
