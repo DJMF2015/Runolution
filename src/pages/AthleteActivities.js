@@ -13,6 +13,7 @@ import { getKmsToMiles, getSecondstoMinutes, formattedDate } from '../utils/conv
 import polyline from '@mapbox/polyline';
 import Login from './Login';
 import Search from '../utils/search';
+import TimeRangeCalendar from '../components/TimeRangeCalendar';
 import '../App.css';
 import { Link } from 'react-router-dom';
 import AthleteStats from './AthleteStats';
@@ -27,6 +28,7 @@ const AthleteActivities = () => {
   const [nodes, setNodes] = useState([]);
   const { windowWidth } = useGetWindowWidth();
   const { isVisible, scrollToTop } = useScroll();
+
   useEffect(() => {
     const token = localStorage.getItem('access_token');
     const accessToken = JSON.parse(token);
@@ -125,7 +127,7 @@ const AthleteActivities = () => {
 
   return (
     <>
-      {!payload && <Login />}
+      {!payload ? <Login /> : null}
 
       {isVisible && (
         <div onClick={scrollToTop}>
@@ -140,6 +142,8 @@ const AthleteActivities = () => {
         />
       )}
       <AthleteStats />
+      <TimeRangeCalendar props={activities} />
+
       <SideNavigation>
         <div>
           {filteredName.map((activity, i) => (
@@ -308,7 +312,6 @@ const CardDetails = styled.div`
   justify-content: center;
   position: relative;
   background-color: #fff;
-  /* z-index: */
   font-family: 'Roboto', sans-serif;
   text-align: left;
 
@@ -329,7 +332,7 @@ const Cardborder = styled.div`
   padding: 0rem;
   margin: 1rem;
   margin-left: 3rem;
-  width: calc((100% - 7rem));
+  width: calc((100% - 10rem));
   text-align: left;
   background-color: white;
   color: #333;
@@ -357,7 +360,7 @@ const ActivityName = styled.h2`
   font-size: 1rem;
   display: flex;
   flex-direction: row;
-  margin: 15px 0 0 0; // top right bottom left
+  margin: 15px 0px 0 0px; // top right bottom left
   text-align: center;
   justify-content: center;
   color: ${(props) => props.theme.colour.strava};
