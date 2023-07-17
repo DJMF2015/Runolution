@@ -1,18 +1,13 @@
 import { ResponsiveTimeRange } from '@nivo/calendar';
 import styled from 'styled-components';
+import { useState, useEffect } from 'react';
 import { formattedDate, getCurrentDate } from '../utils/conversion';
 
 const TimeRangeCalendar = (props) => {
   const accessToken = localStorage.getItem('access_token');
   let formatted = getCurrentDate();
+  const [activitiesCount, setActivityCounts] = useState(0);
   let date = formattedDate(formatted.currentDate.toISOString().split('T')[0]);
-
-  const formattedData = props?.props.map((item) => {
-    return {
-      day: formattedDate(item.start_date),
-      value: 0,
-    };
-  });
 
   const ThreeSixtyDaysAgo = new Date(
     formatted.currentYear,
@@ -21,15 +16,29 @@ const TimeRangeCalendar = (props) => {
   );
   let formattedSixtyDaysAgo = ThreeSixtyDaysAgo.toISOString().split('T')[0];
 
-  for (let i = 0; i < formattedData.length; i++) {
-    for (let y = 1; y < formattedData.length; y++) {
-      if (formattedData[i].day === formattedData[y].day) {
-        formattedData[i].value = formattedData[i].value + 1;
-      } else {
-        formattedData[i].value = formattedData[i].value + 0;
-      }
-    }
-  }
+  useEffect(() => {
+    // Count activities on each date
+    const countActivitiesByDate = () => {
+      const activitiesCount = {};
+      props?.props.forEach((activity) => {
+        const date = activity?.start_date_local.slice(0, 10); // Extract the date from the activity start_date_local
+        activitiesCount[date] = (activitiesCount[date] || 0) + 1;
+      });
+
+      // Filter dates with two or more activities
+      const multipleActivities = {};
+      Object.keys(activitiesCount).forEach((date) => {
+        if (activitiesCount[date] >= 1) {
+          multipleActivities[date] = activitiesCount[date];
+        }
+      });
+
+      setActivityCounts(multipleActivities);
+    };
+
+    countActivitiesByDate();
+  }, [props?.props]);
+
   return (
     accessToken && (
       <StyledCalendar>
@@ -37,7 +46,10 @@ const TimeRangeCalendar = (props) => {
           Activities
         </h4>
         <ResponsiveTimeRange
-          data={formattedData}
+          data={Object.keys(activitiesCount).map((date) => ({
+            day: date,
+            value: activitiesCount[date],
+          }))}
           from={formattedSixtyDaysAgo}
           to={date}
           minValue={0}
