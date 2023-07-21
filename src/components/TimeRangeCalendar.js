@@ -9,6 +9,7 @@ const TimeRangeCalendar = (props) => {
   const [activitiesCount, setActivityCounts] = useState(0);
   let date = formattedDate(formatted.currentDate.toISOString().split('T')[0]);
 
+  // Get date 360 days ago from today
   const ThreeSixtyDaysAgo = new Date(
     formatted.currentYear,
     formatted.currentMonth,
@@ -20,28 +21,42 @@ const TimeRangeCalendar = (props) => {
     // Count activities on each date
     const countActivitiesByDate = () => {
       const activitiesCount = {};
+
       props?.props.forEach((activity) => {
         const date = activity?.start_date_local.slice(0, 10); // Extract the date from the activity start_date_local
-        activitiesCount[date] = (activitiesCount[date] || 0) + 1;
+        activitiesCount[date] = (activitiesCount[date] || 0) + 1; // Increment the count for the date by 1 or initialize it to 1 if it doesn't exist
       });
 
-      // Filter dates with two or more activities
-      const multipleActivities = {};
+      // Filter dates with one or more activities
+      let multipleActivities = {};
       Object.keys(activitiesCount).forEach((date) => {
         if (activitiesCount[date] >= 1) {
-          multipleActivities[date] = activitiesCount[date];
+          multipleActivities = activitiesCount;
         }
       });
-
       setActivityCounts(multipleActivities);
     };
 
     countActivitiesByDate();
   }, [props?.props]);
 
+  // sum the total distance of all activities for each individual calendar year
+  const data = props?.props?.reduce((acc, activity) => {
+    // exytract date from the year
+    const date = activity?.start_date_local.slice(0, 10);
+    // extract the exact year only
+    const year = date.slice(0, 4);
+    // calculate the total distnace from the activity for each year
+    acc[year] = (acc[year] || 0) + activity?.distance;
+
+    return acc;
+  }, {});
+  console.log({ data });
+
   return (
     accessToken && (
       <StyledCalendar>
+        *{' '}
         <h4 style={{ marginBottom: '-1rem', marginTop: '1rem', textAlign: 'center' }}>
           Activities
         </h4>
@@ -82,6 +97,8 @@ const TimeRangeCalendar = (props) => {
 export default TimeRangeCalendar;
 
 const StyledCalendar = styled.div`
+  /* display: flex; */
+  /* grid-template-rows: 1fr; */
   height: 35vh;
   width: 50vw;
   margin-left: 25rem;
