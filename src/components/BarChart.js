@@ -81,7 +81,7 @@ export default function PaceZoneChart(props) {
         label: heartRate !== undefined ? 'Average Heartrate' : '',
         data: heartRate,
         borderColor: 'blue',
-        backgroundColor: 'red',
+        // backgroundColor: 'red',
         borderWidth: 2,
         yAxisID: 'y', // Left y-axis
       },
@@ -89,7 +89,8 @@ export default function PaceZoneChart(props) {
         label: elevation !== undefined ? 'Elevation Difference' : '',
         data: elevation,
         borderColor: 'green',
-        backgroundColor: 'orange',
+        color: 'green',
+        // backgroundColor: 'orange',
         borderWidth: 2,
         yAxisID: 'y1', // Right y-axis
       },
