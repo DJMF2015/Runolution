@@ -80,17 +80,18 @@ export default function PaceZoneChart(props) {
       {
         label: heartRate !== undefined ? 'Average Heartrate' : '',
         data: heartRate,
-        borderColor: 'blue',
-        // backgroundColor: 'red',
-        borderWidth: 2,
+        borderColor: 'red',
+        color: 'red',
+        fill: true,
+        borderWidth: 3,
         yAxisID: 'y', // Left y-axis
       },
       {
         label: elevation !== undefined ? 'Elevation Difference' : '',
         data: elevation,
-        borderColor: 'green',
-        color: 'green',
-        // backgroundColor: 'orange',
+        fill: true,
+        borderColor: 'blue',
+        color: 'blue',
         borderWidth: 2,
         yAxisID: 'y1', // Right y-axis
       },
@@ -118,8 +119,12 @@ export default function PaceZoneChart(props) {
 
   return (
     <>
-      <div style={{ marginBottom: '-300px' }}>
-        <div className="chart" style={{ width: '50vw', height: '330px' }}></div>
+      <div
+        style={{
+          marginTop: '6rem',
+        }}
+      >
+        <div className="chart" style={{ width: '50vw', height: '330px' }} />
         <div
           className="chart"
           style={{
