@@ -1,7 +1,5 @@
-import { useEffect, useState, useRef } from 'react';
-import mapboxgl from 'mapbox-gl';
-import * as turf from '@turf/turf';
-import 'mapbox-gl/dist/mapbox-gl.css';
+import { useEffect, useState } from 'react';
+
 // custom hook for getting the window width
 export const useGetWindowWidth = () => {
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
@@ -23,7 +21,7 @@ export const useScroll = () => {
   const [isVisible, setIsVisible] = useState(false);
 
   const toggleVisibility = () => {
-    if (window.pageYOffset > 300) {
+    if (window.scrollY > 300) {
       setIsVisible(true);
     } else {
       setIsVisible(false);
