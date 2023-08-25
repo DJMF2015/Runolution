@@ -1,15 +1,10 @@
 import styled from 'styled-components';
 import { useLocation, useNavigate } from 'react-router-dom';
-import {
-  getSecondstoMinutes,
-  getKmsToMiles,
-  getMstoKmHr,
-  maxHeartRate,
-} from '../utils/conversion';
+import { getSecondstoMinutes, getKmsToMiles, getMstoKmHr } from '../utils/conversion';
 import { getDetailedAthleteData } from '../utils/functions';
 import { useScroll } from '../utils/hooks';
 import StravaEmbed from '../components/StravaEmbed';
-import PaceZoneBarChart from './BarChart';
+import PaceZoneBarChart from './BestEffortsChart';
 import ElevationChart from './ElevationBarChart';
 import { useEffect, useState } from 'react';
 import { ArrowUpCircleFill } from '@styled-icons/bootstrap/ArrowUpCircleFill';
