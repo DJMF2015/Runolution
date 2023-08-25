@@ -10,65 +10,61 @@ import { CalendarDateFill } from '@styled-icons/bootstrap/CalendarDateFill';
 import { Activity } from '@styled-icons/evaicons-solid/Activity';
 import { Stopwatch } from '@styled-icons/boxicons-regular/Stopwatch';
 import { getKmsToMiles, getSecondstoMinutes, formattedDate } from '../utils/conversion';
-import polyline from '@mapbox/polyline';
-import Login from './Login';
+import Login from '../components/Login';
 import Search from '../utils/search';
 import TimeRangeCalendar from '../components/TimeRangeCalendar';
 import '../App.css';
 import { Link } from 'react-router-dom';
-import AthleteStats from './AthleteStats';
+import AthleteStats from '../components/AthleteStats';
 
 const AthleteActivities = () => {
-  const [payload, setPayload] = useState([]);
   const [activities, setActivities] = useState([]);
-  const [activityName, setActivityName] = useState([]);
   const [searchTxt, setSearchTxt] = useState('');
-  const [pageIndex, setPageIndex] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [nodes, setNodes] = useState([]);
   const { windowWidth } = useGetWindowWidth();
   const { isVisible, scrollToTop } = useScroll();
+  const [activityLoadingState, setActivityLoadingState] = useState(null);
+
+  const access_token = JSON.parse(localStorage.getItem('access_token'));
+  const data = JSON.parse(localStorage.getItem('activities'));
+  const expires_in = localStorage.getItem('expires_in');
+  const payload = JSON.parse(localStorage.getItem('access_token'));
 
   useEffect(() => {
-    const token = localStorage.getItem('access_token');
-    const accessToken = JSON.parse(token);
-    setPayload(accessToken);
-  }, []);
-
-  useEffect(() => {
-    async function fetchData() {
-      const user = await getUsersDetails(payload);
-    }
     if (payload) {
-      fetchData();
+      getUsersDetails(payload);
     }
   }, [payload]);
 
-  const fetchData = async (pageIndex) => {
-    setLoading(true);
-    try {
-      if (payload) {
-        const response = await getAthleteActivities(payload, 200, pageIndex); // fetch data from Strava API
-        if (response.data.length === 0) {
-          localStorage.setItem('activities', JSON.stringify(activities));
-          return;
-        }
-        const newData = response.data || [];
-        setActivities((prevItems) => [...prevItems, ...newData]);
-        setPageIndex((prevPage) => prevPage + 1); // increment page index
+  useEffect(() => {
+    async function fetchData() {
+      if (data !== null && data !== undefined) {
+        setLoading(false);
+        return;
       }
-    } catch (error) {
-      catchErrors(error);
-    } finally {
+
+      setLoading(true);
+      let stravaActivityResponse = await fetchStravaActivities(access_token);
       setLoading(false);
+      setActivities(stravaActivityResponse);
+      localStorage.setItem('activities', JSON.stringify(stravaActivityResponse));
     }
-  };
+
+    catchErrors(fetchData());
+  }, [data, access_token]);
 
   useEffect(() => {
-    const expires_at = localStorage.getItem('expires_at');
-    const expires_in = localStorage.getItem('expires_in');
+    const data = localStorage.getItem('activities');
+    if (data !== null && data !== undefined) {
+      setActivities(JSON.parse(data));
+    }
+  }, [payload]);
+
+  useEffect(() => {
     const fetchTokenInfo = async () => {
       try {
+        const expires_at = localStorage.getItem('expires_at');
+        const expires_in = localStorage.getItem('expires_in');
         if (expires_at && expires_in) {
           checkIfTokenExpired(expires_in, expires_at);
         }
@@ -80,157 +76,163 @@ const AthleteActivities = () => {
     fetchTokenInfo();
   }, []);
 
-  useEffect(() => {
-    const data = localStorage.getItem('activities'); // get data from local storage
-    if (data !== null && data !== undefined) {
-      setActivities(JSON.parse(data));
-    } else {
-      fetchData(pageIndex);
-    }
-  }, [payload, pageIndex]);
+  const fetchStravaActivities = async (accessToken) => {
+    let stravaActivityResponse = [];
+    let looper_num = 1;
 
-  useEffect(() => {
-    if (activities.length > 0) {
-      setLoading(true);
-      const stravaActivityResponse = activities;
-      let polylines = [];
-      for (let i in stravaActivityResponse) {
-        const activityName = stravaActivityResponse[i]?.name;
-        let activity_polyline = stravaActivityResponse?.[i]?.map?.summary_polyline;
-        if (stravaActivityResponse === undefined || stravaActivityResponse === null) {
-          setLoading(false);
-        }
-        setActivityName(activityName);
-        polylines.push({
-          activityPositions: polyline.toGeoJSON(activity_polyline),
-          activityName: activityName,
-        });
+    while (looper_num || stravaActivityResponse.length === 0) {
+      const stravaActivityResponseSingle = await getAthleteActivities(
+        accessToken,
+        200,
+        looper_num
+      );
+
+      if (
+        !stravaActivityResponseSingle.data ||
+        stravaActivityResponseSingle.data.length === 0 ||
+        stravaActivityResponseSingle.data.errors
+      ) {
+        setLoading(false);
+        break;
+      } else {
+        setActivityLoadingState(stravaActivityResponse.length);
+        stravaActivityResponse = stravaActivityResponse.concat(
+          stravaActivityResponseSingle.data
+        );
       }
-      setNodes(polylines);
-      setLoading(false);
+      looper_num++;
     }
-  }, [activities]);
 
-  const filteredName = activities.filter((activity) => {
+    return stravaActivityResponse;
+  };
+
+  const filteredActivities = activities.filter((activity) => {
     return activity.name.toLowerCase().includes(searchTxt.toLowerCase());
   });
 
-  if (loading)
+  if (loading && access_token) {
     return (
-      <div style={{ body: 'black' }}>
+      <div>
         <h1 style={{ color: 'red', textAlign: 'center' }}>
-          Loading...
-          <div className={LoadingWheel.loading}>...</div>
+          <div className={LoadingWheel.loading} style={{ color: 'darkorange' }}>
+            ...
+          </div>
+          Wait. Loading {activityLoadingState} activities......
         </h1>
       </div>
     );
+  }
 
   return (
     <>
-      {!payload ? <Login /> : null}
+      {!access_token || expires_in === '0' ? (
+        <Login />
+      ) : (
+        <>
+          {isVisible && (
+            <div onClick={scrollToTop}>
+              <ScrollToTop alt="Go to top"></ScrollToTop>
+            </div>
+          )}
+          {windowWidth >= 600 && (
+            <Search
+              searchTxt={searchTxt}
+              updateSearchTxt={setSearchTxt}
+              placeholder="search activities..."
+            />
+          )}
+          <AthleteStats />
+          <TimeRangeCalendar props={activities} />
 
-      {isVisible && (
-        <div onClick={scrollToTop}>
-          <ScrollToTop alt="Go to top"></ScrollToTop>
-        </div>
-      )}
-      {windowWidth >= 600 && (
-        <Search
-          searchTxt={searchTxt}
-          updateSearchTxt={setSearchTxt}
-          placeholder="search activities..."
-        />
-      )}
-      <AthleteStats />
-      <TimeRangeCalendar props={activities} />
-
-      <SideNavigation>
-        <div>
-          {filteredName.map((activity, i) => (
-            <>
-              {activity.map?.summary_polyline ? (
-                <div key={activity.id}>
-                  <Link
-                    to="/activity"
-                    state={{ from: activity }}
-                    key={`${activity.id}--${activity.moving_time}--${activity.average_heartrate}`}
-                  >
-                    <h2>
-                      {i + 1}. {activity.name}
-                    </h2>
-                  </Link>
-                </div>
-              ) : (
-                <div key={i}>
-                  <h3>
-                    {i + 1}. {activity?.name}
-                  </h3>
-                </div>
-              )}
-            </>
-          ))}
-        </div>
-      </SideNavigation>
-      {windowWidth < 600 && (
-        <Search
-          searchTxt={searchTxt}
-          updateSearchTxt={setSearchTxt}
-          placeholder={'Search Activities'}
-        />
-      )}
-
-      <CardDetails>
-        {filteredName
-          .map((activity, i) => (
-            <>
-              {activity.map?.summary_polyline ? (
-                <Cardborder>
-                  <div key={i}>
-                    <Link
-                      style={{ textDecoration: 'none' }}
-                      to="/activity"
-                      state={{ from: activity }}
-                      key={`${activity.id}--${activity.moving_time}--${activity.average_heartrate}`}
-                    >
-                      <ActivityName>{activity.name}</ActivityName>
-                    </Link>
-                    <Text>
-                      <p>
-                        <ActivityIcon /> Distance: {getKmsToMiles(activity.distance)}
-                      </p>
-                      <p>
-                        <StopWatchIcon />
-                        Time: {getSecondstoMinutes(activity.moving_time)}{' '}
-                      </p>
-                      <p>
-                        {' '}
-                        <CalendarIcon />
-                        {formattedDate(activity.start_date)}
-                      </p>
-                      <p>
-                        {' '}
-                        <ThumbUpIcon /> kudos: {activity.kudos_count}{' '}
-                      </p>
-                    </Text>
-                  </div>
-                </Cardborder>
-              ) : (
-                <div key={i}>
-                  <Cardborder>
-                    <div key={i}>
-                      <h2>{activity?.name}</h2>
-                      <p>{getKmsToMiles(activity?.distance)}</p>
-                      <p>{getSecondstoMinutes(activity?.moving_time)} </p>
-                      <p>Date: {formattedDate(activity?.start_date)}</p>
-                      <p>kudos: {activity?.kudos_count}</p>
+          <SideNavigation>
+            <div>
+              {filteredActivities.map((activity, i) => (
+                <>
+                  {activity.map?.summary_polyline ? (
+                    <div key={activity.id}>
+                      <Link
+                        to="/activity"
+                        state={{ from: activity }}
+                        key={`${activity.id}--${activity.moving_time}--${activity.average_heartrate}`}
+                      >
+                        <h2>
+                          {i + 1}. {activity.name}
+                        </h2>
+                      </Link>
                     </div>
-                  </Cardborder>
-                </div>
-              )}
-            </>
-          ))
-          .slice(0, pageIndex + 10)}
-      </CardDetails>
+                  ) : (
+                    <div key={i}>
+                      <h3>
+                        {i + 1}. {activity?.name}
+                      </h3>
+                    </div>
+                  )}
+                </>
+              ))}
+            </div>
+          </SideNavigation>
+          {windowWidth < 600 && (
+            <Search
+              searchTxt={searchTxt}
+              updateSearchTxt={setSearchTxt}
+              placeholder={'Search Activities'}
+            />
+          )}
+
+          <CardDetails>
+            {filteredActivities
+              .map((activity, i) => (
+                <>
+                  {activity.map?.summary_polyline ? (
+                    <Cardborder>
+                      <div key={i}>
+                        <Link
+                          style={{ textDecoration: 'none' }}
+                          to="/activity"
+                          state={{ from: activity }}
+                          key={`${activity.id}--${activity.moving_time}--${activity.average_heartrate}`}
+                        >
+                          <ActivityName>{activity.name}</ActivityName>
+                        </Link>
+                        <Text>
+                          <p>
+                            <ActivityIcon /> Distance: {getKmsToMiles(activity.distance)}
+                          </p>
+                          <p>
+                            <StopWatchIcon />
+                            Time: {getSecondstoMinutes(activity.moving_time)}{' '}
+                          </p>
+                          <p>
+                            {' '}
+                            <CalendarIcon />
+                            {formattedDate(activity.start_date)}
+                          </p>
+                          <p>
+                            {' '}
+                            <ThumbUpIcon /> kudos: {activity.kudos_count}{' '}
+                          </p>
+                        </Text>
+                      </div>
+                    </Cardborder>
+                  ) : (
+                    <div key={i}>
+                      <Cardborder>
+                        <div key={i}>
+                          <h2>{activity?.name}</h2>
+                          <p>{getKmsToMiles(activity?.distance)}</p>
+                          <p>{getSecondstoMinutes(activity?.moving_time)} </p>
+                          <p>Date: {formattedDate(activity?.start_date)}</p>
+                          <p>kudos: {activity?.kudos_count}</p>
+                        </div>
+                      </Cardborder>
+                    </div>
+                  )}
+                </>
+              ))
+              .slice(0, 10)}
+          </CardDetails>
+        </>
+      )}
     </>
   );
 };
