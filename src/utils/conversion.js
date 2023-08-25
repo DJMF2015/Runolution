@@ -1,5 +1,3 @@
-import { type } from '@testing-library/user-event/dist/type';
-
 const getKmsToMiles = (distance) => {
   const miles = distance / 1610;
   return miles.toFixed(2);
