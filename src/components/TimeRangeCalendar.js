@@ -40,19 +40,6 @@ const TimeRangeCalendar = (props) => {
     countActivitiesByDate();
   }, [props?.props]);
 
-  // sum the total distance of all activities for each individual calendar year
-  const data = props?.props?.reduce((acc, activity) => {
-    // exytract date from the year
-    const date = activity?.start_date_local.slice(0, 10);
-    // extract the exact year only
-    const year = date.slice(0, 4);
-    // calculate the total distnace from the activity for each year
-    acc[year] = (acc[year] || 0) + activity?.distance;
-
-    return acc;
-  }, {});
-  console.log({ data });
-
   return (
     accessToken && (
       <StyledCalendar>
