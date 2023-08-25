@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { auth_link } from './config';
+import { auth_link, client_secret, client_id } from './config';
 
 // get exchange token from URL to retrieve the access token
 export const getExchangeCodeFromURL = (token) => {
@@ -13,7 +13,7 @@ export const getExchangeCodeFromURL = (token) => {
 export const getAccessToken = async (authCode) => {
   try {
     const response = await axios.post(
-      `https://www.strava.com/api/v3/oauth/token?client_id=27989&client_secret=183e7360ea130a4ded02e4fb219730c7b42e7e13&code=${authCode}&grant_type=authorization_code`
+      `${auth_link}?client_id=${client_id}&client_secret=${client_secret}&code=${authCode}&grant_type=authorization_code`
     );
     if (response.data) {
       storePayloadToLocalStorage(response.data);
@@ -30,7 +30,7 @@ export const getNewAccessToken = async () => {
 
   try {
     const response = await axios.post(
-      `${auth_link}?client_id=27989&client_secret=183e7360ea130a4ded02e4fb219730c7b42e7e13&refresh_token=${refreshToken}&grant_type=refresh_token`
+      `${auth_link}?client_id=${client_id}&client_secret=${client_secret}&refresh_token=${refreshToken}&grant_type=refresh_token`
     );
     if (response.data) {
       storePayloadToLocalStorage(response.data);
