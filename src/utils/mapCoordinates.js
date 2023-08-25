@@ -1,5 +1,6 @@
-const MapCoordinates = (activity_toGEOJSON) => {
-  const mapCoordinates = activity_toGEOJSON?.coordinates.map((item) => {
+const MapCoordinates = (polylines_toGEOJSON) => {
+  // convert the polyline coordinates to GEOJSON linestring
+  const mapCoordinates = polylines_toGEOJSON?.coordinates.map((item) => {
     return item.map((coords) => {
       return coords;
     });
