@@ -4,7 +4,7 @@ import { ArrowUpCircleFill } from '@styled-icons/bootstrap/ArrowUpCircleFill';
 import { getAthleteActivities } from '../utils/functions';
 import { catchErrors } from '../utils/helpers';
 import { formattedDate } from '../utils/conversion';
-import Login from './Login';
+import Login from '../components/Login';
 import styled from 'styled-components';
 import SearchBar from '../utils/search';
 import Layers from '../components/layers';
@@ -28,61 +28,69 @@ const ActivitiesMap = () => {
   const [activityLoadingState, setActivityLoadingState] = useState(null);
   const expires_in = localStorage.getItem('expires_in');
   let access_token = JSON.parse(localStorage.getItem('access_token'));
+  const data = JSON.parse(localStorage.getItem('activities'));
 
   useEffect(() => {
     setLoading(true);
+
     async function fetchData() {
       let polylines = [];
-      let stravaActivityResponse;
-      let looper_num = 1;
 
-      setLoading(true);
-      while (looper_num || stravaActivityResponse.length === 0) {
-        let stravaActivityResponse_single = await getAthleteActivities(
-          access_token,
-          200,
-          looper_num
-        );
-        if (
-          !stravaActivityResponse_single.data ||
-          stravaActivityResponse_single.data.length === 0 ||
-          stravaActivityResponse_single.data.errors
-        ) {
-          setLoading(false);
-          break;
-        } else if (stravaActivityResponse) {
-          setActivityLoadingState(stravaActivityResponse.length);
-          stravaActivityResponse = stravaActivityResponse.concat(
-            stravaActivityResponse_single.data
-          );
-        } else {
-          stravaActivityResponse = stravaActivityResponse_single.data;
-        }
-
-        looper_num++;
+      if (data) {
+        polylines = getDataPolylines(data);
+        setLoading(false);
+        setNodes(polylines);
+      } else if (data === null && access_token) {
+        const stravaActivityResponse = await fetchStravaActivities(access_token);
+        polylines = getDataPolylines(stravaActivityResponse);
+        localStorage.setItem('activities', JSON.stringify(stravaActivityResponse));
+        setLoading(false);
+        setNodes(polylines);
       }
-
-      for (let i = 0; i < stravaActivityResponse.length; i += 1) {
-        const activity_polyline = stravaActivityResponse[i].map.summary_polyline;
-        const activityDate = formattedDate(stravaActivityResponse[i].start_date_local);
-        const activityName = stravaActivityResponse[i].name;
-        const activityType = stravaActivityResponse[i].type;
-        const activityId = stravaActivityResponse[i].id;
-        polylines.push({
-          activityPositions: polyline.decode(activity_polyline),
-          activityName: activityName,
-          activityDate: activityDate,
-          activityType: activityType,
-          activityId: activityId,
-        });
-      }
-      setLoading(false);
-
-      setNodes(polylines);
     }
+
     catchErrors(fetchData());
     // eslint-disable-next-line
   }, []);
+
+  const getDataPolylines = (activities) => {
+    return activities.map((activity) => ({
+      activityPositions: polyline.decode(activity.map.summary_polyline),
+      activityName: activity.name,
+      activityDate: formattedDate(activity.start_date_local),
+      activityType: activity.type,
+      activityId: activity.id,
+    }));
+  };
+
+  const fetchStravaActivities = async (accessToken) => {
+    let stravaActivityResponse = [];
+    let looper_num = 1;
+
+    while (looper_num || stravaActivityResponse.length === 0) {
+      const stravaActivityResponseSingle = await getAthleteActivities(
+        accessToken,
+        200,
+        looper_num
+      );
+
+      if (
+        !stravaActivityResponseSingle.data ||
+        stravaActivityResponseSingle.data.length === 0 ||
+        stravaActivityResponseSingle.data.errors
+      ) {
+        setLoading(false);
+        break;
+      } else {
+        setActivityLoadingState(stravaActivityResponse.length);
+        stravaActivityResponse = stravaActivityResponse.concat(
+          stravaActivityResponseSingle.data
+        );
+      }
+      looper_num++;
+    }
+    return stravaActivityResponse;
+  };
 
   const filteredName = nodes.filter((activity) => {
     return activity.activityName.toLowerCase().includes(searchTxt.toLowerCase());
@@ -103,7 +111,7 @@ const ActivitiesMap = () => {
 
   return (
     <>
-      {!access_token || expires_in === '0' ? (
+      {!access_token || expires_in === 0 ? (
         <Login />
       ) : (
         <>
@@ -135,15 +143,7 @@ const ActivitiesMap = () => {
                 </a>
               ))}
           </SideNavigation>
-          {windowWidth < 785 && (
-            <SearchBar
-              searchTxt={searchTxt}
-              updateSearchTxt={setSearchTxt}
-              width={'75%'}
-              fontSize="1rem"
-              placeholder="Search by activity name..."
-            />
-          )}
+
           <div
             style={{
               position: 'relative',
@@ -151,12 +151,22 @@ const ActivitiesMap = () => {
               height: '600px',
             }}
           >
+            {windowWidth < 785 && (
+              <SearchBar
+                searchTxt={searchTxt}
+                updateSearchTxt={setSearchTxt}
+                width={'75%'}
+                fontSize="1rem"
+                placeholder="Search by activity name..."
+              />
+            )}
+
             <MapContainer
               style={{ height: '100vh', width: '100vw', zIndex: 0 }}
               center={[55.89107, -3.21698]}
               zoom={7}
               zoomControl={false}
-              bounds={nodes.map((node) => node.activityPositions)} //
+              bounds={nodes.map((node) => node.activityPositions)}
               boundsOptions={{ padding: [50, 50] }}
               maxBoundsViscosity={0}
               scrollWheelZoom={true}
@@ -173,6 +183,7 @@ const ActivitiesMap = () => {
                     </LayersControl.BaseLayer>
                   );
                 })}
+
                 {filteredName &&
                   filteredName.map((activity, i) => (
                     <div>
@@ -181,7 +192,7 @@ const ActivitiesMap = () => {
                           positions={activity.activityPositions}
                           key={i}
                           weight={3}
-                          color="red"
+                          color={'red'}
                           smoothFactor={0.7}
                           vectorEffect="non-scaling-stroke"
                           opacity={0.5}
@@ -229,7 +240,7 @@ const SideNavigation = styled.div`
   display: block;
   position: fixed;
   z-index: 1;
-  top: 0;
+  top: 2em;
   left: 0;
   scroll-behavior: smooth;
   overflow-y: scroll;
