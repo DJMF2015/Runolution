@@ -37,7 +37,7 @@ const SearchInput = styled.input`
   border: 1px solid #aaa;
   border-radius: 4px;
   margin: 0 auto;
-  margin-top: 1rem;
+  margin-top: 7rem;
   outline: none;
   padding: 8px;
   box-sizing: border-box;
@@ -59,10 +59,10 @@ const SearchInput = styled.input`
     cursor: pointer;
     border-radius: 4px;
     font-size: 18px;
-    width: 65%;
+    width: 50%;
     padding: 10px;
-    margin-right: 1rem;
-    margin-top: 1rem;
+    margin-right: 6rem;
+    margin-top: 7rem;
     margin-bottom: 1rem;
   }
 
@@ -77,7 +77,7 @@ const SearchInput = styled.input`
     font-size: 18px;
     width: 65%;
     padding: 8px;
-    margin-top: 1rem;
+    margin-top: 6rem;
     margin-bottom: 0rem;
   }
 `;
