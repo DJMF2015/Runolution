@@ -5,7 +5,7 @@ import Layout from './pages/Layout';
 import Activities from './pages/AthleteActivities';
 import ActivityList from './components/ActivityList';
 import Redirect from './utils/Redirect';
-import Login from './pages/Login';
+import Login from './components/Login';
 import ActivitiesMap from './pages/ActivitiesMap';
 import ActivitiesCard from './components/ActivitiesCard';
 
