@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import Login from './Login';
+import Login from '../components/Login';
 import { catchErrors } from '../utils/helpers';
 import { getUsersDetails, getUsersClubActivities } from '../utils/functions';
 
