@@ -1,3 +1,13 @@
+
+.navigation-layer {
+    /* make navigation bar stay fixed at top of screen when user scolls down */
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 1; 
+}
+
 .navigation {
     height: 70px;
     width: 100%;

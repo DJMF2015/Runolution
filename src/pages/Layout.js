@@ -1,71 +1,76 @@
 import { Outlet, Link } from 'react-router-dom';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import LogoutButton from '../components/Logout';
 import PoweredByStrava from '../pwrdBy_strava_light.svg';
 import styled from 'styled-components';
 import '../styles/Navbar.css';
 const Layout = () => {
-  const athlete = JSON.parse(localStorage.getItem('athlete'));
+  const [athlete, setAthleteData] = useState([]);
   const [isNavExpanded, setIsNavExpanded] = useState(false);
+
+  useEffect(() => {
+    const athlete = JSON.parse(localStorage.getItem('athlete'));
+    setAthleteData(athlete);
+  }, []);
 
   return (
     <>
-      <nav className="navigation">
-        <a href="/" className="name">
-          {athlete ? <ImageLogo src={athlete?.profile_medium} alt="user_logo" /> : ''}
-        </a>
-        {athlete ? (
-          <>
-            <AthleteName>{athlete?.firstname + ' ' + athlete?.lastname}</AthleteName>
-            <AthleteFollowers>
-              {athlete?.follower_count > 0 && athlete?.follower_count + ' followers'}
-            </AthleteFollowers>
-          </>
-        ) : (
-          ''
-        )}
+      <span className="navigation-layer">
+        <nav className="navigation">
+          <a href="/" className="name">
+            {athlete && <ImageLogo src={athlete?.profile_medium} alt="user_logo" />}
+          </a>
+          {athlete && (
+            <>
+              <AthleteName>{athlete?.firstname + ' ' + athlete?.lastname}</AthleteName>
+              <AthleteFollowers>
+                {athlete?.follower_count > 0 && athlete?.follower_count + ' followers'}
+              </AthleteFollowers>
+            </>
+          )}
 
-        <img
-          src={PoweredByStrava}
-          alt="powered_by_strava"
-          className="powered_by_strava"
-        />
+          <img
+            src={PoweredByStrava}
+            alt="powered_by_strava"
+            className="powered_by_strava"
+          />
 
-        <button
-          className="hamburger"
-          onClick={() => {
-            setIsNavExpanded(!isNavExpanded);
-          }}
-        >
-          <svg
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={1.5}
-            viewBox="0 0 24 24"
-            xmlns="http://www.w3.org/2000/svg"
-            aria-hidden="true"
+          <button
+            className="hamburger"
+            onClick={() => {
+              setIsNavExpanded(!isNavExpanded);
+            }}
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
-            />
-          </svg>
-        </button>
-        <div className={isNavExpanded ? 'navigation-menu expanded' : 'navigation-menu'}>
-          <ul>
-            <LinksList>
-              <Link to="/">Personal Activities</Link>
-            </LinksList>
-            <LinksList>
-              <Link to="/map">Personal HeatMap</Link>
-            </LinksList>
-            <LinksList>
-              <LogoutButton />
-            </LinksList>
-          </ul>
-        </div>
-      </nav>
+            <svg
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.5}
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
+              />
+            </svg>
+          </button>
+          <div className={isNavExpanded ? 'navigation-menu expanded' : 'navigation-menu'}>
+            <ul>
+              <LinksList>
+                <Link to="/">Personal Activities</Link>
+              </LinksList>
+              <LinksList>
+                <Link to="/map">Personal HeatMap</Link>
+              </LinksList>
+              <LinksList>
+                <LogoutButton />
+              </LinksList>
+            </ul>
+          </div>
+        </nav>
+      </span>
       <Outlet />
     </>
   );
@@ -129,12 +134,6 @@ const AthleteFollowers = styled.h3`
     font-size: 0.6rem;
     margin: 20px 0 0px -60px;
   }
-`;
-
-const AthleteClubs = styled.h4`
-  color: #fff;
-  font-size: 0.7rem;
-  margin: 15px 10px 10px 90px; //
 `;
 
 const LinksList = styled.li`
