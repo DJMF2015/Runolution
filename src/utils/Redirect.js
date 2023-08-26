@@ -11,7 +11,9 @@ const Redirect = () => {
       const code = await getExchangeCodeFromURL(exchangeCode); // get exchange code from URL
       const response = await getAccessToken(code); // get access token from Strava API
 
-      setPayload(response);
+      if (response && response.access_token) {
+        setPayload(response);
+      }
     }
 
     getToken();
