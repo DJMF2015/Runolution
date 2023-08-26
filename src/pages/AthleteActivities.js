@@ -1,10 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import {
-  getAthleteActivities,
-  getUsersDetails,
-  getAthleteStats,
-} from '../utils/functions';
+import { getAthleteActivities, getUsersDetails } from '../utils/functions';
 import { useGetWindowWidth, useScroll } from '../utils/hooks';
 import { catchErrors, checkIfTokenExpired } from '../utils/helpers';
 import LoadingWheel from '../styles/Loading.module.css';
@@ -17,7 +13,6 @@ import { getKmsToMiles, getSecondstoMinutes, formattedDate } from '../utils/conv
 import Login from '../components/Login';
 import Search from '../utils/search';
 import TimeRangeCalendar from '../components/TimeRangeCalendar';
-import BreakdownChart from '../components/BreakdownChart';
 import '../App.css';
 import { Link } from 'react-router-dom';
 import AthleteStats from '../components/AthleteStats';
@@ -29,10 +24,17 @@ const AthleteActivities = () => {
   const { windowWidth } = useGetWindowWidth();
   const { isVisible, scrollToTop } = useScroll();
   const [activityLoadingState, setActivityLoadingState] = useState(null);
-  const [stats, setAthleteStats] = useState([]);
+
   const access_token = JSON.parse(localStorage.getItem('access_token'));
   const data = JSON.parse(localStorage.getItem('activities'));
   const expires_in = localStorage.getItem('expires_in');
+  const payload = JSON.parse(localStorage.getItem('access_token'));
+
+  useEffect(() => {
+    if (payload) {
+      getUsersDetails(payload);
+    }
+  }, [payload]);
 
   useEffect(() => {
     async function fetchData() {
@@ -56,7 +58,7 @@ const AthleteActivities = () => {
     if (data !== null && data !== undefined) {
       setActivities(JSON.parse(data));
     }
-  }, []);
+  }, [payload]);
 
   useEffect(() => {
     const fetchTokenInfo = async () => {
@@ -141,7 +143,7 @@ const AthleteActivities = () => {
           )}
           <AthleteStats />
           <TimeRangeCalendar props={activities} />
-          {/* <BreakdownChart /> */}
+
           <SideNavigation>
             <div>
               {filteredActivities.map((activity, i) => (
