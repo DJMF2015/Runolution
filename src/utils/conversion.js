@@ -10,7 +10,7 @@ const getMilesToKms = (distance) => {
 
 const getMetresToFeet = (data) => {
   const mtrsToFt = data * 3.28084;
-  return getUnitsWithCommas(mtrsToFt.toFixed(2) + ' ft');
+  return getUnitsWithCommas(mtrsToFt.toFixed(0) + ' ft');
 };
 
 const getSecondstoMinutes = (seconds) => {
