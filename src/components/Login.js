@@ -15,9 +15,15 @@ const Login = () => {
   return (
     <>
       {logout && (
-        <StyledLoginContainer>
-          <img src={StravaConnectBtn} alt="Strava Connect Button" onClick={handleLogin} />
-        </StyledLoginContainer>
+        <StyledButtonWrapper>
+          <StyledLoginContainer>
+            <img
+              src={StravaConnectBtn}
+              alt="Strava Connect Button"
+              onClick={handleLogin}
+            />
+          </StyledLoginContainer>
+        </StyledButtonWrapper>
       )}
     </>
   );
@@ -30,8 +36,14 @@ const StyledLoginContainer = styled.main`
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  background-color: #f2f2f2;
   gap: 1rem;
   margin: 0 auto;
   height: 100vh;
+`;
+const StyledButtonWrapper = styled.div`
+  background-color: ${(props) => props.theme.colour.grey};
+  display: flex;
+  border-radius: 10px;
+  border-color: aliceblue;
+  z-index: 1000;
 `;
