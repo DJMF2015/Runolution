@@ -116,8 +116,12 @@ const StyledCalendar = styled.div`
 `;
 
 const StyledChartWrapper = styled.div`
-  margin-left: 90rem;
+  margin-left: 83rem;
   margin-top: -18rem;
+  @media screen and (min-width: 1800px) {
+    margin-left: 118rem;
+    margin-top: -18rem;
+  }
   @media screen and (max-width: 1400px) {
     margin-left: 88rem;
     margin-top: -18rem;
