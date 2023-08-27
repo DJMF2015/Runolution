@@ -2,10 +2,9 @@ import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 export default function ActivityDropDown(props) {
   const [sport, setActivityType] = useState([]);
-
   useEffect(() => {
     let activityArray = props.props.map((activity) => {
-      return activity.activityType;
+      return activity.activityType ? activity.activityType : activity.sport_type;
     });
     activityArray = [...new Set(activityArray)]; // remove duplicates
     activityArray.unshift('Sport Type');
@@ -15,6 +14,7 @@ export default function ActivityDropDown(props) {
   const setFilterBySportType = (e) => {
     props.setFilterBySportType(e.target.value);
   };
+
   return (
     <>
       <DropDown id="filterdropdown" onChange={setFilterBySportType}>

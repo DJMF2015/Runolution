@@ -10,6 +10,7 @@ import { CalendarDateFill } from '@styled-icons/bootstrap/CalendarDateFill';
 import { Activity } from '@styled-icons/evaicons-solid/Activity';
 import { Stopwatch } from '@styled-icons/boxicons-regular/Stopwatch';
 import { getKmsToMiles, getSecondstoMinutes, formattedDate } from '../utils/conversion';
+import ActivityDropDown from '../components/ActivityDropDown';
 import Login from '../components/Login';
 import Search from '../utils/search';
 import TimeRangeCalendar from '../components/TimeRangeCalendar';
@@ -24,7 +25,7 @@ const AthleteActivities = () => {
   const { windowWidth } = useGetWindowWidth();
   const { isVisible, scrollToTop } = useScroll();
   const [activityLoadingState, setActivityLoadingState] = useState(null);
-
+  const [filteredSportType, setFilterBySportType] = useState(null);
   const access_token = JSON.parse(localStorage.getItem('access_token'));
   const data = JSON.parse(localStorage.getItem('activities'));
   const expires_in = localStorage.getItem('expires_in');
@@ -106,10 +107,15 @@ const AthleteActivities = () => {
     return stravaActivityResponse;
   };
 
-  const filteredActivities = activities.filter((activity) => {
+  let filteredActivities = activities.filter((activity) => {
     return activity.name.toLowerCase().includes(searchTxt.toLowerCase());
   });
 
+  if (filteredSportType) {
+    filteredActivities = filteredActivities.filter((activity) => {
+      return activity.sport_type === filteredSportType;
+    });
+  }
   if (loading && access_token) {
     return (
       <div>
@@ -135,16 +141,22 @@ const AthleteActivities = () => {
             </div>
           )}
           {windowWidth >= 600 && (
-            <Search
-              searchTxt={searchTxt}
-              updateSearchTxt={setSearchTxt}
-              placeholder="search activities..."
-            />
+            <>
+              <Search
+                searchTxt={searchTxt}
+                updateSearchTxt={setSearchTxt}
+                placeholder="search activities..."
+              />
+            </>
           )}
           <AthleteStats />
           <TimeRangeCalendar props={activities} />
 
           <SideNavigation>
+            <ActivityDropDown
+              props={activities}
+              setFilterBySportType={setFilterBySportType}
+            />
             <div>
               {filteredActivities.map((activity, i) => (
                 <>
@@ -172,11 +184,17 @@ const AthleteActivities = () => {
             </div>
           </SideNavigation>
           {windowWidth < 600 && (
-            <Search
-              searchTxt={searchTxt}
-              updateSearchTxt={setSearchTxt}
-              placeholder={'Search Activities'}
-            />
+            <>
+              <ActivityDropDown
+                props={activities}
+                setFilterBySportType={setFilterBySportType}
+              />
+              <Search
+                searchTxt={searchTxt}
+                updateSearchTxt={setSearchTxt}
+                placeholder={'Search Activities'}
+              />
+            </>
           )}
 
           <CardDetails>
