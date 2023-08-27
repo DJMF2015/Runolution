@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { getAthleteStats } from '../utils/functions';
 import styled from 'styled-components';
+import { AthleteProfile } from './Profile';
 import { Run } from '@styled-icons/boxicons-regular/Run';
 import { Bicycle } from '@styled-icons/bootstrap/Bicycle';
 import {
@@ -10,117 +11,97 @@ import {
   getNoOfMtEverests,
 } from '../utils/conversion';
 const AthleteStats = () => {
-  const [payload, setPayload] = useState([]);
-  const [user, setUserData] = useState([]);
+  const athlete = JSON.parse(localStorage.getItem('athlete')) || {};
+  const token = JSON.parse(localStorage.getItem('access_token'));
 
-  useEffect(() => {
-    const athlete = localStorage.getItem('athlete');
-    const token = localStorage.getItem('access_token');
-    const athleteId = JSON.parse(athlete) || {};
-    const accessToken = JSON.parse(token);
-    setPayload({
-      athlete: athleteId?.id,
-      athleteName: athleteId?.firstname + ' ' + athleteId?.lastname,
-      athleteProfile: athleteId?.profile_medium,
-      athleteClubs: athleteId?.clubs,
-      athleteFollowers: athleteId?.follower_count,
-      access_token: accessToken,
-    });
-  }, [payload.athlete, payload.access_token]);
-
-  const AthleteProfile = ({ payload }) => {
-    return (
-      <>
-        <AvatarProfile className="athletename">{payload?.athleteName}</AvatarProfile>
-        <AvatarProfile className="followers">
-          <b>{'Followers: '}</b> {payload?.athleteFollowers}
-        </AvatarProfile>
-        {payload?.athleteClubs?.length > 0 && (
-          <AvatarProfile className="clubs">
-            {' '}
-            Clubs: {payload?.athleteClubs?.length}
-          </AvatarProfile>
-        )}
-      </>
-    );
-  };
+  const [user, setUser] = useState(null);
 
   useEffect(() => {
     async function fetchData() {
-      if (payload.athlete && payload.access_token) {
-        await getAthleteStats(payload.athlete, payload.access_token).then((response) => {
-          setUserData(response);
-        });
+      if (athlete.id && token) {
+        const response = await getAthleteStats(athlete.id, token);
+        setUser(response);
       }
     }
     fetchData();
-  }, [payload]);
+  }, [athlete.id, token]);
+
+  const renderTableData = (label, data) => (
+    <TableData>
+      <b>{`${label}: `}</b>
+      {data}
+    </TableData>
+  );
 
   return (
     <div>
       {user?.data && (
         <>
-          <AvatarImage src={payload?.athleteProfile} alt="Avatar" />
-          <AthleteProfile payload={payload} />
+          <AvatarImage src={athlete.profile_medium} alt="Avatar" />
+          <AthleteProfile athlete={athlete} />
 
           <Container>
             <Column>
               <TableHeading>All Time Totals</TableHeading>
               <RunIcon />
-              <TableData>
-                <b> {'Runs: '} </b> {user?.data?.all_run_totals?.count}
-              </TableData>
-              <TableData>
-                <b>{'Miles:'} </b> {getKmsToMiles(user?.data?.all_run_totals?.distance)}
-              </TableData>
-              <TableData>
-                <b>{'Kms: '}</b>
-                {getMilesToKms(user?.data?.all_run_totals?.distance)}
-              </TableData>
-              <TableData>
-                <b> {'Elevation:'} </b>
-                {getMetresToFeet(user?.data.all_run_totals.elevation_gain)}
-              </TableData>
-              <TableData>
-                <b> {'No. of Everests: '}</b>
-                {getNoOfMtEverests(user?.data.all_run_totals.elevation_gain)}
-              </TableData>
+              {renderTableData('Runs', user.data.all_run_totals.count)}
+              {renderTableData('Miles', getKmsToMiles(user.data.all_run_totals.distance))}
+
+              {renderTableData(
+                'Kms: ',
+                getMilesToKms(user?.data?.all_run_totals?.distance)
+              )}
+
+              {renderTableData(
+                'Elevation: ',
+                getMetresToFeet(user?.data.all_run_totals.elevation_gain)
+              )}
+
+              {renderTableData(
+                'No of Everests: ',
+                getNoOfMtEverests(user?.data.all_run_totals.elevation_gain)
+              )}
             </Column>
             <Column>
               <TableHeading></TableHeading>
               <BikeIcon />
-              <TableData>
-                <b>{'Rides: '} </b> {user?.data?.all_ride_totals?.count}
-              </TableData>
-              <TableData>
-                <b> Miles:</b> {getKmsToMiles(user?.data?.all_ride_totals?.distance)}
-              </TableData>
-              <TableData>
-                <b>{'Kms: '}</b>
-                {getMilesToKms(user?.data?.all_ride_totals?.distance)}
-              </TableData>
-              <TableData>
-                <b>{'Elevation: '}</b>
-                {getMetresToFeet(user?.data.all_ride_totals.elevation_gain)}
-              </TableData>
-              <TableData>
-                <b>{'No. of Everests: '}</b>
-                {getNoOfMtEverests(user?.data.ytd_ride_totals.elevation_gain)}
-              </TableData>
+              {renderTableData('Rides: ', user?.data?.all_ride_totals?.count)}
+
+              {renderTableData(
+                'Distance: ',
+                getKmsToMiles(user?.data?.all_ride_totals?.distance)
+              )}
+
+              {renderTableData(
+                'Kms: ',
+                getMilesToKms(user?.data?.all_ride_totals?.distance)
+              )}
+
+              {renderTableData(
+                'Elevation: ',
+                getMetresToFeet(user?.data.all_ride_totals.elevation_gain)
+              )}
+
+              {renderTableData(
+                'No. of Everests: ',
+                getNoOfMtEverests(user?.data.ytd_ride_totals.elevation_gain)
+              )}
             </Column>
             <Column>
               <TableHeading>Year To Date</TableHeading>
               <RunIcon />
-              <TableData>
-                <b>{'Runs: '}</b> {user?.data.ytd_run_totals.count}
-              </TableData>
-              <TableData>
-                <b>{'Miles: '}</b>
-                {getKmsToMiles(user?.data.ytd_run_totals.distance)}{' '}
-              </TableData>
-              <TableData>
-                <b>{'Kms: '}</b> {getMilesToKms(user?.data.ytd_run_totals.distance)}{' '}
-              </TableData>
+              {renderTableData('Runs: ', user?.data.ytd_run_totals.count)}
+
+              {renderTableData(
+                'Miles: ',
+                getKmsToMiles(user?.data.ytd_run_totals.distance)
+              )}
+
+              {renderTableData(
+                'Kms: ',
+                getMilesToKms(user?.data.ytd_run_totals.distance)
+              )}
+
               <TableData>
                 <b>{'Elevation: '}</b>
                 {getMetresToFeet(user?.data.ytd_run_totals.elevation_gain).concat()}
@@ -133,25 +114,23 @@ const AthleteStats = () => {
             <Column>
               <TableHeading></TableHeading>
               <BikeIcon />
-              <TableData>
-                <b>{'Rides: '} </b>
-                {user?.data.ytd_run_totals.count}
-              </TableData>
-              <TableData>
-                <b> {' Miles: '}</b>
-                {getKmsToMiles(user?.data.ytd_ride_totals.distance)}{' '}
-              </TableData>
-              <TableData>
-                <b> {'Kms: '}</b> {getMilesToKms(user?.data.ytd_ride_totals.distance)}
-              </TableData>
-              <TableData>
-                <b> {'Elevation: '} </b>
-                {getMetresToFeet(user?.data.ytd_ride_totals.elevation_gain).concat()}
-              </TableData>
-              <TableData>
-                <b>{'Mnt. Everests: '}</b>
-                {getNoOfMtEverests(user?.data.ytd_ride_totals.elevation_gain)}
-              </TableData>
+              {renderTableData('Rides: ', user?.data.ytd_run_totals.count)}
+              {renderTableData(
+                'Miles: ',
+                getKmsToMiles(user?.data.ytd_ride_totals.distance)
+              )}
+              {renderTableData(
+                'Kms: ',
+                getMilesToKms(user?.data.ytd_ride_totals.distance)
+              )}
+              {renderTableData(
+                'Elevation: ',
+                getMetresToFeet(user?.data.ytd_ride_totals.elevation_gain).concat()
+              )}
+              {renderTableData(
+                'Mnt. Everests: ',
+                getNoOfMtEverests(user?.data.ytd_ride_totals.elevation_gain)
+              )}
             </Column>
           </Container>
         </>
@@ -225,71 +204,5 @@ const AvatarImage = styled.img`
 
   @media screen and (max-width: 1048px) {
     display: none;
-  }
-`;
-
-const AvatarProfile = styled.h4`
-  margin-top: 9rem;
-  width: 7vw;
-  border-radius: 50%;
-  height: 7vw;
-  display: flex;
-  position: absolute;
-  right: 5rem;
-
-  @media screen and (max-width: 1048px) {
-    display: none;
-  }
-
-  &.athletename {
-    margin-top: 9rem;
-    margin-left: 1rem;
-    font-size: 0.9rem;
-    display: flex;
-    position: absolute;
-    right: 5rem;
-
-    @media screen and (max-width: 1200px) {
-      font-size: 0.7rem;
-      margin-top: 7rem;
-    }
-    @media screen and (max-width: 1048px) {
-      display: none;
-    }
-  }
-
-  &.followers {
-    margin-top: 11rem;
-    margin-left: 1rem;
-    font-size: 0.9rem;
-    display: flex;
-    position: absolute;
-    right: 5rem;
-
-    @media screen and (max-width: 1200px) {
-      font-size: 0.7rem;
-      margin-top: 9rem;
-    }
-    @media screen and (max-width: 1048px) {
-      display: none;
-    }
-  }
-
-  &.clubs {
-    margin-top: 13rem;
-    margin-left: 1rem;
-    font-size: 0.9rem;
-    display: flex;
-    position: absolute;
-    right: 5rem;
-
-    @media screen and (max-width: 1200px) {
-      font-size: 0.7rem;
-      margin-top: 8rem;
-    }
-
-    @media screen and (max-width: 1048px) {
-      display: none;
-    }
   }
 `;
