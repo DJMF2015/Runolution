@@ -1,40 +1,51 @@
 import React, { useState, useEffect } from 'react';
-
-// NOTE: This component is not currently in use. It may be used in the future
+import styled from 'styled-components';
 export default function ActivityDropDown(props) {
-  const [activities, setActivityName] = useState([]);
-  const styles = {
-    display: 'flex',
-    alignItems: 'center',
-    margin: '0 auto',
-    justifyContent: 'center',
-    height: '3vh',
-    width: '30vw',
-    border: '2px solid black',
-    borderRadius: '7px',
-    FontFace: 'Montserrat',
-    fontsize: '1.5rem',
-  };
+  const [sport, setActivityType] = useState([]);
 
   useEffect(() => {
-    let activityArray = props.result.map((activity) => {
-      return activity.name;
+    let activityArray = props.props.map((activity) => {
+      return activity.activityType;
     });
-    activityArray.unshift('All Activities');
-    setActivityName(activityArray);
-  }, [props.result]);
+    activityArray = [...new Set(activityArray)]; // remove duplicates
+    activityArray.unshift('Sport Type');
+    setActivityType(activityArray);
+  }, [props.props]);
 
-  const setFilterByActivity = (e) => {
-    props.setFilteredName(e.target.value);
+  const setFilterBySportType = (e) => {
+    props.setFilterBySportType(e.target.value);
   };
-
   return (
     <>
-      <select style={styles} id="filterdropdown" onChange={setFilterByActivity}>
-        {activities.map((Option) => (
+      <DropDown id="filterdropdown" onChange={setFilterBySportType}>
+        {sport.map((Option) => (
           <option key={Option}>{Option}</option>
         ))}
-      </select>
+      </DropDown>
     </>
   );
 }
+
+const DropDown = styled.select`
+  display: flex;
+  align-items: center;
+  margin: 0 auto;
+  justify-content: center;
+  height: 3vh;
+  background-color: white;
+  width: 10vw;
+  border: 2px solid black;
+  border-radius: 7px;
+  font-family: 'Montserrat';
+  font-size: 1rem;
+
+  @media screen and (max-width: 768px) {
+    margin: 0 auto;
+    margin-top: 7rem;
+    margin-bottom: -5rem;
+    width: 30vw;
+    height: 5vh;
+    font-size: 1rem;
+    background-color: ${(props) => props.theme.colour.ghostwhite};
+  }
+`;

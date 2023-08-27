@@ -4,6 +4,7 @@ import { ArrowUpCircleFill } from '@styled-icons/bootstrap/ArrowUpCircleFill';
 import { getAthleteActivities } from '../utils/functions';
 import { catchErrors } from '../utils/helpers';
 import { formattedDate } from '../utils/conversion';
+import ActivityDropDown from '../components/ActivityDropDown';
 import Login from '../components/Login';
 import styled from 'styled-components';
 import SearchBar from '../utils/search';
@@ -26,6 +27,7 @@ const ActivitiesMap = () => {
   const { windowWidth } = useGetWindowWidth();
   const { isVisible, scrollToTop } = useScroll();
   const [activityLoadingState, setActivityLoadingState] = useState(null);
+  const [filteredSportType, setFilteredSportType] = useState(null);
   const expires_in = localStorage.getItem('expires_in');
   let access_token = JSON.parse(localStorage.getItem('access_token'));
   const data = JSON.parse(localStorage.getItem('activities'));
@@ -92,9 +94,15 @@ const ActivitiesMap = () => {
     return stravaActivityResponse;
   };
 
-  const filteredName = nodes.filter((activity) => {
+  let filteredName = nodes.filter((activity) => {
     return activity.activityName.toLowerCase().includes(searchTxt.toLowerCase());
   });
+
+  if (filteredSportType) {
+    filteredName = filteredName.filter((activity) => {
+      return activity.activityType === filteredSportType;
+    });
+  }
 
   if (loading && access_token) {
     return (
@@ -116,6 +124,7 @@ const ActivitiesMap = () => {
       ) : (
         <>
           <SideNavigation>
+            <ActivityDropDown props={nodes} setFilterBySportType={setFilteredSportType} />
             {isVisible && (
               <div onClick={scrollToTop}>
                 <ScrollToTop alt="Go to top"></ScrollToTop>
@@ -152,13 +161,19 @@ const ActivitiesMap = () => {
             }}
           >
             {windowWidth < 785 && (
-              <SearchBar
-                searchTxt={searchTxt}
-                updateSearchTxt={setSearchTxt}
-                width={'75%'}
-                fontSize="1rem"
-                placeholder="Search by activity name..."
-              />
+              <>
+                <ActivityDropDown
+                  props={nodes}
+                  setFilterBySportType={setFilteredSportType}
+                />
+                <SearchBar
+                  searchTxt={searchTxt}
+                  updateSearchTxt={setSearchTxt}
+                  width={'75%'}
+                  fontSize="1rem"
+                  placeholder="Search by activity name..."
+                />
+              </>
             )}
 
             <MapContainer
