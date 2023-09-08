@@ -4,7 +4,7 @@ import styled from 'styled-components';
 import { client_id } from '../utils/config';
 const Login = () => {
   const [logout, setLoggedOut] = useState(true);
-  const redirectUrl = 'strava-personal-dashboard.vercel.app/redirect';
+  const redirectUrl = 'http://strava-personal-dashboard.vercel.app/redirect';
 
   const handleLogin = () => {
     localStorage.clear();
