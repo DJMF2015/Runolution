@@ -216,6 +216,10 @@ export default function ActivitiesCard() {
       <div style={{ backgroundColor: 'black' }}>
         <SideNavigation>
           <CardHeaders>
+            <h3>{from?.name}</h3>
+            <ActivityCard props={from?.average_heartrate}>
+              {from?.average_heartrate && getSufferScore(from.average_heartrate)}{' '}
+            </ActivityCard>
             <LinkText>
               <Link
                 style={{ color: 'white', margin: '10px 12px' }}
@@ -230,12 +234,6 @@ export default function ActivitiesCard() {
                 Go Back
               </Link>
             </LinkText>
-            <h3>{from?.name}</h3>
-            <div>
-              <ActivityCard props={from?.average_heartrate}>
-                {from?.average_heartrate && getSufferScore(from.average_heartrate)}{' '}
-              </ActivityCard>
-            </div>
             <h3>Kudos: {from?.kudos_count} </h3>
             {athleteData?.kudosoers && (
               <div>
@@ -338,7 +336,7 @@ const Text = styled.div`
   margin: 0px 0px;
   text-align: left;
   @media screen and (max-width: 600px) {
-    font-size: 0.7rem;
+    font-size: 1rem;
     margin: 3px 8px;
     text-align: left;
   }
@@ -355,19 +353,15 @@ const LinkText = styled.div`
   text-align: left;
   color: white;
   @media screen and (max-width: 600px) {
-    font-size: 0.7rem;
-    margin: 5px;
-    position: relative;
-    display: inline;
-    text-align: left;
-    color: white;
+    font-size: 1rem;
+    margin: 0px auto;
+    text-align: center;
   }
 `;
 
 const ActivityCard = styled.h3`
   position: relative;
   text-align: center;
-  margin: 2px 3px 2px 3px;
   background-color: ${(props) => props.theme.colour.ghostwhite};
   background: ${(props) =>
     props.props >= 150
@@ -390,7 +384,6 @@ const ScrollToTop = styled(ArrowUpCircleFill)`
 `;
 
 const RadioButton = styled.input`
-  /* position: relative; */
   display: inline;
   margin: 0px 10px 30px 50px;
   padding: 0px 0px 0px 0px;
@@ -422,19 +415,7 @@ const RadioButton = styled.input`
     }
   }
   @media screen and (max-width: 600px) {
-    padding: 0px 0px 0px 0px;
-    width: 0.7rem;
-    height: 0.7rem;
-    top: 5rem;
-    &:checked::before {
-      content: '';
-      width: 0.7rem;
-      height: 0.7rem;
-      background-color: ${(props) => props.theme.colour.red};
-      position: absolute;
-      border-radius: 50%;
-      border: 1px solid ${(props) => props.theme.colour.red};
-    }
+    display: none;
   }
 `;
 
@@ -470,24 +451,8 @@ const RightNavigationBar = styled.div`
   scroll-behavior: smooth;
   padding-top: 20px;
   margin: 0 auto;
-  @media screen and (max-width: 750px) {
-    width: 25%;
-    position: static;
-    display: inline;
-    /* padding: 5px; */
-    color: white;
-    border-right: none;
-    border-bottom: 3px solid grey;
-    overflow: hidden;
-  }
-  @media screen and (max-width: 350px) {
-    z-index: -1;
+  @media screen and (max-width: 600px) {
     display: none;
-    padding-top: 0px;
-    color: white;
-    border-right: none;
-    border-bottom: 3px solid grey;
-    overflow: hidden;
   }
 `;
 const SideNavigation = styled.div`
