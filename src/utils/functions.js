@@ -122,3 +122,15 @@ export const getDetailedAthleteData = async (id, accessToken) => {
     console.log(error);
   }
 };
+
+//upload activity to strava api
+export const uploadActivity = async (formData, accessToken) => {
+  try {
+    const response = await axios.post(`https://www.strava.com/api/v3/uploads`, formData, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    return response;
+  } catch (error) {
+    console.log(error);
+  }
+};
