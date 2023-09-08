@@ -28,7 +28,7 @@ const AthleteStats = () => {
 
   const renderTableData = (label, data) => (
     <TableData>
-      <b>{`${label}: `}</b>
+      <b>{`${label} `}</b>
       {data}
     </TableData>
   );

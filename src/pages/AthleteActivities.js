@@ -11,6 +11,7 @@ import { Activity } from '@styled-icons/evaicons-solid/Activity';
 import { Stopwatch } from '@styled-icons/boxicons-regular/Stopwatch';
 import { getKmsToMiles, getSecondstoMinutes, formattedDate } from '../utils/conversion';
 import ActivityDropDown from '../components/ActivityDropDown';
+import { useLocalStorage } from '../utils/hooks';
 import Login from '../components/Login';
 import Search from '../utils/search';
 import TimeRangeCalendar from '../components/TimeRangeCalendar';
@@ -140,7 +141,7 @@ const AthleteActivities = () => {
               <ScrollToTop alt="Go to top"></ScrollToTop>
             </div>
           )}
-          {windowWidth >= 600 && (
+          {windowWidth >= 700 && (
             <>
               <Search
                 searchTxt={searchTxt}
@@ -183,7 +184,7 @@ const AthleteActivities = () => {
               ))}
             </div>
           </SideNavigation>
-          {windowWidth < 600 && (
+          {windowWidth < 700 && (
             <>
               <ActivityDropDown
                 props={activities}
@@ -319,7 +320,7 @@ const SideNavigation = styled.div`
 
   /* media queries here */
 
-  @media screen and (max-width: 600px) {
+  @media screen and (max-width: 800px) {
     display: none;
   }
 `;
@@ -335,7 +336,7 @@ const CardDetails = styled.div`
   font-family: 'Roboto', sans-serif;
   text-align: left;
 
-  @media screen and (max-width: 600px) {
+  @media screen and (max-width: 800px) {
     display: flex;
     flex-direction: column;
     flex-wrap: wrap;

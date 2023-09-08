@@ -3,7 +3,6 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { getSecondstoMinutes, getKmsToMiles, getMstoKmHr } from '../utils/conversion';
 import { getDetailedAthleteData } from '../utils/functions';
 import { useScroll } from '../utils/hooks';
-import StravaEmbed from '../components/StravaEmbed';
 import PaceZoneBarChart from './BestEffortsChart';
 import ElevationChart from './ElevationBarChart';
 import { useEffect, useState } from 'react';
@@ -45,15 +44,15 @@ export default function ActivityList() {
 
       <Container>
         <Heading>
-          <th>Splits</th>
-          <th>Distance</th>
-          <th>Elevation Gain (mtrs)</th>
-          <th>Elapsed Time</th>
-          <th>Average Speed</th>
-          <th>Average Cadence</th>
-          <th>Average Heartrate</th>
-          <th>Max Heartrate</th>
-          <th>Pace Zone</th>
+          <div>Splits</div>
+          <div>Distance</div>
+          <div>Elevation Gain (mtrs)</div>
+          <div>Elapsed Time</div>
+          <div>Average Speed</div>
+          <div>Average Cadence</div>
+          <div>Average Heartrate</div>
+          <div>Max Heartrate</div>
+          <div>Pace Zone</div>
         </Heading>
 
         <Wrapper>
@@ -111,7 +110,6 @@ export default function ActivityList() {
               })}
           </tbody>
         </Table>
-        <StravaEmbed id={from?.id} />
       </Container>
 
       <StyledBackButton
