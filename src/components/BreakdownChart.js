@@ -13,7 +13,7 @@ export const options = {
     },
     title: {
       display: true,
-      text: 'Best Efforts',
+      text: 'Activities',
     },
   },
 };
