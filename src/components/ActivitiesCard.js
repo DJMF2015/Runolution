@@ -53,7 +53,6 @@ export default function ActivitiesCard() {
         setAthleteData((prevState) => ({ ...prevState, comments: response.data }));
       });
       await getDetailedAthleteData(from.id, token).then((response) => {
-        console.log(response.data);
         setAthleteData((prevState) => ({
           ...prevState,
           detailedActivity: response.data,
@@ -157,7 +156,6 @@ export default function ActivitiesCard() {
       });
 
       const pinRoute = data.geometry.coordinates;
-      // create the marker and popup that will display the elevation queries
       const popup = new mapboxgl.Popup({ closeButton: false });
       new mapboxgl.Marker({
         color: 'red',
@@ -173,9 +171,7 @@ export default function ActivitiesCard() {
       map.addSource('trace', { type: 'geojson', data: data });
     });
 
-    function rotateAndFlyTo(endLocation) {
-      // Get the map instance
-      // Rotate the map 360 degrees in 3 seconds
+    function rotateAndFlyTo() {
       var bearing = map.getBearing(); // Get the current bearing
       var start = null;
       function animate(timestamp) {
@@ -190,8 +186,7 @@ export default function ActivitiesCard() {
           // Stop rotating and fly to the end location
           map.rotateTo(bearing);
           map.easeTo({
-            center: data.geometry.coordinates[0],
-            // zoom: 10,
+            center: [from?.end_latlng[1], from?.end_latlng[0]],
             zoom: athleteData.distance > 15000 ? 10 : 13,
             pitch: 65,
             bearing: 200,
@@ -202,6 +197,16 @@ export default function ActivitiesCard() {
       requestAnimationFrame(animate);
     }
     rotateAndFlyTo(endLocation);
+    // tilt map to 2d view after 10 seconds
+    setTimeout(() => {
+      map.easeTo({
+        center: data.geometry.coordinates[0],
+        zoom: athleteData.distance > 15000 ? 10 : 13,
+        pitch: 0,
+        bearing: 0,
+        duration: 3000,
+      });
+    }, 8000);
 
     return () => map.remove();
   }, [selectedLayer]);
@@ -234,7 +239,10 @@ export default function ActivitiesCard() {
                 Go Back
               </Link>
             </LinkText>
-            <h3>Kudos: {from?.kudos_count} </h3>
+            <Text>
+              {' '}
+              <h3>Kudos: {from?.kudos_count} </h3>
+            </Text>
             {athleteData?.kudosoers && (
               <div>
                 <Text>
@@ -242,7 +250,9 @@ export default function ActivitiesCard() {
                     return <span key={index}>{kudoer.firstname + ', '}</span>;
                   })}
                 </Text>
-                <h4>Comments: {from?.comment_count}</h4>
+                <Text>
+                  <h4>Comments: {from?.comment_count}</h4>
+                </Text>
                 <Text>
                   {athleteData?.comments && (
                     <div>
@@ -262,15 +272,18 @@ export default function ActivitiesCard() {
                     </div>
                   )}
                 </Text>
-                <h4>Distance:</h4> <Text>{getMilesToKms(from.distance)}</Text>
-                <h4>Total Elevation: </h4>
-                <Text>{getMetresToFeet(from.total_elevation_gain)}</Text>
+                <Text>
+                  <h4>Distance:</h4> {getMilesToKms(from.distance)}
+                </Text>
+                <Text>
+                  <h4>Total Elevation:</h4> {getMetresToFeet(from.total_elevation_gain)}
+                </Text>
                 <Text>{athleteData.detailedActivity?.description}</Text>
               </div>
             )}
             {athleteData?.detailedActivity && (
-              // eslint-disable-next-line jsx-a11y/alt-text
               <img
+                alt=""
                 style={{ margin: '10px 0px' }}
                 src={athleteData?.detailedActivity?.photos?.primary?.urls['100']}
               />
@@ -304,17 +317,7 @@ export default function ActivitiesCard() {
             })}
           </CardHeaders>
         </RightNavigationBar>
-        <div
-          id="map"
-          ref={(el) => (mapContainer.current = el)}
-          style={{
-            width: '75%',
-            justifyContent: 'center',
-            margin: '0 auto',
-            height: '100vh',
-            position: 'relative',
-          }}
-        ></div>
+        <Map id="map" ref={(el) => (mapContainer.current = el)}></Map>
       </div>
     </>
   );
@@ -336,9 +339,7 @@ const Text = styled.div`
   margin: 0px 0px;
   text-align: left;
   @media screen and (max-width: 600px) {
-    font-size: 1rem;
-    margin: 3px 8px;
-    text-align: left;
+    display: none;
   }
 `;
 
@@ -369,6 +370,21 @@ const ActivityCard = styled.h3`
       : props.props > 50 && props.props < 150
       ? props.theme.colour.green
       : props.theme.colour.transparent};
+`;
+const Map = styled.div`
+  position: relative;
+  text-align: center;
+  background-color: ${(props) => props.theme.colour.ghostwhite};
+  justify-content: center;
+  margin: 0 auto;
+  width: 75%;
+  height: 100vh;
+
+  @media screen and (max-width: 750px) {
+    width: 100%;
+    height: 100vh;
+    margin: 0 auto;
+  }
 `;
 
 const ScrollToTop = styled(ArrowUpCircleFill)`
