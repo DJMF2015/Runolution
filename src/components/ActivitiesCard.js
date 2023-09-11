@@ -282,10 +282,8 @@ export default function ActivitiesCard() {
               />
             )}
 
-            <CardHeaders>
-              Achievements: {athleteData?.detailedActivity?.achievement_count}
-            </CardHeaders>
-            <CardHeaders>PR's: {athleteData?.detailedActivity?.pr_count}</CardHeaders>
+            <Text>Achievements: {athleteData?.detailedActivity?.achievement_count}</Text>
+            <Text>PR's: {athleteData?.detailedActivity?.pr_count}</Text>
           </CardHeaders>
         </SideNavigation>
 
@@ -297,15 +295,16 @@ export default function ActivitiesCard() {
 
 const CardHeaders = styled.div`
   position: relative;
-  text-align: left;
+  text-align: center;
   margin-top: 0.5rem;
   color: ${(props) => props.theme.colour.white};
   margin: 5px 5px;
+  font-style: bold;
   font-family: Verdana, Geneva, Tahoma, sans-serif;
   font-size: 1rem;
 
   @media screen and (max-width: 600px) {
-    display: none;
+    margin: 0px auto;
   }
 `;
 
@@ -330,6 +329,7 @@ const LinkText = styled.div`
   text-align: left;
   color: white;
   @media screen and (max-width: 600px) {
+    margin-top: 1rem;
     font-size: 1rem;
     margin: 0px auto;
     text-align: center;
@@ -348,7 +348,7 @@ const ActivityCard = styled.h3`
       : props.theme.colour.transparent};
 
   @media screen and (max-width: 600px) {
-    margin-top: 3rem;
+    /* margin-top: 3rem; */
   }
 `;
 
