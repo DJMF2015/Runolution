@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { ArrowUpCircleFill } from '@styled-icons/bootstrap/ArrowUpCircleFill';
 import styled from 'styled-components';
@@ -16,9 +16,6 @@ import {
 import polyline from '@mapbox/polyline';
 
 export default function ActivitiesCard() {
-  const [selectedLayer, setSelectedLayer] = useState(
-    'mapbox://styles/mapbox/satellite-v9'
-  );
   const { isVisible, scrollToTop } = useScroll();
   const [athleteData, setAthleteData] = React.useState([
     {
@@ -62,19 +59,11 @@ export default function ActivitiesCard() {
     fetchData();
   }, [from.id, token]);
 
-  const layers = [
-    {
-      name: 'Satellite',
-      style: 'mapbox://styles/mapbox/satellite-v9',
-    },
-    { name: 'Outdoors', style: 'mapbox://styles/mapbox/outdoors-v11' },
-  ];
-
   useEffect(() => {
     mapboxgl.accessToken = process.env.REACT_APP_MAPBOX_KEY;
     const map = new mapboxgl.Map({
       projection: 'globe',
-      style: selectedLayer,
+      style: 'mapbox://styles/mapbox/satellite-v9',
       antialias: true, // create the gl context with MSAA antialiasing, so custom layers are antialiased
       ...endLocation,
       zoom: 1.5,
@@ -171,8 +160,24 @@ export default function ActivitiesCard() {
       map.addSource('trace', { type: 'geojson', data: data });
     });
 
+    setTimeout(() => {
+      const bounds = new mapboxgl.LngLatBounds(
+        data.geometry.coordinates[0],
+        data.geometry.coordinates[0]
+      );
+
+      data.geometry.coordinates.forEach((point) => {
+        bounds.extend(point);
+        map.fitBounds(bounds, {
+          padding: { top: 25, bottom: 25, left: 25, right: 25 },
+          duration: 2000,
+          pitch: 25,
+        });
+      });
+    }, 6500);
+
     function rotateAndFlyTo() {
-      var bearing = map.getBearing(); // Get the current bearing
+      var bearing = map.getBearing();
       var start = null;
       function animate(timestamp) {
         if (!start) start = timestamp;
@@ -180,36 +185,24 @@ export default function ActivitiesCard() {
         map.rotateTo((bearing + (360 * progress) / 2000) % 360, { duration: 0 });
 
         if (progress < 2000) {
-          // Continue rotating
           requestAnimationFrame(animate);
         } else {
-          // Stop rotating and fly to the end location
           map.rotateTo(bearing);
           map.easeTo({
             center: [from?.end_latlng[1], from?.end_latlng[0]],
             zoom: athleteData.distance > 15000 ? 10 : 13,
             pitch: 65,
             bearing: 200,
-            duration: 7000,
+            duration: 6000,
           });
         }
       }
       requestAnimationFrame(animate);
     }
-    rotateAndFlyTo(endLocation);
-    // tilt map to 2d view after 10 seconds
-    setTimeout(() => {
-      map.easeTo({
-        center: data.geometry.coordinates[0],
-        zoom: athleteData.distance > 15000 ? 10 : 13,
-        pitch: 0,
-        bearing: 0,
-        duration: 3000,
-      });
-    }, 8000);
+    rotateAndFlyTo();
 
     return () => map.remove();
-  }, [selectedLayer]);
+  }, []);
 
   return (
     <>
@@ -223,7 +216,7 @@ export default function ActivitiesCard() {
           <CardHeaders>
             <h3>{from?.name}</h3>
             <ActivityCard props={from?.average_heartrate}>
-              {from?.average_heartrate && getSufferScore(from.average_heartrate)}{' '}
+              {from?.average_heartrate && getSufferScore(from?.average_heartrate)}{' '}
             </ActivityCard>
             <LinkText>
               <Link
@@ -296,27 +289,6 @@ export default function ActivitiesCard() {
           </CardHeaders>
         </SideNavigation>
 
-        <RightNavigationBar>
-          {' '}
-          <CardHeaders>
-            {layers.map((layer, index) => {
-              return (
-                <>
-                  <div>
-                    <RadioButton
-                      type="radio"
-                      id={layer.index}
-                      name={layer.name}
-                      checked={layer.style === selectedLayer}
-                      onChange={() => setSelectedLayer(layer.style)}
-                    ></RadioButton>
-                    <Label htmlFor={layer.name}>{layer.name}</Label>
-                  </div>
-                </>
-              );
-            })}
-          </CardHeaders>
-        </RightNavigationBar>
         <Map id="map" ref={(el) => (mapContainer.current = el)}></Map>
       </div>
     </>
@@ -331,6 +303,10 @@ const CardHeaders = styled.div`
   margin: 5px 5px;
   font-family: Verdana, Geneva, Tahoma, sans-serif;
   font-size: 1rem;
+
+  @media screen and (max-width: 600px) {
+    display: none;
+  }
 `;
 
 const Text = styled.div`
@@ -370,14 +346,19 @@ const ActivityCard = styled.h3`
       : props.props > 50 && props.props < 150
       ? props.theme.colour.green
       : props.theme.colour.transparent};
+
+  @media screen and (max-width: 600px) {
+    margin-top: 3rem;
+  }
 `;
+
 const Map = styled.div`
   position: relative;
   text-align: center;
   background-color: ${(props) => props.theme.colour.ghostwhite};
   justify-content: center;
   margin: 0 auto;
-  width: 75%;
+  width: 100%;
   height: 100vh;
 
   @media screen and (max-width: 750px) {
@@ -399,78 +380,6 @@ const ScrollToTop = styled(ArrowUpCircleFill)`
   margin: 60px 0px 200px 85vw;
 `;
 
-const RadioButton = styled.input`
-  display: inline;
-  margin: 0px 10px 30px 50px;
-  padding: 0px 0px 0px 0px;
-  width: 1rem;
-  height: 1rem;
-  z-index: 1000;
-  &:checked::before {
-    content: '';
-    width: 1rem;
-    height: 1rem;
-    background-color: ${(props) => props.theme.colour.red};
-    position: absolute;
-    border-radius: 50%;
-    border: 1px solid ${(props) => props.theme.colour.red};
-  }
-  @media screen and (max-width: 1250px) {
-    width: 1rem;
-    height: 1rem;
-    top: 5rem;
-    margin: 0px 0px 20px 0px;
-    &:checked::before {
-      content: '';
-      width: 1rem;
-      height: 1rem;
-      background-color: ${(props) => props.theme.colour.red};
-      position: absolute;
-      border-radius: 50%;
-      border: 1px solid ${(props) => props.theme.colour.red};
-    }
-  }
-  @media screen and (max-width: 600px) {
-    display: none;
-  }
-`;
-
-const Label = styled.label`
-  display: inline;
-  margin-bottom: 12px;
-  cursor: pointer;
-  font-size: 1rem;
-  -webkit-user-select: none;
-  -moz-user-select: none;
-  -ms-user-select: none;
-  user-select: none;
-  @media screen and (max-width: 1250px) {
-    font-size: 0.8rem;
-    margin: 0px 0px 0px 5px; //
-    cursor: pointer;
-  }
-`;
-const RightNavigationBar = styled.div`
-  height: 100%;
-  width: calc(14% - 22px);
-  display: block;
-  color: 'red';
-  text-align: cente;
-  justify-content: center;
-  font-size: 1rem;
-  background-color: #111;
-  position: fixed;
-  border-left: 3px solid grey;
-  z-index: 1000;
-  top: calc(11vh - 14px);
-  right: 0;
-  scroll-behavior: smooth;
-  padding-top: 20px;
-  margin: 0 auto;
-  @media screen and (max-width: 600px) {
-    display: none;
-  }
-`;
 const SideNavigation = styled.div`
   height: 100%;
   width: 250px;
