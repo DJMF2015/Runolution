@@ -236,9 +236,9 @@ const AthleteActivities = () => {
                   ) : (
                     <div key={i}>
                       <Cardborder>
-                        <div key={i}>
-                          <h2>{activity?.name}</h2>
-                          <p>{getKmsToMiles(activity?.distance)}</p>
+                        <div key={i} style={{ textAlign: 'center' }}>
+                          <ActivityName>{activity?.name}</ActivityName>
+                          <p>{getKmsToMiles(activity?.distance)} miles</p>
                           <p>{getSecondstoMinutes(activity?.moving_time)} </p>
                           <p>Date: {formattedDate(activity?.start_date)}</p>
                           <p>kudos: {activity?.kudos_count}</p>
@@ -368,6 +368,11 @@ const Cardborder = styled.div`
     opacity: 1;
     /* make card fade as scroll out of view */
   }
+
+  @media screen and (max-width: 750px) {
+    width: calc((100% - 3rem));
+    margin-left: 1rem;
+  }
 `;
 
 const Text = styled.div`
@@ -376,6 +381,11 @@ const Text = styled.div`
   flex-direction: row;
   align-items: center;
   justify-content: space-evenly;
+
+  @media screen and (max-width: 750px) {
+    font-size: 0.7rem;
+    justify-content: space-evenly;
+  }
 `;
 const ActivityName = styled.h2`
   font-size: 1rem;
@@ -404,6 +414,11 @@ const ActivityIcon = styled(Activity)`
   width: 2.5em;
   color: ${(props) => props.theme.colour.strava};
   margin: 0px 5px 0px 0px;
+
+  @media screen and (max-width: 750px) {
+    width: 1em;
+    height: 2em;
+  }
 `;
 
 const StopWatchIcon = styled(Stopwatch)`
@@ -411,6 +426,11 @@ const StopWatchIcon = styled(Stopwatch)`
   width: 2em;
   width: 2em;
   color: ${(props) => props.theme.colour.strava};
+
+  @media screen and (max-width: 750px) {
+    width: 1em;
+    height: 2em;
+  }
 `;
 
 const ThumbUpIcon = styled(HandThumbsUpFill)`
@@ -418,6 +438,11 @@ const ThumbUpIcon = styled(HandThumbsUpFill)`
   width: 2em;
   height: 2em;
   color: ${(props) => props.theme.colour.strava};
+
+  @media screen and (max-width: 750px) {
+    width: 1em;
+    height: 2em;
+  }
 `;
 
 const CalendarIcon = styled(CalendarDateFill)`
@@ -425,5 +450,10 @@ const CalendarIcon = styled(CalendarDateFill)`
   width: 2em;
   height: 2em;
   color: ${(props) => props.theme.colour.strava};
+
+  @media screen and (max-width: 750px) {
+    width: 1em;
+    height: 2em;
+  }
 `;
 export default AthleteActivities;
