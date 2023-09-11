@@ -19,8 +19,15 @@ const AthleteStats = () => {
   useEffect(() => {
     async function fetchData() {
       if (athlete.id && token) {
-        const response = await getAthleteStats(athlete.id, token);
-        setUser(response);
+        try {
+          const athleteStats = await getAthleteStats(athlete.id, token);
+          // Handle successful response here
+          if (athleteStats) {
+            setUser(athleteStats);
+          }
+        } catch (error) {
+          console.error(error.message); // Log the error message
+        }
       }
     }
     fetchData();
