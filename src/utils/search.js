@@ -4,6 +4,7 @@ import styled from 'styled-components';
 const Search = ({ placeholder, updateSearchTxt }) => {
   const accessToken = localStorage.getItem('access_token');
   const [searchInput, setSearchTerm] = useState('');
+
   const ref = useRef();
   const handleChange = (e) => {
     if (ref.current !== searchInput) {
@@ -53,7 +54,6 @@ const SearchInput = styled.input`
   @media screen and (max-width: 990px) {
     display: flex;
     height: 2.5rem;
-    margin: 0 auto;
     border: 1px solid #aaa;
     background-color: ghostwhite;
     cursor: pointer;
@@ -65,7 +65,21 @@ const SearchInput = styled.input`
     margin-top: 7rem;
     margin-bottom: 1rem;
   }
-
+  @media screen and (max-width: 800px) {
+    display: flex;
+    height: 2.5rem;
+    border: 1px solid #aaa;
+    margin-left: 8rem;
+    background-color: ghostwhite;
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 18px;
+    width: 50%;
+    padding: 10px;
+    margin-right: 6rem;
+    margin-top: 7rem;
+    margin-bottom: 1rem;
+  }
   @media screen and (max-width: 600px) {
     display: flex;
     height: 3rem;
@@ -84,6 +98,7 @@ const SearchInput = styled.input`
 
 const StyledInput = styled.div`
   width: 100%;
+  position: relative;
   &.inputWithIcon {
     position: relative;
   }
