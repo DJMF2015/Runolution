@@ -17,17 +17,31 @@ html {
  }
 
 .mapboxgl-ctrl-top-right{
-  margin-top: 10em;
-}
+  margin-top: 7em;
 
-.leaflet-right .leaflet-control{
-  margin-top: 8em;
-}
+  @media screen and (max-width: 768px) {
+    margin-top: 5rem;
+  }
 
+  @media screen and (max-width: 400px) {
+    margin-top: 5rem;
+  }
+}
  
 .mapboxgl-ctrl-bottom-left{
   margin-bottom: 1em;
   margin-left: -10em;
   background-color: transparent;
+
+  @media screen and (max-width: 768px) {
+    margin-left: -1em;
+  }
+
+  @media screen and (max-width: 400px) {
+    margin-left: -1em;
+  }
 }
 
+.leaflet-right .leaflet-control {
+  margin-top: 8em;
+}
