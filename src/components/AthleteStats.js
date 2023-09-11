@@ -114,7 +114,7 @@ const AthleteStats = () => {
             <Column>
               <TableHeading></TableHeading>
               <BikeIcon />
-              {renderTableData('Rides: ', user?.data.ytd_run_totals.count)}
+              {renderTableData('Rides: ', user?.data.ytd_ride_totals.count)}
               {renderTableData(
                 'Miles: ',
                 getKmsToMiles(user?.data.ytd_ride_totals.distance)
