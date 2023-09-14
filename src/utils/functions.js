@@ -24,7 +24,7 @@ export const getAthleteActivities = async (accessToken, per_page, index) => {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
     if (response.status === 200) {
-      return response.data;
+      return response;
     } else {
     }
     throw new Error(`Failed to fetch athlete stats. Status: ${response.status}`);
