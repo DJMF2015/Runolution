@@ -2,7 +2,7 @@ import { ResponsiveTimeRange } from '@nivo/calendar';
 import styled from 'styled-components';
 import { useState, useEffect } from 'react';
 import { formattedDate, getCurrentDate } from '../utils/conversion';
-import BreakdownChart from './BreakdownChart';
+
 const TimeRangeCalendar = (props) => {
   const accessToken = localStorage.getItem('access_token');
   let formatted = getCurrentDate();
@@ -23,7 +23,7 @@ const TimeRangeCalendar = (props) => {
       const activitiesCount = {};
 
       props?.props.forEach((activity) => {
-        const date = activity?.start_date_local.slice(0, 10); // Extract the date from the activity start_date_local
+        const date = activity?.start_date_local.slice(0, 10);
         activitiesCount[date] = (activitiesCount[date] || 0) + 1; // Increment the count for the date by 1 or initialize it to 1 if it doesn't exist
       });
 
@@ -44,7 +44,7 @@ const TimeRangeCalendar = (props) => {
     accessToken && (
       <>
         <StyledCalendar>
-          *{' '}
+          {' '}
           <h4 style={{ marginBottom: '-1rem', marginTop: '1rem', textAlign: 'center' }}>
             Activities
           </h4>
@@ -55,7 +55,8 @@ const TimeRangeCalendar = (props) => {
             }))}
             from={formattedSixtyDaysAgo}
             to={date}
-            minValue={0}
+            minValue={Math.round(...Object.values(activitiesCount))}
+            maxValue={Math.round(...Object.values(activitiesCount))}
             emptyColor="#eeeeee"
             colors={['#61cdbb', 'orange', '#e8c1a0', '#f47560']}
             margin={{ top: 40, right: 40, bottom: 10, left: 30 }}
@@ -78,9 +79,6 @@ const TimeRangeCalendar = (props) => {
             ]}
           />
         </StyledCalendar>
-        <StyledChartWrapper>
-          <BreakdownChart />
-        </StyledChartWrapper>
       </>
     )
   );
@@ -108,35 +106,6 @@ const StyledCalendar = styled.div`
     margin-bottom: -11rem;
     border: 1px solid #e6e6e6;
     box-shadow: 0px 0 5px #e6e6e6;
-  }
-
-  @media screen and (max-width: 850px) {
-    display: none;
-  }
-`;
-
-const StyledChartWrapper = styled.div`
-  margin-left: 83rem;
-  margin-top: -18rem;
-  @media screen and (min-width: 1800px) {
-    margin-left: 118rem;
-    margin-top: -18rem;
-  }
-  @media screen and (max-width: 1400px) {
-    margin-left: 88rem;
-    margin-top: -18rem;
-  }
-  @media screen and (max-width: 1150px) {
-    margin-left: 30rem;
-    margin-top: 5rem;
-  }
-  @media screen and (min-width: 980px) and (max-width: 1150px) {
-    margin-top: 6rem;
-    margin-left: 35rem;
-  }
-  @media screen and (min-width: 850px) and (max-width: 980px) {
-    margin-left: 17rem;
-    margin-top: 12rem;
   }
 
   @media screen and (max-width: 850px) {
