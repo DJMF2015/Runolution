@@ -77,7 +77,7 @@ export const checkIfTokenExpired = async (expires_in, expires_at) => {
     const expirationTime = new Date(expires_at * 1000); // Convert to milliseconds
     const currentTime = new Date();
     if (currentTime > expirationTime) {
-      const res = await getNewAccessToken(); // Call API to get a new access token
+      await getNewAccessToken();
     } else {
       console.log('Token not expired');
     }
