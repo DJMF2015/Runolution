@@ -11,7 +11,6 @@ import { Activity } from '@styled-icons/evaicons-solid/Activity';
 import { Stopwatch } from '@styled-icons/boxicons-regular/Stopwatch';
 import { getKmsToMiles, getSecondstoMinutes, formattedDate } from '../utils/conversion';
 import ActivityDropDown from '../components/ActivityDropDown';
-import { useLocalStorage } from '../utils/hooks';
 import Login from '../components/Login';
 import Search from '../utils/search';
 import TimeRangeCalendar from '../components/TimeRangeCalendar';
