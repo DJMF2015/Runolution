@@ -18,14 +18,18 @@ import '../App.css';
 import { Link } from 'react-router-dom';
 import AthleteStats from '../components/AthleteStats';
 
+const initialState = {
+  activities: [],
+  searchTxt: '',
+  loading: false,
+  activityLoadingState: null,
+  filteredSportType: null,
+};
+
 const AthleteActivities = () => {
-  const [activities, setActivities] = useState([]);
-  const [searchTxt, setSearchTxt] = useState('');
-  const [loading, setLoading] = useState(false);
   const { windowWidth } = useGetWindowWidth();
   const { isVisible, scrollToTop } = useScroll();
-  const [activityLoadingState, setActivityLoadingState] = useState(null);
-  const [filteredSportType, setFilterBySportType] = useState(null);
+  const [state, setState] = useState(initialState);
   const access_token = JSON.parse(localStorage.getItem('access_token'));
   const data = JSON.parse(localStorage.getItem('activities'));
   const expires_in = localStorage.getItem('expires_in');
@@ -40,14 +44,20 @@ const AthleteActivities = () => {
   useEffect(() => {
     async function fetchData() {
       if (data !== null && data !== undefined) {
-        setLoading(false);
+        setState((prevState) => ({
+          ...prevState,
+          loading: false,
+        }));
         return;
       }
 
-      setLoading(true);
+      setState((prevState) => ({ ...prevState, loading: true }));
       let stravaActivityResponse = await fetchStravaActivities(access_token);
-      setLoading(false);
-      setActivities(stravaActivityResponse);
+      setState((prevState) => ({
+        ...prevState,
+        activities: stravaActivityResponse,
+        loading: false,
+      }));
       localStorage.setItem('activities', JSON.stringify(stravaActivityResponse));
     }
 
@@ -57,7 +67,10 @@ const AthleteActivities = () => {
   useEffect(() => {
     const data = localStorage.getItem('activities');
     if (data !== null && data !== undefined) {
-      setActivities(JSON.parse(data));
+      setState((prevState) => ({
+        ...prevState,
+        activities: JSON.parse(data),
+      }));
     }
   }, [payload]);
 
@@ -93,10 +106,16 @@ const AthleteActivities = () => {
         stravaActivityResponseSingle.data.length === 0 ||
         stravaActivityResponseSingle.data.errors
       ) {
-        setLoading(false);
+        setState((prevState) => ({
+          ...prevState,
+          loading: false,
+        }));
         break;
       } else {
-        setActivityLoadingState(stravaActivityResponse.length);
+        setState((prevState) => ({
+          ...prevState,
+          activityLoadingState: stravaActivityResponse.length,
+        }));
         stravaActivityResponse = stravaActivityResponse.concat(
           stravaActivityResponseSingle.data
         );
@@ -107,23 +126,23 @@ const AthleteActivities = () => {
     return stravaActivityResponse;
   };
 
-  let filteredActivities = activities.filter((activity) => {
-    return activity.name.toLowerCase().includes(searchTxt.toLowerCase());
+  let filteredActivities = state.activities.filter((activity) => {
+    return activity.name.toLowerCase().includes(state.searchTxt.toLowerCase());
   });
 
-  if (filteredSportType) {
+  if (state.filteredSportType) {
     filteredActivities = filteredActivities.filter((activity) => {
-      return activity.sport_type === filteredSportType;
+      return activity.sport_type === state.filteredSportType;
     });
   }
-  if (loading && access_token) {
+  if (state.loading && access_token) {
     return (
       <div>
         <h1 style={{ color: 'red', textAlign: 'center' }}>
           <div className={LoadingWheel.loading} style={{ color: 'darkorange' }}>
             ...
           </div>
-          Wait. Loading {activityLoadingState} activities......
+          Wait. Loading {state.activityLoadingState} activities......
         </h1>
       </div>
     );
@@ -143,19 +162,25 @@ const AthleteActivities = () => {
           {windowWidth >= 700 && (
             <>
               <Search
-                searchTxt={searchTxt}
-                updateSearchTxt={setSearchTxt}
+                searchTxt={state.searchTxt}
+                updateSearchTxt={(prevState) => ({
+                  ...prevState,
+                  searchTxt: state.searchTxt,
+                })}
                 placeholder="search activities..."
               />
             </>
           )}
           <AthleteStats />
-          <TimeRangeCalendar props={activities} />
+          <TimeRangeCalendar props={state.activities} />
 
           <SideNavigation>
             <ActivityDropDown
-              props={activities}
-              setFilterBySportType={setFilterBySportType}
+              props={state.activities}
+              setFilterBySportType={(prevState) => ({
+                ...prevState,
+                filteredSportType: state.filteredSportType,
+              })}
             />
             <div>
               {filteredActivities.map((activity, i) => (
@@ -186,13 +211,19 @@ const AthleteActivities = () => {
           {windowWidth < 700 && (
             <>
               <ActivityDropDown
-                props={activities}
-                setFilterBySportType={setFilterBySportType}
+                props={state.activities}
+                setFilterBySportType={(prevState) => ({
+                  ...prevState,
+                  filteredSportType: state.filteredSportType,
+                })}
               />
               <Search
-                searchTxt={searchTxt}
-                updateSearchTxt={setSearchTxt}
-                placeholder={'Search Activities'}
+                searchTxt={state.searchTxt}
+                updateSearchTxt={(prevState) => ({
+                  ...prevState,
+                  searchTxt: state.searchTxt,
+                })}
+                placeholder={'Search All Activities'}
               />
             </>
           )}
@@ -247,7 +278,7 @@ const AthleteActivities = () => {
                   )}
                 </>
               ))
-              .slice(0, 10)}
+              .slice(0, 20)}
           </CardDetails>
         </>
       )}
@@ -319,7 +350,7 @@ const SideNavigation = styled.div`
 
   /* media queries here */
 
-  @media screen and (max-width: 800px) {
+  @media screen and (max-width: 830px) {
     display: none;
   }
 `;
@@ -349,7 +380,6 @@ const Cardborder = styled.div`
   border-radius: 5px;
   box-sizing: border-box;
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
-  padding: 0rem;
   margin: 1rem;
   margin-left: 3rem;
   width: calc((100% - 10rem));
