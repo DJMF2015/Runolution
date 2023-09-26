@@ -20,29 +20,28 @@ import AthleteStats from '../components/AthleteStats';
 
 const initialState = {
   activities: [],
-  searchTxt: '',
   loading: false,
   activityLoadingState: null,
-  filteredSportType: null,
 };
 
 const AthleteActivities = () => {
   const { windowWidth } = useGetWindowWidth();
   const { isVisible, scrollToTop } = useScroll();
+  const [filteredSportType, setFilteredSportType] = useState(null);
+  const [searchTxt, setSearchTxt] = useState('');
   const [state, setState] = useState(initialState);
   const access_token = JSON.parse(localStorage.getItem('access_token'));
-  const data = JSON.parse(localStorage.getItem('activities'));
-  const expires_in = localStorage.getItem('expires_in');
-  const payload = JSON.parse(localStorage.getItem('access_token'));
 
   useEffect(() => {
+    const payload = JSON.parse(localStorage.getItem('access_token'));
     if (payload) {
       getUsersDetails(payload);
     }
-  }, [payload]);
+  }, []);
 
   useEffect(() => {
     async function fetchData() {
+      const data = JSON.parse(localStorage.getItem('activities'));
       if (data !== null && data !== undefined) {
         setState((prevState) => ({
           ...prevState,
@@ -62,7 +61,7 @@ const AthleteActivities = () => {
     }
 
     catchErrors(fetchData());
-  }, [data, access_token]);
+  }, [access_token]);
 
   useEffect(() => {
     const data = localStorage.getItem('activities');
@@ -72,7 +71,7 @@ const AthleteActivities = () => {
         activities: JSON.parse(data),
       }));
     }
-  }, [payload]);
+  }, []);
 
   useEffect(() => {
     const fetchTokenInfo = async () => {
@@ -125,16 +124,19 @@ const AthleteActivities = () => {
 
     return stravaActivityResponse;
   };
-
-  let filteredActivities = state.activities.filter((activity) => {
-    return activity.name.toLowerCase().includes(state.searchTxt.toLowerCase());
-  });
-
-  if (state.filteredSportType) {
+  let filteredActivities = state.activities;
+  if (searchTxt) {
     filteredActivities = filteredActivities.filter((activity) => {
-      return activity.sport_type === state.filteredSportType;
+      return activity.name.toLowerCase().includes(searchTxt.toLowerCase());
     });
   }
+
+  if (filteredSportType) {
+    filteredActivities = filteredActivities.filter((activity) => {
+      return activity.sport_type === filteredSportType;
+    });
+  }
+
   if (state.loading && access_token) {
     return (
       <div>
@@ -150,7 +152,7 @@ const AthleteActivities = () => {
 
   return (
     <>
-      {!access_token || expires_in === '0' ? (
+      {!access_token ? (
         <Login />
       ) : (
         <>
@@ -162,12 +164,9 @@ const AthleteActivities = () => {
           {windowWidth >= 700 && (
             <>
               <Search
-                searchTxt={state.searchTxt}
-                updateSearchTxt={(prevState) => ({
-                  ...prevState,
-                  searchTxt: state.searchTxt,
-                })}
-                placeholder="search activities..."
+                searchTxt={searchTxt}
+                updateSearchTxt={setSearchTxt}
+                placeholder={'Search All Activities'}
               />
             </>
           )}
@@ -177,10 +176,7 @@ const AthleteActivities = () => {
           <SideNavigation>
             <ActivityDropDown
               props={state.activities}
-              setFilterBySportType={(prevState) => ({
-                ...prevState,
-                filteredSportType: state.filteredSportType,
-              })}
+              setFilterBySportType={setFilteredSportType}
             />
             <div>
               {filteredActivities.map((activity, i) => (
@@ -212,17 +208,11 @@ const AthleteActivities = () => {
             <>
               <ActivityDropDown
                 props={state.activities}
-                setFilterBySportType={(prevState) => ({
-                  ...prevState,
-                  filteredSportType: state.filteredSportType,
-                })}
+                setFilterBySportType={setFilteredSportType}
               />
               <Search
-                searchTxt={state.searchTxt}
-                updateSearchTxt={(prevState) => ({
-                  ...prevState,
-                  searchTxt: state.searchTxt,
-                })}
+                searchTxt={searchTxt}
+                updateSearchTxt={setSearchTxt}
                 placeholder={'Search All Activities'}
               />
             </>
@@ -382,7 +372,6 @@ const Cardborder = styled.div`
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
   margin: 1rem;
   margin-left: 3rem;
-  width: calc((100% - 10rem));
   text-align: left;
   background-color: white;
   color: #333;

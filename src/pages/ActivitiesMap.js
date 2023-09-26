@@ -20,34 +20,53 @@ import {
   Popup,
 } from 'react-leaflet';
 
+const initialState = {
+  nodes: [],
+  loading: false,
+  activityLoadingState: null,
+};
+
 const ActivitiesMap = () => {
-  const [nodes, setNodes] = useState([]);
-  const [loading, setLoading] = useState(false);
   const [searchTxt, setSearchTxt] = useState('');
+  const [state, setState] = useState(initialState);
   const { windowWidth } = useGetWindowWidth();
   const { isVisible, scrollToTop } = useScroll();
-  const [activityLoadingState, setActivityLoadingState] = useState(null);
   const [filteredSportType, setFilteredSportType] = useState(null);
   const expires_in = localStorage.getItem('expires_in');
   let access_token = JSON.parse(localStorage.getItem('access_token'));
-  const data = JSON.parse(localStorage.getItem('activities'));
 
   useEffect(() => {
-    setLoading(true);
+    setState((prevState) => ({
+      ...prevState,
+      loading: true,
+    }));
 
     async function fetchData() {
+      const data = JSON.parse(localStorage.getItem('activities'));
       let polylines = [];
 
       if (data) {
         polylines = getDataPolylines(data);
-        setLoading(false);
-        setNodes(polylines);
+        setState((prevState) => ({
+          ...prevState,
+          loading: false,
+        }));
+        setState((prevState) => ({
+          ...prevState,
+          nodes: polylines,
+        }));
       } else if (data === null && access_token) {
         const stravaActivityResponse = await fetchStravaActivities(access_token);
         polylines = getDataPolylines(stravaActivityResponse);
         localStorage.setItem('activities', JSON.stringify(stravaActivityResponse));
-        setLoading(false);
-        setNodes(polylines);
+        setState((prevState) => ({
+          ...prevState,
+          loading: false,
+        }));
+        setState((prevState) => ({
+          ...prevState,
+          nodes: polylines,
+        }));
       }
     }
 
@@ -81,10 +100,16 @@ const ActivitiesMap = () => {
         stravaActivityResponseSingle.data.length === 0 ||
         stravaActivityResponseSingle.data.errors
       ) {
-        setLoading(false);
+        setState((prevState) => ({
+          ...prevState,
+          loading: false,
+        }));
         break;
       } else {
-        setActivityLoadingState(stravaActivityResponse.length);
+        setState((prevState) => ({
+          ...prevState,
+          activityLoadingState: stravaActivityResponse.length,
+        }));
         stravaActivityResponse = stravaActivityResponse.concat(
           stravaActivityResponseSingle.data
         );
@@ -94,7 +119,7 @@ const ActivitiesMap = () => {
     return stravaActivityResponse;
   };
 
-  let filteredName = nodes.filter((activity) => {
+  let filteredName = state.nodes.filter((activity) => {
     return activity.activityName.toLowerCase().includes(searchTxt.toLowerCase());
   });
 
@@ -104,14 +129,14 @@ const ActivitiesMap = () => {
     });
   }
 
-  if (loading && access_token) {
+  if (state.loading && access_token) {
     return (
       <div>
         <h1 style={{ color: 'red', textAlign: 'center' }}>
           <div className={LoadingWheel.loading} style={{ color: 'darkorange' }}>
             ...
           </div>
-          Wait. Loading {activityLoadingState} activities......
+          Wait. Loading {state.activityLoadingState} activities......
         </h1>
       </div>
     );
@@ -124,7 +149,10 @@ const ActivitiesMap = () => {
       ) : (
         <>
           <SideNavigation>
-            <ActivityDropDown props={nodes} setFilterBySportType={setFilteredSportType} />
+            <ActivityDropDown
+              props={state.nodes}
+              setFilterBySportType={setFilteredSportType}
+            />
             {isVisible && (
               <div onClick={scrollToTop}>
                 <ScrollToTop alt="Go to top"></ScrollToTop>
@@ -163,7 +191,7 @@ const ActivitiesMap = () => {
             {windowWidth < 785 && (
               <>
                 <ActivityDropDown
-                  props={nodes}
+                  props={state.nodes}
                   setFilterBySportType={setFilteredSportType}
                 />
                 <SearchBar
@@ -181,7 +209,7 @@ const ActivitiesMap = () => {
               center={[55.89107, -3.21698]}
               zoom={7}
               zoomControl={false}
-              bounds={nodes.map((node) => node.activityPositions)}
+              bounds={state.nodes.map((node) => node.activityPositions)}
               boundsOptions={{ padding: [50, 50] }}
               maxBoundsViscosity={0}
               scrollWheelZoom={true}
