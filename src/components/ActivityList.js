@@ -43,39 +43,45 @@ export default function ActivityList() {
       <ElevationChart props={detailedActivity} />
 
       <Container>
-        <Heading>
-          <div>Splits</div>
-          <div>Distance</div>
-          <div>Elevation Gain (mtrs)</div>
-          <div>Elapsed Time</div>
-          <div>Average Speed</div>
-          <div>Average Cadence</div>
-          <div>Average Heartrate</div>
-          <div>Max Heartrate</div>
-          <div>Pace Zone</div>
-        </Heading>
-
-        <Wrapper>
-          {detailedActivity &&
-            detailedActivity?.laps &&
-            detailedActivity.laps.map((lap, i) => {
-              return (
-                <>
+        <Table>
+          <thead>
+            <th style={{ color: 'red' }}>Segment Efforts</th>
+            <tr>
+              <TableHeader>Splits</TableHeader>
+              <TableHeader>Distance</TableHeader>
+              <TableHeader>Elevation Gain (mtrs)</TableHeader>
+              <TableHeader>Elapsed Time</TableHeader>
+              <TableHeader>Average Speed</TableHeader>
+              <TableHeader>Average Cadence</TableHeader>
+              <TableHeader>Average Heartrate</TableHeader>
+              <TableHeader>Max Heartrate</TableHeader>
+              <TableHeader>Pace Zone</TableHeader>
+            </tr>
+          </thead>
+          <tbody>
+            {detailedActivity &&
+              detailedActivity?.laps &&
+              detailedActivity.laps.map((lap, i) => {
+                return (
                   <>
-                    <div>{from.name}</div>
-                    <div>{getKmsToMiles(lap.distance)}</div>
-                    <div>{lap.total_elevation_gain}</div>
-                    <div>{getSecondstoMinutes(lap.elapsed_time)}</div>
-                    <div>{getMstoKmHr(lap?.average_speed)}</div>
-                    <div>{lap.average_cadence}</div>
-                    <div>{lap.average_heartrate}</div>
-                    <div>{lap.max_heartrate}</div>
-                    <div>{lap.pace_zone}</div>
+                    <>
+                      <tr>
+                        <TableData>{from.name}</TableData>
+                        <TableData>{getKmsToMiles(lap.distance)}</TableData>
+                        <TableData>{lap.total_elevation_gain}</TableData>
+                        <TableData>{getSecondstoMinutes(lap.elapsed_time)}</TableData>
+                        <TableData>{getMstoKmHr(lap?.average_speed)}</TableData>
+                        <TableData>{lap.average_cadence}</TableData>
+                        <TableData>{lap.average_heartrate}</TableData>
+                        <TableData>{lap.max_heartrate}</TableData>
+                        <TableData>{lap.pace_zone}</TableData>
+                      </tr>
+                    </>
                   </>
-                </>
-              );
-            })}
-        </Wrapper>
+                );
+              })}
+          </tbody>
+        </Table>
       </Container>
 
       <Container>
@@ -114,7 +120,7 @@ export default function ActivityList() {
 
       <StyledBackButton
         onClick={handleGoBack}
-        style={{ textAlign: 'center', marginLeft: '49vw', paddingBottom: '1em' }}
+        style={{ textAlign: 'center', marginLeft: '50vw' }}
       >
         Back
       </StyledBackButton>
@@ -138,86 +144,6 @@ const Container = styled.div`
   }
 `;
 
-// display data in 7 columns with 7 rows
-const Wrapper = styled.div`
-  display: grid;
-  grid-template-columns: repeat(9, 1fr);
-  grid-gap: 1em;
-  padding: 0.5em;
-  text-align: left;
-  border-bottom: 1px solid #ddd;
-
-  /* style rows with odd even background color */
-  div {
-    border-bottom: 1px solid #ddd;
-    padding: 0.2em;
-  }
-  /* layout as a stack on top of one another */
-  @media screen and (max-width: 768px) {
-    display: grid;
-    font-size: 14px;
-    margin-top: 0.5em;
-    border-radius: 5px;
-    padding: 0.5em;
-    text-align: left;
-    border-bottom: 1px solid #ddd;
-  }
-  @media screen and (max-width: 650px) {
-    grid-template-columns: repeat(9, 1fr);
-    grid-template-rows: repeat(8, 1fr);
-    font-size: 10px;
-    grid-gap: 0.25em;
-    padding: 0.25em;
-    text-align: left;
-    border-bottom: 1px solid #ddd;
-  }
-  @media screen and (max-width: 450px) {
-    grid-template-columns: repeat(9, 1fr);
-    grid-template-rows: repeat(8, 1fr);
-    font-size: 8px;
-    grid-gap: 0.15em;
-    padding: 0.15em;
-    text-align: left;
-  }
-`;
-
-const Heading = styled.div`
-  display: grid;
-  grid-template-columns: repeat(9, 1fr);
-  grid-gap: 0.5em;
-  padding: 0.5em;
-  text-align: left;
-
-  th {
-    @media screen and (max-width: 768px) {
-      grid-template-columns: repeat(9, 1fr);
-      grid-template-rows: repeat(8, 1fr);
-      font-size: 12px;
-      grid-gap: 0.5em;
-      padding: 0.5em;
-      text-align: left;
-      border-bottom: 1px solid #ddd;
-    }
-    @media screen and (max-width: 650px) {
-      grid-template-columns: repeat(9, 1fr);
-      grid-template-rows: repeat(8, 1fr);
-      font-size: 10px;
-      grid-gap: 0.25em;
-      padding: 0.25em;
-      text-align: left;
-      border-bottom: 1px solid #ddd;
-    }
-    @media screen and (max-width: 450px) {
-      grid-template-columns: repeat(9, 1fr);
-      grid-template-rows: repeat(8, 1fr);
-      font-size: 8px;
-      grid-gap: 0.15em;
-      padding: 0.15em;
-      text-align: left;
-    }
-  }
-`;
-
 const StyledBackButton = styled.button`
   display: relative;
   position: sticky;
@@ -226,7 +152,6 @@ const StyledBackButton = styled.button`
   height: 50px;
   width: 8%;
   text-align: center;
-  /* margin-top: -2em; */
   line-height: 48px;
   padding: 6px 12px;
   font-size: 18px;
