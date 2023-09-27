@@ -11,6 +11,16 @@ const Layers = [
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
   },
   {
+    name: 'UK Open ZoomStack Day',
+    attribution: 'OS & GIS Community',
+    url: 'https://api.maptiler.com/maps/dataviz/{z}/{x}/{y}.png?key=P4mXjfln7pyu2rZS6XhZ',
+  },
+  {
+    name: 'Open ZoomStack Night',
+    attribution: 'OS & GIS Community',
+    url: 'https://api.maptiler.com/maps/uk-openzoomstack-night/{z}/{x}/{y}.png?key=P4mXjfln7pyu2rZS6XhZ',
+  },
+  {
     name: 'Satellite',
     attribution:
       '&copy; <a href="http://www.thunderforest.com/">Thunderforest</a>, &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
