@@ -1,8 +1,8 @@
 import axios from 'axios';
+import { baseURL } from './config';
 
 export const getAthleteStats = async (userId, accessToken) => {
-  const apiUrl = `https://www.strava.com/api/v3/athletes/${userId}/stats`;
-
+  const apiUrl = `${baseURL}/athletes/${userId}/stats`;
   try {
     const response = await axios.get(apiUrl, {
       headers: { Authorization: `Bearer ${accessToken}` },
@@ -18,7 +18,7 @@ export const getAthleteStats = async (userId, accessToken) => {
 };
 
 export const getAthleteActivities = async (accessToken, per_page, index) => {
-  const apiUrl = `https://www.strava.com/api/v3/athlete/activities?per_page=${per_page}&page=${index}`;
+  const apiUrl = `${baseURL}/athlete/activities?per_page=${per_page}&page=${index}`;
   try {
     const response = await axios.get(apiUrl, {
       headers: { Authorization: `Bearer ${accessToken}` },
@@ -34,7 +34,7 @@ export const getAthleteActivities = async (accessToken, per_page, index) => {
 };
 
 export const getUsersDetails = async (accessToken) => {
-  const apiUrl = `https://www.strava.com/api/v3/athlete`;
+  const apiUrl = `${baseURL}/athlete`;
   try {
     const response = await axios.get(apiUrl, {
       headers: { Authorization: `Bearer ${accessToken}` },
@@ -52,7 +52,7 @@ export const getUsersDetails = async (accessToken) => {
 
 export const getUsersClubs = async (accessToken) => {
   try {
-    const response = await axios.get(`https://www.strava.com/api/v3/athlete/clubs`, {
+    const response = await axios.get(`${baseURL}/athlete/clubs`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
     return response;
@@ -63,12 +63,9 @@ export const getUsersClubs = async (accessToken) => {
 
 export const getUsersClubActivities = async (clubId, accessToken) => {
   try {
-    const response = await axios.get(
-      `https://www.strava.com/api/v3/clubs/${clubId}/activities`,
-      {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      }
-    );
+    const response = await axios.get(`${baseURL}/clubs/${clubId}/activities`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
     return response;
   } catch (error) {
     console.log(error);
@@ -76,7 +73,7 @@ export const getUsersClubActivities = async (clubId, accessToken) => {
 };
 
 export const getKudoersByActivityId = async (activityId, accessToken) => {
-  const apiUrl = `https://www.strava.com/api/v3/activities/${activityId}/kudos`;
+  const apiUrl = `${baseURL}/activities/${activityId}/kudos`;
   try {
     const response = await axios.get(apiUrl, {
       headers: { Authorization: `Bearer ${accessToken}` },
@@ -92,7 +89,7 @@ export const getKudoersByActivityId = async (activityId, accessToken) => {
 };
 
 export const getCommentsByActivityId = async (activityId, accessToken) => {
-  const apiUrl = `https://www.strava.com/api/v3/activities/${activityId}/comments`;
+  const apiUrl = `${baseURL}/activities/${activityId}/comments`;
   try {
     const response = await axios.get(apiUrl, {
       headers: { Authorization: `Bearer ${accessToken}` },
@@ -108,7 +105,7 @@ export const getCommentsByActivityId = async (activityId, accessToken) => {
 };
 
 export const getUserActivityLaps = async (activityId, accessToken) => {
-  const apiUrl = `https://www.strava.com/api/v3/activities/${activityId}/laps`;
+  const apiUrl = `${baseURL}/activities/${activityId}/laps`;
   try {
     const response = await axios.get(apiUrl, {
       headers: { Authorization: `Bearer ${accessToken}` },
@@ -125,7 +122,7 @@ export const getUserActivityLaps = async (activityId, accessToken) => {
 
 /*  get detailed activity data */
 export const getDetailedAthleteData = async (id, accessToken) => {
-  const apiUrl = `https://www.strava.com/api/v3/activities/${id}`;
+  const apiUrl = `${baseURL}/activities/${id}`;
   try {
     const response = await axios.get(apiUrl, {
       headers: { Authorization: `Bearer ${accessToken}` },
@@ -143,7 +140,7 @@ export const getDetailedAthleteData = async (id, accessToken) => {
 //upload activity to strava api
 export const uploadActivity = async (formData, accessToken) => {
   try {
-    const response = await axios.post(`https://www.strava.com/api/v3/uploads`, formData, {
+    const response = await axios.post(`${baseURL}/uploads`, formData, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
     return response;
