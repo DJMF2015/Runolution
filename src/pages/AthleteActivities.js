@@ -12,7 +12,7 @@ import { Stopwatch } from '@styled-icons/boxicons-regular/Stopwatch';
 import { getKmsToMiles, getSecondstoMinutes, formattedDate } from '../utils/conversion';
 import ActivityDropDown from '../components/ActivityDropDown';
 import Login from '../components/Login';
-import Search from '../utils/search';
+import Search from '../components/search';
 import TimeRangeCalendar from '../components/TimeRangeCalendar';
 import '../App.css';
 import { Link } from 'react-router-dom';

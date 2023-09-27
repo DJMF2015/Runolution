@@ -7,7 +7,7 @@ import { formattedDate } from '../utils/conversion';
 import ActivityDropDown from '../components/ActivityDropDown';
 import Login from '../components/Login';
 import styled from 'styled-components';
-import SearchBar from '../utils/search';
+import SearchBar from '../components/search';
 import Layers from '../components/layers';
 import { useGetWindowWidth, useScroll } from '../utils/hooks';
 import LoadingWheel from '../styles/Loading.module.css';
