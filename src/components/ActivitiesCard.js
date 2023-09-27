@@ -94,7 +94,7 @@ export default function ActivitiesCard() {
       });
       map.setTerrain({
         source: 'mapbox-dem',
-        exaggeration: 1,
+        exaggeration: 1.5,
       });
       map.addLayer({
         id: 'sky',
