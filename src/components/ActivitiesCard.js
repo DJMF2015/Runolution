@@ -38,6 +38,7 @@ export default function ActivitiesCard() {
   const endLocation = {
     center: [from?.end_latlng[1], from?.end_latlng[0]],
     bearing: 0,
+    zoom: 1.5,
     pitch: 0,
   };
 
@@ -66,7 +67,7 @@ export default function ActivitiesCard() {
       style: 'mapbox://styles/mapbox/satellite-v9',
       antialias: true, // create the gl context with MSAA antialiasing, so custom layers are antialiased
       ...endLocation,
-      zoom: 1.5,
+      zoom: 1,
       pitch: 55,
       bearing: 60,
       interactive: true,
@@ -93,7 +94,7 @@ export default function ActivitiesCard() {
       });
       map.setTerrain({
         source: 'mapbox-dem',
-        exaggeration: 2,
+        exaggeration: 1,
       });
       map.addLayer({
         id: 'sky',
@@ -178,6 +179,7 @@ export default function ActivitiesCard() {
 
     function rotateAndFlyTo() {
       var bearing = map.getBearing();
+
       var start = null;
       function animate(timestamp) {
         if (!start) start = timestamp;
