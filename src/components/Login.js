@@ -45,10 +45,16 @@ const StyledLoginContainer = styled.main`
 `;
 const StyledButtonWrapper = styled.div`
   background-color: ${(props) => props.theme.colour.black};
+  opacity: 0.8;
+  position: absolute;
+  width: 100%;
   display: flex;
   border-radius: 10px;
-  border-color: aliceblue;
   z-index: 1000;
+
+  @media (max-width: 768px) {
+    width: 100%;
+  }
 `;
 
 const CardWrapper = styled.div`
@@ -57,6 +63,22 @@ const CardWrapper = styled.div`
   margin: 0 auto;
   border-radius: 0.4rem;
   background-color: ${(props) => props.theme.colour.grey};
+
+  @media (max-width: 768px) {
+    width: 25rem;
+    height: 20rem;
+    margin: 0 auto;
+    border-radius: 0.4rem;
+    background-color: ${(props) => props.theme.colour.grey};
+  }
+
+  @media screen and (max-width: 425px) {
+    width: 15rem;
+    height: 20rem;
+    margin: 0 auto;
+    border-radius: 0.4rem;
+    background-color: ${(props) => props.theme.colour.grey};
+  }
 `;
 
 const ImageButton = styled.img`
@@ -65,4 +87,19 @@ const ImageButton = styled.img`
   margin: 0 auto;
   width: 85%;
   height: 10rem;
+
+  &:hover {
+    cursor: pointer;
+    scale: 1.15;
+  }
+
+  @media (max-width: 768px) {
+    width: 85%;
+    height: 10rem;
+  }
+
+  @media screen and (max-width: 425px) {
+    width: 85%;
+    height: 10rem;
+  }
 `;
