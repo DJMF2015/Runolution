@@ -20,7 +20,7 @@ export const getAccessToken = async (authCode) => {
     }
     return response.data;
   } catch (error) {
-    console.log(error);
+    throw new Error(`Error while fetching access token ${error.message}`);
   }
 };
 
@@ -37,7 +37,7 @@ export const getNewAccessToken = async () => {
     }
     return response.data;
   } catch (error) {
-    console.log(error);
+    throw new Error(`Error while fetching new access token ${error.message}`);
   }
 };
 
@@ -60,18 +60,11 @@ const storePayloadToLocalStorage = (payload) => {
 };
 
 /**
- * Higher-order function for async/await error handling
- * @param {function} fn an async function
- * @returns {function}
+ *
+ * @param {function} expires_in
+ * @param {function} expires_at
+ * @returns  check if token has expired and if so get new access token
  */
-export const catchErrors = (fn) => {
-  return function (...args) {
-    return fn(...args).catch((err) => {
-      console.error(err);
-    });
-  };
-};
-
 export const checkIfTokenExpired = async (expires_in, expires_at) => {
   if (expires_in && expires_at) {
     const expirationTime = new Date(expires_at * 1000); // Convert to milliseconds
@@ -79,7 +72,20 @@ export const checkIfTokenExpired = async (expires_in, expires_at) => {
     if (currentTime > expirationTime) {
       await getNewAccessToken();
     } else {
-      console.log('Token not expired');
+      return;
     }
   }
+};
+
+/**
+ * Higher-order function for async/await error handling
+ * @param {function} fn an async function
+ * @returns {function}
+ */
+export const catchErrors = (fn) => {
+  return function (...args) {
+    return fn(...args).catch((err) => {
+      throw new Error(err);
+    });
+  };
 };
