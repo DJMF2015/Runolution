@@ -1,7 +1,7 @@
 import { Outlet, Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import LogoutButton from '../components/Logout';
-import PoweredByStrava from '../pwrdBy_strava_light.svg';
+import PoweredByStrava from '../powered_by_strava_light.svg';
 import styled from 'styled-components';
 import '../styles/Navbar.css';
 const Layout = () => {
