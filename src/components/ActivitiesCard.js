@@ -64,8 +64,8 @@ export default function ActivitiesCard() {
     mapboxgl.accessToken = process.env.REACT_APP_MAPBOX_KEY;
     const map = new mapboxgl.Map({
       projection: 'globe',
-      style: 'mapbox://styles/mapbox/satellite-streets-v11',
-      antialias: true, // create the gl context with MSAA antialiasing, so custom layers are antialiased
+      style: 'mapbox://styles/mapbox/satellite-v9',
+      antialias: true,
       ...endLocation,
       zoom: 1,
       pitch: 55,
@@ -83,8 +83,8 @@ export default function ActivitiesCard() {
       });
 
       map.setFog({
-        'horizon-blend': 0.1, // Exaggerate atmosphere (default is .1)
-        'space-color': 'rgb(10, 10, 10)', // Black space
+        'horizon-blend': 0.1,
+        'space-color': 'rgb(10, 10, 10)',
         'star-intensity': 1,
       });
       map.addSource('mapbox-dem', {
@@ -101,8 +101,8 @@ export default function ActivitiesCard() {
         type: 'sky',
         paint: {
           'sky-type': 'atmosphere',
-          'sky-atmosphere-sun': [1.0, 1.0],
-          'sky-atmosphere-sun-intensity': 15,
+          'sky-atmosphere-sun': [0, 1.0],
+          'sky-atmosphere-sun-intensity': 5,
         },
       });
       map.addLayer({
@@ -193,11 +193,7 @@ export default function ActivitiesCard() {
 
   return (
     <>
-      {isVisible && (
-        <div onClick={scrollToTop}>
-          <ScrollToTop alt="Go to top"></ScrollToTop>
-        </div>
-      )}
+      {isVisible && <ScrollToTop alt="Go to top" onClick={scrollToTop} />}
       <div style={{ backgroundColor: 'black' }}>
         <SideNavigation>
           <CardHeaders>
