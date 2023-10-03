@@ -44,9 +44,11 @@ html {
 
 .leaflet-right .leaflet-control {
   margin-top: 8em;
-
   @media screen and (max-width: 768px) {
     margin-top: 0rem;
+    margin-right: 0rem;
+    font-size: 0.65rem;
   }
      
 }
+ 
