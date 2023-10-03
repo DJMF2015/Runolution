@@ -45,7 +45,6 @@ const StyledLoginContainer = styled.main`
 `;
 const StyledButtonWrapper = styled.div`
   background-color: ${(props) => props.theme.colour.black};
-  opacity: 0.8;
   position: absolute;
   width: 100%;
   display: flex;
@@ -73,7 +72,7 @@ const CardWrapper = styled.div`
   }
 
   @media screen and (max-width: 425px) {
-    width: 15rem;
+    width: 100%;
     height: 20rem;
     margin: 0 auto;
     border-radius: 0.4rem;
@@ -90,7 +89,7 @@ const ImageButton = styled.img`
 
   &:hover {
     cursor: pointer;
-    scale: 1.15;
+    scale: 0.95;
   }
 
   @media (max-width: 768px) {
@@ -102,4 +101,13 @@ const ImageButton = styled.img`
     width: 85%;
     height: 10rem;
   }
+`;
+
+const StyledText = styled.h1`
+  display: flex;
+  font-size: 3rem;
+  margin: 0 auto;
+  text-align: center;
+  color: ${(props) => props.theme.colour.white};
+  font-style: italic;
 `;

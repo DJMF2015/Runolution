@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 
 const Logout = () => {
   const token = localStorage.getItem('access_token');
+  const navigate = useNavigate();
   const [loggedIn, setLoggedIn] = useState(false);
 
   const handleLogout = () => {
     localStorage.clear();
-    window.location.href = 'strava-personal-dashboard.vercel.app';
+    setLoggedIn(false);
+    navigate('/');
   };
 
   useEffect(() => {
@@ -33,7 +36,7 @@ const Logout = () => {
 };
 export default Logout;
 
-const StyledLoginButton = styled.a`
+const StyledLoginButton = styled.button`
   font-size: 16px;
   background-color: #fc5200;
   border-color: #fc5200;
