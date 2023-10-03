@@ -64,7 +64,7 @@ export default function ActivitiesCard() {
     mapboxgl.accessToken = process.env.REACT_APP_MAPBOX_KEY;
     const map = new mapboxgl.Map({
       projection: 'globe',
-      style: 'mapbox://styles/mapbox/satellite-v9',
+      style: 'mapbox://styles/mapbox/satellite-streets-v11',
       antialias: true, // create the gl context with MSAA antialiasing, so custom layers are antialiased
       ...endLocation,
       zoom: 1,
@@ -101,8 +101,8 @@ export default function ActivitiesCard() {
         type: 'sky',
         paint: {
           'sky-type': 'atmosphere',
-          'sky-atmosphere-sun': [0.0, 0.0],
-          'sky-atmosphere-sun-intensity': 10,
+          'sky-atmosphere-sun': [1.0, 1.0],
+          'sky-atmosphere-sun-intensity': 15,
         },
       });
       map.addLayer({
@@ -132,33 +132,18 @@ export default function ActivitiesCard() {
             0,
             'yellow',
             0.1,
-            'green',
-            0.3,
-            'yellow',
-            0.5,
             'orange',
+            0.3,
+            'darkorange',
+            0.5,
+            'orangered',
             0.7,
-            'coral',
+            'tomato',
             1,
             'red',
           ],
         },
       });
-
-      const pinRoute = data.geometry.coordinates;
-      const popup = new mapboxgl.Popup({ closeButton: false });
-      new mapboxgl.Marker({
-        color: 'red',
-        scale: 0.8,
-        draggable: false,
-        pitchAlignment: 'auto',
-        rotationAlignment: 'auto',
-      })
-        .setLngLat(pinRoute[0])
-        .setPopup(popup)
-        .addTo(map)
-        .togglePopup();
-      map.addSource('trace', { type: 'geojson', data: data });
     });
 
     setTimeout(() => {
@@ -350,7 +335,8 @@ const ActivityCard = styled.h3`
       : props.theme.colour.transparent};
 
   @media screen and (max-width: 600px) {
-    /* margin-top: 3rem; */
+    margin-top: 4rem;
+    text-align: center;
   }
 `;
 
