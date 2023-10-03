@@ -5,7 +5,7 @@ import styled from 'styled-components';
 import { client_id } from '../utils/config';
 
 const Login = () => {
-  const [logout, setLoggedOut] = useState(true);
+  const [logout, setLoggedOut] = useState(false);
   const redirectUrl = 'http://strava-personal-dashboard.vercel.app/redirect';
 
   const handleLogin = () => {
@@ -16,7 +16,7 @@ const Login = () => {
 
   return (
     <>
-      {logout && (
+      {!logout && (
         <StyledButtonWrapper>
           <StyledLoginContainer>
             <CardWrapper>

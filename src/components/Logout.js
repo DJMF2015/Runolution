@@ -5,11 +5,11 @@ import styled from 'styled-components';
 const Logout = () => {
   const token = localStorage.getItem('access_token');
   const navigate = useNavigate();
-  const [loggedIn, setLoggedIn] = useState(false);
+  const [loggedIn, setLoggedIn] = useState(true);
 
   const handleLogout = () => {
     localStorage.clear();
-    setLoggedIn(false);
+    setLoggedIn((loggedIn) => !loggedIn);
     navigate('/');
   };
 
@@ -17,10 +17,11 @@ const Logout = () => {
     async function logout() {
       if (token) {
         setLoggedIn(false);
+        navigate('/');
       }
     }
     logout();
-  }, [token, loggedIn]);
+  }, [token]);
 
   return (
     <>
@@ -36,13 +37,13 @@ const Logout = () => {
 };
 export default Logout;
 
-const StyledLoginButton = styled.button`
-  font-size: 16px;
+const StyledLoginButton = styled.a`
+  font-size: 14px;
   background-color: #fc5200;
   border-color: #fc5200;
   height: auto;
-  font-size: 12px;
-  padding: 6px 16px;
+  margin-left: 1rem;
+  padding: 0.5rem 0.8rem;
   min-height: unset;
   line-height: normal;
   border-radius: 10px;
