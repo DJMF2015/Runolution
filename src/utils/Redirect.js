@@ -1,29 +1,42 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getExchangeCodeFromURL, getAccessToken } from './helpers';
+import { getExchangeCodeFromURL, getAccessToken, catchErrors } from './helpers';
 
 const Redirect = () => {
   const navigate = useNavigate();
   const [payload, setPayload] = useState([]);
+  const [error, setError] = useState(null);
+
   useEffect(() => {
     async function getToken() {
-      const exchangeCode = new URLSearchParams(window.location.search).get('code');
-      const code = await getExchangeCodeFromURL(exchangeCode); // get exchange code from URL
-      const response = await getAccessToken(code); // get access token from Strava API
+      try {
+        const exchangeCode = new URLSearchParams(window.location.search).get('code');
+        const code = await getExchangeCodeFromURL(exchangeCode);
+        const response = await getAccessToken(code);
 
-      if (response && response.access_token) {
-        setPayload(response);
+        if (response && response?.access_token) {
+          setPayload(response);
+          navigate('/');
+        } else {
+          setError('No access token found in the response.');
+        }
+      } catch (err) {
+        setError('An error occurred while fetching the token.');
+        console.error(err);
       }
     }
 
     getToken();
-  }, [payload]);
+  }, [navigate]);
 
   useEffect(() => {
-    if (payload?.access_token) {
-      navigate('/');
+    if (error) {
+      console.error(error);
+      catchErrors(error + 'no access token found in the response');
     }
-  }, [payload, navigate]);
+  }, [error]);
+
+  return <p>Redirecting...</p>;
 };
 
 export default Redirect;
