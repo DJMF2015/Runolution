@@ -144,7 +144,7 @@ const AthleteActivities = () => {
           <div className={LoadingWheel.loading} style={{ color: 'darkorange' }}>
             ...
           </div>
-          Wait. Loading {state.activityLoadingState} activities......
+          Please Wait. Loading {state.activityLoadingState} activities......
         </h1>
       </div>
     );
@@ -156,11 +156,7 @@ const AthleteActivities = () => {
         <Login />
       ) : (
         <>
-          {isVisible && (
-            <div onClick={scrollToTop}>
-              <ScrollToTop alt="Go to top"></ScrollToTop>
-            </div>
-          )}
+          {isVisible && <ScrollToTop alt="Go to top" onClick={scrollToTop} />}
           {windowWidth >= 700 && (
             <>
               <Search
@@ -370,7 +366,7 @@ const Cardborder = styled.div`
   border-radius: 5px;
   box-sizing: border-box;
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
-  margin: 1rem;
+  margin: 0.5rem;
   margin-left: 3rem;
   text-align: left;
   background-color: white;
