@@ -3,33 +3,20 @@ import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 
 const Logout = () => {
-  const token = localStorage.getItem('access_token');
   const navigate = useNavigate();
   const [loggedIn, setLoggedIn] = useState(true);
 
   const handleLogout = () => {
     localStorage.clear();
-    setLoggedIn((loggedIn) => !loggedIn);
+    setLoggedIn(false);
     navigate('/');
   };
-
-  useEffect(() => {
-    async function logout() {
-      if (token) {
-        setLoggedIn(false);
-        navigate('/');
-      }
-    }
-    logout();
-  }, [token]);
 
   return (
     <>
       {!loggedIn && (
         <li>
-          <StyledLoginButton to="/" onClick={handleLogout}>
-            Logout
-          </StyledLoginButton>
+          <StyledLoginButton onClick={handleLogout}>Logout</StyledLoginButton>
         </li>
       )}
     </>
