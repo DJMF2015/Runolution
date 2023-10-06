@@ -1,22 +1,32 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 
 const Logout = () => {
-  const navigate = useNavigate();
-  const [loggedIn, setLoggedIn] = useState(true);
+  const token = localStorage.getItem('access_token');
+  const [loggedIn, setLoggedIn] = useState(false);
 
   const handleLogout = () => {
     localStorage.clear();
-    setLoggedIn(false);
-    navigate('/');
+    // remove token from state
+    window.location.href = 'http://strava-personal-dashboard.vercel.app';
   };
+
+  useEffect(() => {
+    async function logout() {
+      if (token) {
+        setLoggedIn(false);
+      }
+    }
+    logout();
+  }, [token, loggedIn]);
 
   return (
     <>
       {!loggedIn && (
         <li>
-          <StyledLoginButton onClick={handleLogout}>Logout</StyledLoginButton>
+          <StyledLoginButton to="/" onClick={handleLogout}>
+            Logout
+          </StyledLoginButton>
         </li>
       )}
     </>
