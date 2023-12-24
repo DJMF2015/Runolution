@@ -1,74 +1,84 @@
 import axios from 'axios';
 import { baseURL } from './config';
+import { removeDataAfterDuration } from './helpers';
+import { RateLimiter } from './rateLimiter';
+
+const stravaRateLimiter = new RateLimiter(100, 15 * 60 * 1000);
 
 export const getAthleteStats = async (userId, accessToken) => {
-  const apiUrl = `${baseURL}/athletes/${userId}/stats`;
-  try {
-    const response = await axios.get(apiUrl, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-    if (response.status === 200) {
-      return response;
-    } else {
-      throw new Error(`Failed to fetch athlete stats. Status: ${response.status}`);
+  if (await stravaRateLimiter.request()) {
+    const apiUrl = `${baseURL}/athletes/${userId}/stats`;
+    try {
+      removeDataAfterDuration('athlete', 6);
+      const response = await axios.get(apiUrl, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (response.status === 200) {
+        return response;
+      } else {
+        throw new Error(`Failed to fetch athlete stats. Status: ${response.status}`);
+      }
+    } catch (error) {
+      throw new Error(`Error while fetching athlete stats: ${error.message}`);
     }
-  } catch (error) {
-    throw new Error(`Error while fetching athlete stats: ${error.message}`);
+  } else {
+    throw new Error('Exceeded the Strava rate limit. Please try again later.');
   }
 };
 
 export const getAthleteActivities = async (accessToken, per_page, index) => {
-  const apiUrl = `${baseURL}/athlete/activities?per_page=${per_page}&page=${index}`;
-  try {
-    const response = await axios.get(apiUrl, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-    if (response.status === 200) {
-      return response;
-    } else {
+  if (await stravaRateLimiter.request()) {
+    const apiUrl = `${baseURL}/athlete/activities?per_page=${per_page}&page=${index}`;
+    try {
+      const response = await axios.get(apiUrl, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (response.status === 200) {
+        return response;
+      } else {
+      }
+      throw new Error(`Failed to fetch athlete stats. Status: ${response.status}`);
+    } catch (error) {
+      throw new Error(`Error while fetching athlete stats: ${error.message}`);
     }
-    throw new Error(`Failed to fetch athlete stats. Status: ${response.status}`);
-  } catch (error) {
-    throw new Error(`Error while fetching athlete stats: ${error.message}`);
+  } else {
+    throw new Error('Exceeded the Strava rate limit. Please try again later.');
   }
 };
 
 export const getUsersDetails = async (accessToken) => {
-  const apiUrl = `${baseURL}/athlete`;
-  try {
-    const response = await axios.get(apiUrl, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-    if (response.status === 200) {
-      localStorage.setItem('athlete', JSON.stringify(response.data));
-      return response;
-    } else {
-      throw new Error(`Failed to fetch athlete stats. Status: ${response.status}`);
+  if (await stravaRateLimiter.request()) {
+    const apiUrl = `${baseURL}/athlete`;
+    try {
+      const response = await axios.get(apiUrl, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (response.status === 200) {
+        localStorage.setItem('athlete', JSON.stringify(response.data));
+        return response;
+      } else {
+        throw new Error(`Failed to fetch athlete stats. Status: ${response.status}`);
+      }
+    } catch (error) {
+      throw new Error(`Error while fetching athlete stats: ${error.message}`);
     }
-  } catch (error) {
-    throw new Error(`Error while fetching athlete stats: ${error.message}`);
+  } else {
+    throw new Error('Exceeded the strava rate limit. Please try again later.');
   }
 };
 
 export const getUsersClubs = async (accessToken) => {
-  try {
-    const response = await axios.get(`${baseURL}/athlete/clubs`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-    return response;
-  } catch (error) {
-    console.log(error);
-  }
-};
-
-export const getUsersClubActivities = async (clubId, accessToken) => {
-  try {
-    const response = await axios.get(`${baseURL}/clubs/${clubId}/activities`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-    return response;
-  } catch (error) {
-    console.log(error);
+  if (await stravaRateLimiter.request()) {
+    try {
+      const response = await axios.get(`${baseURL}/athlete/clubs`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      return response;
+    } catch (error) {
+      console.log(error);
+    }
+  } else {
+    throw new Error('Exceeded the Strava rate limit. Please try again later.');
   }
 };
 
@@ -134,17 +144,5 @@ export const getDetailedAthleteData = async (id, accessToken) => {
     }
   } catch (error) {
     throw new Error(`Error while fetching athlete stats: ${error.message}`);
-  }
-};
-
-//upload activity to strava api
-export const uploadActivity = async (formData, accessToken) => {
-  try {
-    const response = await axios.post(`${baseURL}/uploads`, formData, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-    return response;
-  } catch (error) {
-    console.log(error);
   }
 };
