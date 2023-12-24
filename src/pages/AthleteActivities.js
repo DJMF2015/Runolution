@@ -3,6 +3,7 @@ import styled from 'styled-components';
 import { getAthleteActivities, getUsersDetails } from '../utils/functions';
 import { useGetWindowWidth, useScroll } from '../utils/hooks';
 import { catchErrors, checkIfTokenExpired } from '../utils/helpers';
+import { removeDataAfterDuration } from '../utils/helpers';
 import LoadingWheel from '../styles/Loading.module.css';
 import { ArrowUpCircleFill } from '@styled-icons/bootstrap/ArrowUpCircleFill';
 import { HandThumbsUpFill } from '@styled-icons/bootstrap/HandThumbsUpFill';
@@ -41,6 +42,7 @@ const AthleteActivities = () => {
 
   useEffect(() => {
     async function fetchData() {
+      removeDataAfterDuration('activities', 6);
       const data = JSON.parse(localStorage.getItem('activities'));
       if (data !== null && data !== undefined) {
         setState((prevState) => ({

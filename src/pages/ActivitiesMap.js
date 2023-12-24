@@ -9,6 +9,7 @@ import Login from '../components/Login';
 import styled from 'styled-components';
 import SearchBar from '../components/search';
 import Layers from '../components/layers';
+import { removeDataAfterDuration } from '../utils/helpers';
 import { useGetWindowWidth, useScroll } from '../utils/hooks';
 import LoadingWheel from '../styles/Loading.module.css';
 import {
@@ -44,7 +45,7 @@ const ActivitiesMap = () => {
     async function fetchData() {
       const data = JSON.parse(localStorage.getItem('activities'));
       let polylines = [];
-
+      removeDataAfterDuration('activities', 6);
       if (data) {
         polylines = getDataPolylines(data);
         setState((prevState) => ({
@@ -235,7 +236,7 @@ const ActivitiesMap = () => {
                           positions={activity.activityPositions}
                           key={i}
                           weight={3}
-                          color={'red'}
+                          color={activity.activityType === 'Run' ? 'red' : 'blue'}
                           smoothFactor={0.7}
                           vectorEffect="non-scaling-stroke"
                           opacity={0.5}
