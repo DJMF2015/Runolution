@@ -9,9 +9,8 @@ const Login = () => {
   const redirectUrl = 'http://strava-personal-dashboard.vercel.app/redirect';
 
   const handleLogin = () => {
-    localStorage.clear();
     setLoggedOut(!logout);
-    window.location = `http://www.strava.com/oauth/authorize?client_id=${client_id}&response_type=code&redirect_uri=${redirectUrl}&approval_prompt=force&scope=read_all,activity:read_all,profile:read_all,activity:write`;
+    window.location = `http://www.strava.com/oauth/authorize?client_id=${client_id}&response_type=code&redirect_uri=${redirectUrl}&approval_prompt=force&scope=read_all,activity:read_all,profile:read_all`;
   };
 
   return (
@@ -19,6 +18,7 @@ const Login = () => {
       {!logout && (
         <StyledButtonWrapper>
           <StyledLoginContainer>
+            <br />
             <CardWrapper>
               <ImageButton
                 src={StravaConnectBtn}
