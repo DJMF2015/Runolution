@@ -43,24 +43,6 @@ export const getNewAccessToken = async () => {
 
 /**
  *
- * @param { json array} payload  an async function
- * @returns {function} store payload to local storage
- */
-const storePayloadToLocalStorage = (payload) => {
-  const keysToStore = {
-    payload,
-    access_token: payload.access_token,
-    refresh_token: payload.refresh_token,
-    expires_in: payload.expires_in,
-    expires_at: payload.expires_at,
-  };
-  Object.entries(keysToStore).forEach(([key, value]) => {
-    localStorage.setItem(key, JSON.stringify(value));
-  });
-};
-
-/**
- *
  * @param {function} expires_in
  * @param {function} expires_at
  * @returns  check if token has expired and if so get new access token
@@ -75,6 +57,51 @@ export const checkIfTokenExpired = async (expires_in, expires_at) => {
       return;
     }
   }
+};
+
+/**
+ *
+ * @param  {data} key
+ * @param {integer} durationInDays
+ */
+// Utility function to remove data from local storage after 6 days to comply with Strava's regulations
+export const removeDataAfterDuration = (key, durationInDays) => {
+  const storedData = localStorage.getItem(key);
+
+  if (storedData) {
+    const storedTimestamp = new Date(JSON.parse(storedData).timestamp);
+    const currentTimestamp = new Date();
+
+    // Calculate the time difference in milliseconds
+    const timeDifference = currentTimestamp - storedTimestamp;
+
+    // Convert the time difference from milliseconds to days
+    const timeDifferenceInDays = timeDifference / (1000 * 60 * 60 * 24);
+
+    // Check if the stored data is older than the specified duration
+    if (timeDifferenceInDays >= durationInDays) {
+      localStorage.removeItem(key);
+    }
+  }
+};
+
+/**
+ *
+ * @param { json array} payload  an async function
+ * @returns {function} store payload to local storage
+ */
+const storePayloadToLocalStorage = (payload) => {
+  removeDataAfterDuration('payload', 6);
+  const keysToStore = {
+    payload,
+    access_token: payload.access_token,
+    refresh_token: payload.refresh_token,
+    expires_in: payload.expires_in,
+    expires_at: payload.expires_at,
+  };
+  Object.entries(keysToStore).forEach(([key, value]) => {
+    localStorage.setItem(key, JSON.stringify(value));
+  });
 };
 
 /**
