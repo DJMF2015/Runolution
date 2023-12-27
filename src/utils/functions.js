@@ -116,17 +116,21 @@ export const getCommentsByActivityId = async (activityId, accessToken) => {
 
 export const getUserActivityLaps = async (activityId, accessToken) => {
   const apiUrl = `${baseURL}/activities/${activityId}/laps`;
-  try {
-    const response = await axios.get(apiUrl, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-    if (response.status === 200) {
-      return response;
-    } else {
-      throw new Error(`Failed to fetch athlete stats. Status: ${response.status}`);
+  if (await stravaRateLimiter.request()) {
+    try {
+      const response = await axios.get(apiUrl, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (response.status === 200) {
+        return response;
+      } else {
+        throw new Error(`Failed to fetch athlete stats. Status: ${response.status}`);
+      }
+    } catch (error) {
+      throw new Error(`Error while fetching athlete stats: ${error.message}`);
     }
-  } catch (error) {
-    throw new Error(`Error while fetching athlete stats: ${error.message}`);
+  } else {
+    throw new Error('Exceeded the Strava rate limit. Please try again later.');
   }
 };
 
@@ -144,5 +148,28 @@ export const getDetailedAthleteData = async (id, accessToken) => {
     }
   } catch (error) {
     throw new Error(`Error while fetching athlete stats: ${error.message}`);
+  }
+};
+
+// deauthorize a user from the strava app
+export const deauthorizeUser = async () => {
+  const accessToken = localStorage.getItem('access_token');
+  // remove %22 prefix and "' from access token string before sending to strava
+  const removePrefix = accessToken
+    .replace(/%22/g, '')
+    .replace(/"/g, '')
+    .replace(/'/g, '');
+
+  const apiurl = `https://www.strava.com/oauth/deauthorize?access_token=${removePrefix}`;
+  try {
+    const response = await axios.post(apiurl);
+    if (response.status === 200) {
+      console.log(response);
+      return response;
+    } else {
+      throw new Error(`Failed to deauthorize user. Status: ${response.status}`);
+    }
+  } catch (error) {
+    throw new Error(`Error while deauthorizing user: ${error.message}`);
   }
 };
