@@ -136,18 +136,22 @@ export const getUserActivityLaps = async (activityId, accessToken) => {
 
 /*  get detailed activity data */
 export const getDetailedAthleteData = async (id, accessToken) => {
-  const apiUrl = `${baseURL}/activities/${id}`;
-  try {
-    const response = await axios.get(apiUrl, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-    if (response.status === 200) {
-      return response;
-    } else {
-      throw new Error(`Failed to fetch athlete stats. Status: ${response.status}`);
+  if (await stravaRateLimiter.request()) {
+    const apiUrl = `${baseURL}/activities/${id}`;
+    try {
+      const response = await axios.get(apiUrl, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (response.status === 200) {
+        return response;
+      } else {
+        throw new Error(`Failed to fetch athlete stats. Status: ${response.status}`);
+      }
+    } catch (error) {
+      throw new Error(`Error while fetching athlete stats: ${error.message}`);
     }
-  } catch (error) {
-    throw new Error(`Error while fetching athlete stats: ${error.message}`);
+  } else {
+    throw new Error('Exceeded the Strava rate limit. Please try again later.');
   }
 };
 

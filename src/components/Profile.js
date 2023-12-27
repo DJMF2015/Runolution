@@ -15,12 +15,13 @@ export const AthleteProfile = ({ athlete }) => (
 
 const AvatarProfile = styled.h4`
   margin-top: 9rem;
+  margin-left: 1rem;
   width: 7vw;
   border-radius: 50%;
   height: 7vw;
   display: flex;
   position: absolute;
-  right: 5rem;
+  right: 2rem;
 
   @media screen and (max-width: 1048px) {
     display: none;
@@ -32,7 +33,7 @@ const AvatarProfile = styled.h4`
     font-size: 0.9rem;
     display: flex;
     position: absolute;
-    right: 5rem;
+    right: 2rem;
 
     @media screen and (max-width: 1200px) {
       font-size: 0.7rem;
@@ -49,7 +50,7 @@ const AvatarProfile = styled.h4`
     font-size: 0.9rem;
     display: flex;
     position: absolute;
-    right: 5rem;
+    right: 2rem;
 
     @media screen and (max-width: 1200px) {
       font-size: 0.7rem;
@@ -66,7 +67,7 @@ const AvatarProfile = styled.h4`
     font-size: 0.9rem;
     display: flex;
     position: absolute;
-    right: 5rem;
+    right: 2rem;
 
     @media screen and (max-width: 1200px) {
       font-size: 0.7rem;

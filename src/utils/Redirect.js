@@ -31,7 +31,6 @@ const Redirect = () => {
 
   useEffect(() => {
     if (error) {
-      console.error(error);
       catchErrors(error + 'no access token found in the response');
     }
   }, [error]);
