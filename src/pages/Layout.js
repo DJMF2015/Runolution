@@ -36,6 +36,7 @@ const Layout = () => {
             className="powered_by_strava"
           />
 
+          <Title>Runolution</Title>
           <button
             className="hamburger"
             onClick={() => {
@@ -102,6 +103,24 @@ const ImageLogo = styled.img`
     width: 35px;
     height: 35px;
     margin: 0 0 0 10px;
+  }
+`;
+
+const Title = styled.span`
+  color: white;
+  margin: 0 auto;
+  font-family: Arial;
+  font-size: 1.5rem;
+  font-weight: bold;
+  font-style: italic;
+  letter-spacing: 0.25rem;
+
+  @media (max-width: 768px) {
+    font-size: 1rem;
+  }
+
+  @media (max-width: 468px) {
+    display: none;
   }
 `;
 
