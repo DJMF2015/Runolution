@@ -1,12 +1,12 @@
 #  Strava Personalised Dashboard
 
 View project at:
-<https://strava-personal-dashboard.vercel.app/>
+<https://runolution.vercel.app/>
 
 ### This application is built using 
 - React
 - Mapbox-gl & React Leaflet
-- Chartjs & Nivo
+- Chartjs
 - Styled Components & Styled-icons
 
 ## Installation
