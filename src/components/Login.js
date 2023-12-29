@@ -6,7 +6,7 @@ import { client_id } from '../utils/config';
 
 const Login = () => {
   const [logout, setLoggedOut] = useState(false);
-  const redirectUrl = 'http://runolution.vercel.app/redirect';
+  const redirectUrl = 'https://runolution.vercel.app/redirect';
 
   const handleLogin = () => {
     setLoggedOut(!logout);

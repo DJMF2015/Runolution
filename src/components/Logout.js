@@ -7,7 +7,8 @@ const Logout = () => {
 
   const handleLogout = () => {
     localStorage.clear();
-    window.location.href = 'http://runolution.vercel.app';
+    // remove token from state
+    window.location.href = 'https://runolution.vercel.app/';
   };
 
   useEffect(() => {
