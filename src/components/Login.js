@@ -6,7 +6,7 @@ import { client_id } from '../utils/config';
 
 const Login = () => {
   const [logout, setLoggedOut] = useState(false);
-  const redirectUrl = 'http://strava-personal-dashboard.vercel.app/redirect';
+  const redirectUrl = 'http://runolution.vercel.app/redirect';
 
   const handleLogin = () => {
     setLoggedOut(!logout);
@@ -16,19 +16,21 @@ const Login = () => {
   return (
     <>
       {!logout && (
-        <StyledButtonWrapper>
-          <StyledLoginContainer>
-            <br />
-            <CardWrapper>
-              <ImageButton
-                src={StravaConnectBtn}
-                alt="Strava Connect Button"
-                onClick={handleLogin}
-              />
-              <ImageButton src={PoweredByStrava} alt="powered by strava" />
-            </CardWrapper>
-          </StyledLoginContainer>
-        </StyledButtonWrapper>
+        <>
+          <StyledButtonWrapper>
+            <StyledLoginContainer>
+              <br />
+              <CardWrapper>
+                <ImageButton
+                  src={StravaConnectBtn}
+                  alt="Strava Connect Button"
+                  onClick={handleLogin}
+                />
+                <ImageButton src={PoweredByStrava} alt="powered by strava" />
+              </CardWrapper>
+            </StyledLoginContainer>
+          </StyledButtonWrapper>
+        </>
       )}
     </>
   );

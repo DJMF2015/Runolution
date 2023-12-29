@@ -7,8 +7,7 @@ const Logout = () => {
 
   const handleLogout = () => {
     localStorage.clear();
-    // remove token from state
-    window.location.href = 'http://strava-personal-dashboard.vercel.app';
+    window.location.href = 'http://runolution.vercel.app';
   };
 
   useEffect(() => {
