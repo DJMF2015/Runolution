@@ -164,7 +164,7 @@ const Container = styled.div`
   height: 47vh;
   margin: 0 11rem 1rem 20rem;
   grid-template-columns: repeat(4, 1fr);
-  @media (max-width: 1048px) {
+  @media (max-width: 1223px) {
     display: none;
   }
 `;
@@ -190,15 +190,10 @@ const Card = styled.div`
   display: flex;
   padding: 0.5rem;
   margin: 0 10px 5px 0px;
-  border: 1px solid ${(props) => props.theme.colour.grey};
   height: 40vh;
 
-  @media (max-width: 800px) {
+  @media (max-width: 1225px) {
     display: none;
-  }
-
-  &:hover {
-    box-shadow: 0px 0 5px ${(props) => props.theme.colour.strava};
   }
 `;
 
