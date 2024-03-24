@@ -7,6 +7,7 @@ const TimeRangeCalendar = (props) => {
   const accessToken = localStorage.getItem('access_token');
   let formatted = getCurrentDate();
   const [activitiesCount, setActivityCounts] = useState(0);
+  const [activityName, setActivityName] = useState([]);
   let date = formattedDate(formatted.currentDate.toISOString().split('T')[0]);
 
   // Get date 360 days ago from today
@@ -37,6 +38,15 @@ const TimeRangeCalendar = (props) => {
       setActivityCounts(multipleActivities);
     };
 
+    const getActivityName = () => {
+      const activityName = [];
+      props?.props.forEach((activity) => {
+        const name = activity?.name;
+        activityName.push(name);
+      });
+      setActivityName(activityName);
+    };
+    getActivityName();
     countActivitiesByDate();
   }, [props?.props]);
 
@@ -58,7 +68,7 @@ const TimeRangeCalendar = (props) => {
             minValue={Math.round(...Object.values(activitiesCount))}
             maxValue={Math.round(...Object.values(activitiesCount))}
             emptyColor="#eeeeee"
-            colors={['#61cdbb', 'orange', '#e8c1a0', '#f47560']}
+            colors={['darkorange', 'orange', 'red']}
             margin={{ top: 40, right: 40, bottom: 10, left: 30 }}
             dayBorderWidth={2}
             dayBorderColor="#ffffff"
@@ -108,7 +118,7 @@ const StyledCalendar = styled.div`
     box-shadow: 0px 0 5px #e6e6e6;
   }
 
-  @media screen and (max-width: 850px) {
+  @media screen and (max-width: 1225px) {
     display: none;
   }
 `;

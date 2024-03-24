@@ -6,7 +6,7 @@ import { Doughnut } from 'react-chartjs-2';
 ChartJS.register(ArcElement, Tooltip, Legend);
 export const options = {
   responsive: true,
-  maintainAspectRatio: false,
+  maintainAspectRatio: true,
   plugins: {
     legend: {
       position: 'top',
@@ -62,7 +62,7 @@ const BreakdownChart = () => {
   return (
     <div style={{ display: 'flex', justifyContent: 'end' }}>
       <div className="chart" style={{ width: '60vw', height: '280px' }}>
-        <Doughnut width={75} height={50} data={data} />
+        <Doughnut width={75} height={50} data={data} options={options} />
       </div>
     </div>
   );
