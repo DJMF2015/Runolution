@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { getAthleteActivities, getUsersDetails } from '../utils/functions';
 import { useGetWindowWidth, useScroll } from '../utils/hooks';
-import { catchErrors, checkIfTokenExpired } from '../utils/helpers';
-import { removeDataAfterDuration } from '../utils/helpers';
+import { catchErrors } from '../utils/helpers';
+import { 
+  fetchData, 
+  fetchTokenInfo, 
+  initializeUserDetails 
+} from '../utils/athleteActivitiesFunctions';
 import LoadingWheel from '../styles/Loading.module.css';
 import { ArrowUpCircleFill } from '@styled-icons/bootstrap/ArrowUpCircleFill';
 import { HandThumbsUpFill } from '@styled-icons/bootstrap/HandThumbsUpFill';
@@ -35,34 +38,24 @@ const AthleteActivities = () => {
 
   useEffect(() => {
     const payload = JSON.parse(localStorage.getItem('access_token'));
-    if (payload) {
-      getUsersDetails(payload);
-    }
+    initializeUserDetails(payload);
   }, []);
 
   useEffect(() => {
-    async function fetchData() {
-      removeDataAfterDuration('activities', 6);
-      const data = JSON.parse(localStorage.getItem('activities'));
-      if (data !== null && data !== undefined) {
-        setState((prevState) => ({
-          ...prevState,
-          loading: false,
-        }));
-        return;
-      }
-
-      setState((prevState) => ({ ...prevState, loading: true }));
-      let stravaActivityResponse = await fetchStravaActivities(access_token);
+    async function loadActivities() {
+      let stravaActivityResponse = await fetchData(
+        access_token,
+        (loading) => setState(prev => ({ ...prev, loading })),
+        (count) => setState(prev => ({ ...prev, activityLoadingState: count }))
+      );
       setState((prevState) => ({
         ...prevState,
         activities: stravaActivityResponse,
         loading: false,
       }));
-      localStorage.setItem('activities', JSON.stringify(stravaActivityResponse));
     }
 
-    catchErrors(fetchData());
+    catchErrors(loadActivities());
   }, [access_token]);
 
   useEffect(() => {
@@ -76,56 +69,9 @@ const AthleteActivities = () => {
   }, []);
 
   useEffect(() => {
-    const fetchTokenInfo = async () => {
-      try {
-        const expires_at = localStorage.getItem('expires_at');
-        const expires_in = localStorage.getItem('expires_in');
-        if (expires_at && expires_in) {
-          checkIfTokenExpired(expires_in, expires_at);
-        }
-      } catch (error) {
-        console.error('Error fetching token info:', error);
-      }
-    };
-
     fetchTokenInfo();
   }, []);
 
-  const fetchStravaActivities = async (accessToken) => {
-    let stravaActivityResponse = [];
-    let looper_num = 1;
-
-    while (looper_num || stravaActivityResponse.length === 0) {
-      const stravaActivityResponseSingle = await getAthleteActivities(
-        accessToken,
-        200,
-        looper_num
-      );
-
-      if (
-        !stravaActivityResponseSingle.data ||
-        stravaActivityResponseSingle.data.length === 0 ||
-        stravaActivityResponseSingle.data.errors
-      ) {
-        setState((prevState) => ({
-          ...prevState,
-          loading: false,
-        }));
-        break;
-      } else {
-        setState((prevState) => ({
-          ...prevState,
-          activityLoadingState: stravaActivityResponse.length,
-        }));
-        stravaActivityResponse = stravaActivityResponse.concat(
-          stravaActivityResponseSingle.data
-        );
-      }
-      looper_num++;
-    }
-
-    return stravaActivityResponse;
-  };
   let filteredActivities = state.activities;
   if (searchTxt) {
     filteredActivities = filteredActivities.filter((activity) => {
