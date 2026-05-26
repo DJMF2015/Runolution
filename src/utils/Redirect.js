@@ -4,7 +4,6 @@ import { getExchangeCodeFromURL, getAccessToken, catchErrors } from './helpers';
 
 const Redirect = () => {
   const navigate = useNavigate();
-  const [, setPayload] = useState([]);
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -15,7 +14,6 @@ const Redirect = () => {
         const response = await getAccessToken(code);
 
         if (response && response?.access_token) {
-          setPayload(response);
           navigate('/');
         } else {
           setError('No access token found in the response.');

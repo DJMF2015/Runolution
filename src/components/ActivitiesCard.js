@@ -231,7 +231,6 @@ export default function ActivitiesCard() {
       currentMapStyleRef.current = 'street';
     };
   }, [
-    athleteData.distance,
     data,
     from?.end_latlng,
     isOnline,

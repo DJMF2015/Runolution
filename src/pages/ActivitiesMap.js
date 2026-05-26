@@ -115,6 +115,20 @@ const ActivitiesMap = () => {
       .filter((activity) => activity.activityCoordinates.length > 1);
   };
 
+  const setMapLoading = (loading) => {
+    setState((prevState) => ({
+      ...prevState,
+      loading,
+    }));
+  };
+
+  const setLoadedActivityCount = (activityLoadingState) => {
+    setState((prevState) => ({
+      ...prevState,
+      activityLoadingState,
+    }));
+  };
+
   const fetchStravaActivities = async (accessToken) => {
     let stravaActivityResponse = [];
     let looper_num = 1;
@@ -131,17 +145,11 @@ const ActivitiesMap = () => {
         stravaActivityResponseSingle.data.length === 0 ||
         stravaActivityResponseSingle.data.errors
       ) {
-        setState((prevState) => ({
-          ...prevState,
-          loading: false,
-        }));
+        setMapLoading(false);
         break;
       } else {
         const loadedActivityCount = stravaActivityResponse.length;
-        setState((prevState) => ({
-          ...prevState,
-          activityLoadingState: loadedActivityCount,
-        }));
+        setLoadedActivityCount(loadedActivityCount);
         stravaActivityResponse = stravaActivityResponse.concat(
           stravaActivityResponseSingle.data,
         );

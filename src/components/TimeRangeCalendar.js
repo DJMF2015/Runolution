@@ -7,7 +7,6 @@ const TimeRangeCalendar = (props) => {
   const accessToken = localStorage.getItem('access_token');
   let formatted = getCurrentDate();
   const [activitiesCount, setActivityCounts] = useState(0);
-  const [activityName, setActivityName] = useState([]);
   let date = formattedDate(formatted.currentDate.toISOString().split('T')[0]);
 
   // Get date 360 days ago from today
@@ -38,15 +37,6 @@ const TimeRangeCalendar = (props) => {
       setActivityCounts(multipleActivities);
     };
 
-    const getActivityName = () => {
-      const activityName = [];
-      props?.props.forEach((activity) => {
-        const name = activity?.name;
-        activityName.push(name);
-      });
-      setActivityName(activityName);
-    };
-    getActivityName();
     countActivitiesByDate();
   }, [props?.props]);
 

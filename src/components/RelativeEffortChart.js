@@ -30,11 +30,6 @@ const speedToPace = (speed) => {
   return Number(pace.toFixed(2));
 };
 
-const metresToMiles = (metres) => {
-  if (!metres) return 0;
-  return Number((metres / 1609.344).toFixed(2));
-};
-
 const calculateEffortScore = (activity) => {
   const elevation = activity.total_elevation_gain || 0;
   const heartRate = activity.average_heartrate || 0;

@@ -47,6 +47,7 @@ export const useScroll = () => {
 
 export const useLocalStorageState = ({ key, state, setState, stateKey }) => {
   const [hasLoadedFromStorage, setHasLoadedFromStorage] = useState(false);
+  const valueToStore = state[stateKey];
   console.log({ key, state, setState, stateKey });
   useEffect(() => {
     try {
@@ -69,7 +70,6 @@ export const useLocalStorageState = ({ key, state, setState, stateKey }) => {
     if (!hasLoadedFromStorage) {
       return;
     }
-    const valueToStore = state[stateKey];
     if (Array.isArray(valueToStore) && valueToStore.length === 0) {
       return;
     }
@@ -79,6 +79,6 @@ export const useLocalStorageState = ({ key, state, setState, stateKey }) => {
     } catch (error) {
       console.error(`Error saving "${key}" to localStorage`, error);
     }
-  }, [key, stateKey, state[stateKey], state, hasLoadedFromStorage]);
+  }, [key, valueToStore, hasLoadedFromStorage]);
   return { hasLoadedFromStorage };
 };

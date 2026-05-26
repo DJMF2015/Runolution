@@ -524,16 +524,6 @@ const OfflineText = styled.p`
   line-height: 1.5;
 `;
 
-const DashboardContent = styled.div`
-  margin-left: 260px;
-  padding: 1.5rem;
-
-  @media screen and (max-width: 830px) {
-    margin-left: 0;
-    padding: 1rem;
-  }
-`;
-
 const DashboardLayout = styled.div`
   display: grid;
   grid-template-columns: 260px minmax(0, 1fr);
@@ -687,15 +677,6 @@ const TableTitle = styled.h2`
   margin: 0;
 `;
 
-const ViewAllLink = styled.a`
-  color: #ff6b35;
-  text-decoration: none;
-  font-size: 0.9rem;
-  cursor: pointer;
-  &:hover {
-    color: #ff8c42;
-  }
-`;
 const Table = styled.table`
   width: 100%;
   border-collapse: collapse;
