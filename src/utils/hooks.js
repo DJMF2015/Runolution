@@ -44,3 +44,41 @@ export const useScroll = () => {
 
   return { isVisible, scrollToTop };
 };
+
+export const useLocalStorageState = ({ key, state, setState, stateKey }) => {
+  const [hasLoadedFromStorage, setHasLoadedFromStorage] = useState(false);
+  console.log({ key, state, setState, stateKey });
+  useEffect(() => {
+    try {
+      const item = localStorage.getItem(key);
+
+      if (item !== null && item !== undefined) {
+        setState((prevState) => ({
+          ...prevState,
+          [stateKey]: JSON.parse(item),
+        }));
+      }
+    } catch (error) {
+      console.error(`Error reading localStorage key "${key}":`, error);
+    } finally {
+      setHasLoadedFromStorage(true);
+    }
+  }, [key, setState, stateKey]);
+
+  useEffect(() => {
+    if (!hasLoadedFromStorage) {
+      return;
+    }
+    const valueToStore = state[stateKey];
+    if (Array.isArray(valueToStore) && valueToStore.length === 0) {
+      return;
+    }
+
+    try {
+      localStorage.setItem(key, JSON.stringify(valueToStore));
+    } catch (error) {
+      console.error(`Error saving "${key}" to localStorage`, error);
+    }
+  }, [key, stateKey, state[stateKey], state, hasLoadedFromStorage]);
+  return { hasLoadedFromStorage };
+};
