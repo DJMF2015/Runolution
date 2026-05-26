@@ -1,6 +1,5 @@
 import React from 'react';
 import styled from 'styled-components';
-import { getSecondstoMinutes } from '../utils/conversion';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -76,6 +75,10 @@ const options = {
   },
 };
 
+const secondsToMinutes = (seconds) => {
+  return Number((Number(seconds || 0) / 60).toFixed(2));
+};
+
 export default function BestEffortsChart({ props }) {
   const bestEfforts = props?.best_efforts || [];
   if (!bestEfforts.length) {
@@ -84,10 +87,9 @@ export default function BestEffortsChart({ props }) {
 
   const labels = bestEfforts.map((effort) => effort.name);
 
-  const elapsedTimes = bestEfforts.map((effort) => {
-    const mins = getSecondstoMinutes(effort.elapsed_time);
-    return parseFloat(mins);
-  });
+  const elapsedTimes = bestEfforts.map((effort) =>
+    secondsToMinutes(effort.elapsed_time),
+  );
 
   const data = {
     labels,
