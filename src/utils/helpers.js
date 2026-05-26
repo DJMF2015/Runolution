@@ -1,6 +1,24 @@
 import axios from 'axios';
 import { auth_link, client_secret, client_id } from './config';
 
+const STRAVA_AUTH_KEYS = [
+  'payload',
+  'access_token',
+  'refresh_token',
+  'expires_in',
+  'expires_at',
+  'athlete',
+  'activities',
+];
+
+export const clearStravaAuth = () => {
+  STRAVA_AUTH_KEYS.forEach((key) => localStorage.removeItem(key));
+};
+
+export const isUnauthorizedError = (error) => {
+  return error?.status === 401 || error?.response?.status === 401;
+};
+
 // get exchange token from URL to retrieve the access token
 export const getExchangeCodeFromURL = (token) => {
   if (token && window.location.href.includes('code')) {

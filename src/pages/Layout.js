@@ -1,4 +1,4 @@
-import { Outlet, Link } from 'react-router-dom';
+import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import LogoutButton from '../components/Logout';
 import PoweredByStrava from '../powered_by_strava_light.svg';
@@ -8,37 +8,68 @@ import '../styles/Navbar.css';
 const Layout = () => {
   const [athlete, setAthleteData] = useState([]);
   const [isNavExpanded, setIsNavExpanded] = useState(false);
+  const location = useLocation();
+  const isActivitiesPage = location.pathname === '/';
+  const isActivityCardPage = location.pathname === '/activity';
+  const isActivityListPage = location.pathname === '/splits';
+  const isActivitiesMapPage = location.pathname === '/map';
+  const showTopBar = !isActivitiesMapPage;
+  const showPoweredByStrava = isActivitiesPage;
+  const showTitle = !isActivityListPage;
+  const navigationLayerClasses = [
+    'navigation-layer',
+    isActivitiesPage ? 'navigation-layer--activities' : '',
+    isActivityCardPage ? 'navigation-layer--activity-card' : '',
+    isActivityListPage ? 'navigation-layer--activity-list' : '',
+    isActivitiesMapPage ? 'navigation-layer--map-menu-only' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   useEffect(() => {
     const athlete = JSON.parse(localStorage.getItem('athlete'));
     setAthleteData(athlete);
   }, []);
 
+  useEffect(() => {
+    setIsNavExpanded(false);
+  }, [location.pathname]);
+
   return (
     <>
-      <span className="navigation-layer">
-        <nav className="navigation">
-          <a href="/" className="name">
-            {athlete && <ImageLogo src={athlete?.profile_medium} alt="user_logo" />}
-          </a>
-          {athlete && (
+      <span className={navigationLayerClasses}>
+        <nav className="navigation" aria-label="Primary navigation">
+          {showTopBar && (
             <>
-              <AthleteName>{athlete?.firstname + ' ' + athlete?.lastname}</AthleteName>
-              <AthleteFollowers>
-                {athlete?.follower_count > 0 && athlete?.follower_count + ' followers'}
-              </AthleteFollowers>
+              <a href="/" className="name">
+                {athlete && <ImageLogo src={athlete?.profile_medium} alt="user_logo" />}
+              </a>
+              {athlete && (
+                <AthleteMeta>
+                  <AthleteName>{athlete?.firstname + ' ' + athlete?.lastname}</AthleteName>
+                  <AthleteFollowers>
+                    {athlete?.follower_count > 0 && athlete?.follower_count + ' followers'}
+                  </AthleteFollowers>
+                </AthleteMeta>
+              )}
+
+              {showPoweredByStrava && (
+                <img
+                  src={PoweredByStrava}
+                  alt="powered_by_strava"
+                  className="powered_by_strava"
+                />
+              )}
+
+              {showTitle && <Title>Runolution</Title>}
             </>
           )}
 
-          <img
-            src={PoweredByStrava}
-            alt="powered_by_strava"
-            className="powered_by_strava"
-          />
-
-          <Title>Runolution</Title>
           <button
+            type="button"
             className="hamburger"
+            aria-label="Toggle navigation menu"
+            aria-expanded={isNavExpanded}
             onClick={() => {
               setIsNavExpanded(!isNavExpanded);
             }}
@@ -61,14 +92,27 @@ const Layout = () => {
           <div className={isNavExpanded ? 'navigation-menu expanded' : 'navigation-menu'}>
             <ul>
               <LinksList>
-                <Link to="/">Personal Activities</Link>
+                <Link to="/" onClick={() => setIsNavExpanded(false)}>
+                  Personal Activities
+                </Link>
               </LinksList>
               <LinksList>
-                <Link to="/map">Personal HeatMap</Link>
+                <Link to="/map" onClick={() => setIsNavExpanded(false)}>
+                  Personal Heatmap
+                </Link>
               </LinksList>
               <LinksList>
                 <LogoutButton />
               </LinksList>
+              {showPoweredByStrava && (
+                <li className="navigation-menu__strava">
+                  <img
+                    src={PoweredByStrava}
+                    alt="powered_by_strava"
+                    className="powered_by_strava"
+                  />
+                </li>
+              )}
             </ul>
           </div>
         </nav>
@@ -113,10 +157,11 @@ const Title = styled.span`
   font-size: 1.5rem;
   font-weight: bold;
   font-style: italic;
-  letter-spacing: 0.25rem;
+  letter-spacing: 0.08rem;
 
   @media (max-width: 768px) {
-    font-size: 1rem;
+    font-size: 0.95rem;
+    display: none;
   }
 
   @media (max-width: 468px) {
@@ -124,40 +169,66 @@ const Title = styled.span`
   }
 `;
 
-const AthleteName = styled.h3`
+const AthleteMeta = styled.div`
+  display: flex;
+  min-width: 0;
+  max-width: min(28vw, 18rem);
+  flex-direction: column;
+  gap: 0.18rem;
   color: #fff;
-  font-size: 1rem;
-  margin: 0 0 20px 10px;
 
   @media (max-width: 768px) {
-    font-size: 0.8rem;
-    margin: 0 0 20px 10px;
+    max-width: calc(100vw - 15.5rem);
+  }
+
+  @media (max-width: 560px) {
+    max-width: calc(100vw - 11.5rem);
   }
 
   @media (max-width: 425px) {
-    font-size: 0.6rem;
-    margin: 0 0 20px 10px;
+    max-width: calc(100vw - 9rem);
+  }
+`;
+
+const AthleteName = styled.h3`
+  color: #fff;
+  font-size: 0.98rem;
+  line-height: 1.15;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  @media (max-width: 768px) {
+    font-size: 0.86rem;
+  }
+
+  @media (max-width: 425px) {
+    font-size: 0.78rem;
   }
 `;
 
 const AthleteFollowers = styled.h3`
   color: #fff;
-  font-size: 1rem;
-  margin: 30px 0 0px -97px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  line-height: 1.15;
+  margin: 0;
+  opacity: 0.78;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 
   @media (max-width: 768px) {
-    font-size: 0.8rem;
-    margin: 30px 0 0px -80px;
+    font-size: 0.72rem;
   }
 
   @media (max-width: 425px) {
-    font-size: 0.6rem;
-    margin: 20px 0 0px -60px;
+    font-size: 0.68rem;
   }
 `;
 
 const LinksList = styled.li`
   color: white;
-  margin: 0 0 0 10px;
   font-size: 1rem;
 `;

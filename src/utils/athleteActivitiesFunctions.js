@@ -1,5 +1,5 @@
 import { getAthleteActivities, getUsersDetails } from './functions';
-import { catchErrors, checkIfTokenExpired, removeDataAfterDuration } from './helpers';
+import { checkIfTokenExpired, removeDataAfterDuration } from './helpers';
 
 /**
  * Fetches all Strava activities for the athlete, handling pagination
@@ -14,7 +14,7 @@ export const fetchStravaActivities = async (accessToken, onLoadingStateChange) =
     const stravaActivityResponseSingle = await getAthleteActivities(
       accessToken,
       200,
-      looper_num
+      looper_num,
     );
 
     if (
@@ -24,12 +24,11 @@ export const fetchStravaActivities = async (accessToken, onLoadingStateChange) =
     ) {
       break;
     } else {
-      // Call the callback to update loading state
       if (onLoadingStateChange) {
         onLoadingStateChange(stravaActivityResponse.length);
       }
       stravaActivityResponse = stravaActivityResponse.concat(
-        stravaActivityResponseSingle.data
+        stravaActivityResponseSingle.data,
       );
     }
     looper_num++;
@@ -48,7 +47,7 @@ export const fetchStravaActivities = async (accessToken, onLoadingStateChange) =
 export const fetchData = async (accessToken, setLoading, setActivityLoadingState) => {
   removeDataAfterDuration('activities', 6);
   const data = JSON.parse(localStorage.getItem('activities'));
-  
+
   if (data !== null && data !== undefined) {
     setLoading(false);
     return data;
@@ -58,7 +57,7 @@ export const fetchData = async (accessToken, setLoading, setActivityLoadingState
   let stravaActivityResponse = await fetchStravaActivities(accessToken, (count) => {
     setActivityLoadingState(count);
   });
-  
+
   setLoading(false);
   localStorage.setItem('activities', JSON.stringify(stravaActivityResponse));
   return stravaActivityResponse;
@@ -73,7 +72,7 @@ export const fetchTokenInfo = async () => {
     const expires_at = localStorage.getItem('expires_at');
     const expires_in = localStorage.getItem('expires_in');
     if (expires_at && expires_in) {
-      checkIfTokenExpired(expires_in, expires_at);
+      await checkIfTokenExpired(expires_in, expires_at);
     }
   } catch (error) {
     console.error('Error fetching token info:', error);
@@ -87,6 +86,9 @@ export const fetchTokenInfo = async () => {
  */
 export const initializeUserDetails = async (accessToken) => {
   if (accessToken) {
-    await getUsersDetails(accessToken);
+    const response = await getUsersDetails(accessToken);
+    return response?.data;
   }
+
+  return null;
 };

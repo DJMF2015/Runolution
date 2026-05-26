@@ -1,26 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { useGetWindowWidth, useScroll } from '../utils/hooks';
-import { catchErrors } from '../utils/helpers';
-import { 
-  fetchData, 
-  fetchTokenInfo, 
-  initializeUserDetails 
+import { useGetWindowWidth, useScroll, useLocalStorageState } from '../utils/hooks';
+import { clearStravaAuth, isUnauthorizedError } from '../utils/helpers';
+import {
+  fetchData,
+  fetchTokenInfo,
+  initializeUserDetails,
 } from '../utils/athleteActivitiesFunctions';
 import LoadingWheel from '../styles/Loading.module.css';
 import { ArrowUpCircleFill } from '@styled-icons/bootstrap/ArrowUpCircleFill';
-import { HandThumbsUpFill } from '@styled-icons/bootstrap/HandThumbsUpFill';
-import { CalendarDateFill } from '@styled-icons/bootstrap/CalendarDateFill';
 import { Activity } from '@styled-icons/evaicons-solid/Activity';
-import { Stopwatch } from '@styled-icons/boxicons-regular/Stopwatch';
 import { getKmsToMiles, getSecondstoMinutes, formattedDate } from '../utils/conversion';
+import StravaMetricsChart from '../components/RelativeEffortChart';
 import ActivityDropDown from '../components/ActivityDropDown';
 import Login from '../components/Login';
 import Search from '../components/search';
-import TimeRangeCalendar from '../components/TimeRangeCalendar';
+import BreakdownChart from '../components/BreakdownChart';
 import '../App.css';
 import { Link } from 'react-router-dom';
 import AthleteStats from '../components/AthleteStats';
+import Pagination from '../utils/pagination';
 
 const initialState = {
   activities: [],
@@ -28,54 +27,144 @@ const initialState = {
   activityLoadingState: null,
 };
 
+const RESULTS_PER_PAGE = 20;
 const AthleteActivities = () => {
   const { windowWidth } = useGetWindowWidth();
   const { isVisible, scrollToTop } = useScroll();
   const [filteredSportType, setFilteredSportType] = useState(null);
+  const [athlete, setAthlete] = useState(null);
+  const [paginationIndex, setPaginationIndex] = useState(1);
   const [searchTxt, setSearchTxt] = useState('');
   const [state, setState] = useState(initialState);
+  const [authError, setAuthError] = useState(null);
+  const [isOnline, setIsOnline] = useState(() =>
+    typeof navigator === 'undefined' ? true : navigator.onLine,
+  );
+  const { hasLoadedFromStorage } = useLocalStorageState({
+    key: 'activities',
+    state,
+    setState,
+    stateKey: 'activities',
+  });
+
   const access_token = JSON.parse(localStorage.getItem('access_token'));
+  const activitiesLoaded = state.activities.length > 0;
 
   useEffect(() => {
-    const payload = JSON.parse(localStorage.getItem('access_token'));
-    initializeUserDetails(payload);
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  const handleAuthError = useCallback((error) => {
+    if (!isUnauthorizedError(error)) {
+      console.error(error);
+      return false;
+    }
+
+    clearStravaAuth();
+    setAthlete(null);
+    setAuthError('Your Strava session has expired. Please connect again.');
+    setState((prevState) => ({
+      ...prevState,
+      loading: false,
+      activityLoadingState: null,
+    }));
+    return true;
   }, []);
 
   useEffect(() => {
+    if (!isOnline) {
+      const storedAthlete = JSON.parse(localStorage.getItem('athlete'));
+      setAthlete(storedAthlete);
+      return;
+    }
+
+    async function loadAthlete() {
+      try {
+        await fetchTokenInfo();
+        const payload = JSON.parse(localStorage.getItem('access_token'));
+        if (!payload) {
+          return;
+        }
+
+        const athleteDetails = await initializeUserDetails(payload);
+        if (athleteDetails) {
+          setAthlete(athleteDetails);
+          return;
+        }
+      } catch (error) {
+        handleAuthError(error);
+        return;
+      }
+
+      const storedAthlete = JSON.parse(localStorage.getItem('athlete'));
+
+      setAthlete(storedAthlete);
+    }
+    loadAthlete();
+  }, [handleAuthError, isOnline]);
+
+  useEffect(() => {
+    if (!access_token || !hasLoadedFromStorage || !isOnline) {
+      return;
+    }
+    if (activitiesLoaded) {
+      return;
+    }
+
     async function loadActivities() {
-      let stravaActivityResponse = await fetchData(
-        access_token,
-        (loading) => setState(prev => ({ ...prev, loading })),
-        (count) => setState(prev => ({ ...prev, activityLoadingState: count }))
-      );
-      setState((prevState) => ({
-        ...prevState,
-        activities: stravaActivityResponse,
-        loading: false,
-      }));
+      try {
+        await fetchTokenInfo();
+        const currentAccessToken = JSON.parse(localStorage.getItem('access_token'));
+        if (!currentAccessToken) {
+          return;
+        }
+
+        let stravaActivityResponse = await fetchData(
+          currentAccessToken,
+          (loading) => setState((prev) => ({ ...prev, loading })),
+          (count) => setState((prev) => ({ ...prev, activityLoadingState: count })),
+        );
+        setState((prevState) => ({
+          ...prevState,
+          activities: stravaActivityResponse,
+          loading: false,
+        }));
+      } catch (error) {
+        if (!handleAuthError(error)) {
+          setState((prevState) => ({
+            ...prevState,
+            loading: false,
+          }));
+        }
+      }
     }
 
-    catchErrors(loadActivities());
-  }, [access_token]);
+    loadActivities();
+  }, [access_token, activitiesLoaded, handleAuthError, hasLoadedFromStorage, isOnline]);
 
   useEffect(() => {
-    const data = localStorage.getItem('activities');
-    if (data !== null && data !== undefined) {
-      setState((prevState) => ({
-        ...prevState,
-        activities: JSON.parse(data),
-      }));
+    setPaginationIndex(1);
+  }, [searchTxt, filteredSportType]);
+
+  const onPageChange = (pageIndex) => {
+    if (typeof pageIndex === 'number' && !isNaN(pageIndex)) {
+      setPaginationIndex(pageIndex);
     }
-  }, []);
+  };
 
-  useEffect(() => {
-    fetchTokenInfo();
-  }, []);
-
-  let filteredActivities = state.activities;
-  if (searchTxt) {
+  let filteredActivities = [...state.activities];
+  if (searchTxt.trim()) {
     filteredActivities = filteredActivities.filter((activity) => {
-      return activity.name.toLowerCase().includes(searchTxt.toLowerCase());
+      return activity?.name?.toLowerCase().includes(searchTxt.toLowerCase());
     });
   }
 
@@ -85,282 +174,265 @@ const AthleteActivities = () => {
     });
   }
 
+  const paginatedActivities = filteredActivities.slice(
+    (paginationIndex - 1) * RESULTS_PER_PAGE,
+    paginationIndex * RESULTS_PER_PAGE,
+  );
+
   if (state.loading && access_token) {
     return (
-      <div>
-        <h1 style={{ color: 'red', textAlign: 'center' }}>
-          <div className={LoadingWheel.loading} style={{ color: 'darkorange' }}>
-            ...
+      <div className={LoadingWheel.screen}>
+        <div className={LoadingWheel.panel}>
+          <div className={LoadingWheel.indicator} aria-hidden="true">
+            <div className={LoadingWheel.loading}></div>
           </div>
-          Please Wait. Loading {state.activityLoadingState} activities......
-        </h1>
+          <h1 className={LoadingWheel.title}>Loading activities</h1>
+          <p className={LoadingWheel.message}>
+            Preparing{' '}
+            <span className={LoadingWheel.count}>
+              {state.activityLoadingState || 0}
+            </span>{' '}
+            Strava activities for your dashboard.
+          </p>
+          <div className={LoadingWheel.dots} aria-hidden="true">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <>
+    <PageContainer>
       {!access_token ? (
-        <Login />
+        <>
+          {authError && <AuthMessage>{authError}</AuthMessage>}
+          <Login />
+        </>
       ) : (
         <>
           {isVisible && <ScrollToTop alt="Go to top" onClick={scrollToTop} />}
-          {windowWidth >= 700 && (
-            <>
-              <Search
-                searchTxt={searchTxt}
-                updateSearchTxt={setSearchTxt}
-                placeholder={'Search All Activities'}
-              />
-            </>
-          )}
-          <AthleteStats />
-          <TimeRangeCalendar props={state.activities} />
 
-          <SideNavigation>
-            <ActivityDropDown
-              props={state.activities}
-              setFilterBySportType={setFilteredSportType}
-            />
-            <div>
-              {filteredActivities.map((activity, i) => (
-                <>
-                  {activity.map?.summary_polyline ? (
-                    <div key={activity.id}>
-                      <Link
-                        to="/activity"
-                        state={{ from: activity }}
-                        key={`${activity.id}--${activity.moving_time}--${activity.average_heartrate}`}
-                      >
-                        <h2>
-                          {i + 1}. {activity.name}
-                        </h2>
-                      </Link>
-                    </div>
-                  ) : (
-                    <div key={i}>
-                      <h3>
-                        {i + 1}. {activity?.name}
-                      </h3>
-                    </div>
-                  )}
-                </>
-              ))}
-            </div>
-          </SideNavigation>
-          {windowWidth < 700 && (
-            <>
-              <ActivityDropDown
-                props={state.activities}
-                setFilterBySportType={setFilteredSportType}
-              />
-              <Search
-                searchTxt={searchTxt}
-                updateSearchTxt={setSearchTxt}
-                placeholder={'Search All Activities'}
-              />
-            </>
-          )}
+          <DashboardLayout>
+            <DashboardSidebar>
+              <SidebarTitle>Dashboard</SidebarTitle>
+              <SidebarText>Filter your Strava activities</SidebarText>
 
-          <CardDetails>
-            {filteredActivities
-              .map((activity, i) => (
-                <>
-                  {activity.map?.summary_polyline ? (
-                    <Cardborder>
-                      <div key={i}>
-                        <Link
-                          style={{ textDecoration: 'none' }}
-                          to="/activity"
-                          state={{ from: activity }}
-                          key={`${activity.id}--${activity.moving_time}--${activity.average_heartrate}`}
-                        >
-                          <ActivityName>{activity.name}</ActivityName>
-                        </Link>
-                        <Text>
-                          <p>
-                            <ActivityIcon /> Distance: {getKmsToMiles(activity.distance)}
-                          </p>
-                          <p>
-                            <StopWatchIcon />
-                            Time: {getSecondstoMinutes(activity.moving_time)}{' '}
-                          </p>
-                          <p>
-                            {' '}
-                            <CalendarIcon />
-                            {formattedDate(activity.start_date)}
-                          </p>
-                          <p>
-                            {' '}
-                            <ThumbUpIcon /> kudos: {activity.kudos_count}{' '}
-                          </p>
-                        </Text>
-                      </div>
-                    </Cardborder>
-                  ) : (
-                    <div key={i}>
-                      <Cardborder>
-                        <div key={i} style={{ textAlign: 'center' }}>
-                          <ActivityName>{activity?.name}</ActivityName>
-                          <p>{getKmsToMiles(activity?.distance)} miles</p>
-                          <p>{getSecondstoMinutes(activity?.moving_time)} </p>
-                          <p>Date: {formattedDate(activity?.start_date)}</p>
-                          <p>kudos: {activity?.kudos_count}</p>
-                        </div>
-                      </Cardborder>
-                    </div>
-                  )}
-                </>
-              ))
-              .slice(0, 20)}
-          </CardDetails>
+              <SidebarControl>
+                <Search
+                  searchTxt={searchTxt}
+                  updateSearchTxt={setSearchTxt}
+                  placeholder="Search all activities"
+                />
+              </SidebarControl>
+
+              <SidebarControl>
+                <ActivityDropDown
+                  props={state.activities}
+                  setFilterBySportType={setFilteredSportType}
+                />
+              </SidebarControl>
+            </DashboardSidebar>
+
+            <DashboardMain>
+              {!isOnline && (
+                <OfflineNotice>
+                  <OfflineTitle>Internet connection required</OfflineTitle>
+                  <OfflineText>
+                    Athlete stats and activity details need a network connection.
+                    Reconnect to refresh Strava data and open activity maps.
+                  </OfflineText>
+                </OfflineNotice>
+              )}
+
+              {isOnline && athlete?.id && (
+                <AthleteStats athlete={athlete} onAuthError={handleAuthError} />
+              )}
+              {isOnline && (
+                <BreakdownChart props={state.activities} onAuthError={handleAuthError} />
+              )}
+              {isOnline && (
+                <DashboardChartArea>
+                  <StravaMetricsChart activities={state.activities} />
+                </DashboardChartArea>
+              )}
+
+              {!isOnline ? (
+                <OfflineTablePlaceholder>
+                  <OfflineTitle>Activities are unavailable offline</OfflineTitle>
+                  <OfflineText>
+                    Connect to the internet to view the activity table and open activity
+                    detail pages.
+                  </OfflineText>
+                </OfflineTablePlaceholder>
+              ) : windowWidth >= 700 ? (
+                <DesktopOnly>
+                  <ActivitiesTableContainer>
+                    <TableHeader>
+                      <TableTitle>Recent Activities</TableTitle>
+                    </TableHeader>
+
+                    <Table>
+                      <thead>
+                        <tr>
+                          <th>Activity</th>
+                          <th>Sport</th>
+                          <th>Date</th>
+                          <th>Distance</th>
+                          <th>Time</th>
+                          <th>Elev Gain</th>
+                          <th>Avg HR</th>
+                          <th>Kudos</th>
+                        </tr>
+                      </thead>
+
+                      <tbody>
+                        {paginatedActivities.map((activity) => (
+                          <TableRow key={activity.id}>
+                            <ActivityCell>
+                              <ActivityIcon type={activity.sport_type} />
+
+                              <ActivityInfo>
+                                <ActivityTitle>
+                                  {activity.map?.summary_polyline ? (
+                                    <Link
+                                      to="/activity"
+                                      state={{ from: activity }}
+                                      style={{
+                                        textDecoration: 'none',
+                                        color: 'inherit',
+                                      }}
+                                    >
+                                      {activity.name}
+                                    </Link>
+                                  ) : (
+                                    activity.name
+                                  )}
+                                </ActivityTitle>
+
+                                <ActivityDate>
+                                  {formattedDate(activity.start_date)}
+                                </ActivityDate>
+                              </ActivityInfo>
+                            </ActivityCell>
+
+                            <SportCell>{activity.sport_type}</SportCell>
+                            <DateCell>{formattedDate(activity.start_date)}</DateCell>
+                            <DistanceCell>
+                              {getKmsToMiles(activity.distance)}
+                            </DistanceCell>
+                            <TimeCell>
+                              {getSecondstoMinutes(activity.moving_time)}
+                            </TimeCell>
+                            <ElevationCell>{activity.total_elevation_gain}</ElevationCell>
+                            <HRCell>{activity.average_heartrate || '—'}</HRCell>
+                            <KudosCell>{activity.kudos_count}</KudosCell>
+                          </TableRow>
+                        ))}
+                      </tbody>
+                    </Table>
+                  </ActivitiesTableContainer>
+
+                  <Pagination
+                    onPageChange={onPageChange}
+                    paginationIndex={paginationIndex}
+                    totalPages={Math.ceil(filteredActivities.length / RESULTS_PER_PAGE)}
+                  />
+                </DesktopOnly>
+              ) : (
+                <MobileOnly>
+                  <MobileActivitiesList>
+                    {paginatedActivities.map((activity) => (
+                      <MobileActivityCard key={activity.id}>
+                        <MobileActivityHeader>
+                          <MobileActivityTitle>
+                            {activity.map?.summary_polyline ? (
+                              <Link to="/activity" state={{ from: activity }}>
+                                {activity.name}
+                              </Link>
+                            ) : (
+                              activity.name
+                            )}
+                          </MobileActivityTitle>
+
+                          <SportBadge>{activity.sport_type}</SportBadge>
+                        </MobileActivityHeader>
+
+                        <MobileActivityDate>
+                          {formattedDate(activity.start_date)}
+                        </MobileActivityDate>
+
+                        <MobileActivityDetails>
+                          <DetailItem>
+                            <DetailLabel>Distance</DetailLabel>
+                            <DetailValue>{getKmsToMiles(activity.distance)}</DetailValue>
+                          </DetailItem>
+
+                          <DetailItem>
+                            <DetailLabel>Time</DetailLabel>
+                            <DetailValue>
+                              {getSecondstoMinutes(activity.moving_time)}
+                            </DetailValue>
+                          </DetailItem>
+
+                          <DetailItem>
+                            <DetailLabel>Elevation</DetailLabel>
+                            <DetailValue>{activity.total_elevation_gain}</DetailValue>
+                          </DetailItem>
+                        </MobileActivityDetails>
+
+                        <MobileActivityFooter>
+                          <DetailItem>
+                            <DetailLabel>Avg HR</DetailLabel>
+                            <DetailValue>{activity.average_heartrate || '—'}</DetailValue>
+                          </DetailItem>
+
+                          <DetailItem>
+                            <DetailLabel>Kudos</DetailLabel>
+                            <DetailValue>{activity.kudos_count}</DetailValue>
+                          </DetailItem>
+                        </MobileActivityFooter>
+                      </MobileActivityCard>
+                    ))}
+                  </MobileActivitiesList>
+
+                  <Pagination
+                    onPageChange={onPageChange}
+                    paginationIndex={paginationIndex}
+                    totalPages={Math.ceil(filteredActivities.length / RESULTS_PER_PAGE)}
+                  />
+                </MobileOnly>
+              )}
+            </DashboardMain>
+          </DashboardLayout>
         </>
       )}
-    </>
+    </PageContainer>
   );
 };
-// sidenavigation bar for search and pagination
-const SideNavigation = styled.div`
-  height: 100%;
-  width: 240px;
-  font-size: 0.8rem;
-  position: fixed;
-  padding: 10px;
+export default AthleteActivities;
+
+const DesktopOnly = styled.div`
   display: block;
-  position: fixed;
-  z-index: 1000;
-  top: calc(10% - 5px);
-  left: 0;
-  scroll-behavior: smooth;
-  padding-top: 20px;
-  overflow: auto;
-  background-color: #111;
-  opacity: 0.8;
-  color: white;
 
-  /* customise scrollbar for modern browser except firefox*/
-  ::-webkit-scrollbar {
-    width: 10px;
-  }
-  ::-webkit-scrollbar-track {
-    box-shadow: inset 0 0 5px grey;
-    border-radius: 10px;
-  }
-  ::-webkit-scollbar-thumb {
-    background: #888;
-    border-radius: 10px;
-  }
-  ::-webkit-scrollbar-thumb:hover {
-    background: #555;
-  }
-
-  ::-webkit-scrollbar-thumb:active {
-    background-color: #555;
-  }
-  ::-webkit-scrollbar-thumb:window-inactive {
-    background-color: #555;
-  }
-  ::-webkit-scrollbar-thumb:horizontal {
-    background-color: #555;
-  }
-  ::-webkit-scrollbar-thumb:vertical {
-    background-color: #555;
-  }
-
-  a {
-    padding: 2px 0px 0px 15px;
-    line-break: 2px;
-    margin-top: 2px;
-    text-decoration: none;
-    font-size: 10px;
-    color: white;
-    display: block;
-  }
-
-  a:hover {
-    color: white;
-    text-decoration: underline;
-  }
-
-  /* media queries here */
-
-  @media screen and (max-width: 830px) {
+  @media screen and (max-width: 699px) {
     display: none;
   }
 `;
 
-const CardDetails = styled.div`
-  display: flex;
-  flex-direction: column;
-  flex-wrap: wrap;
-  margin-left: 250px;
-  justify-content: center;
-  position: relative;
-  background-color: #fff;
-  font-family: 'Roboto', sans-serif;
-  text-align: left;
+const MobileOnly = styled.div`
+  display: none;
 
-  @media screen and (max-width: 800px) {
-    display: flex;
-    flex-direction: column;
-    flex-wrap: wrap;
-    margin-left: 50px;
-    background-color: #fff;
+  @media screen and (max-width: 699px) {
+    display: block;
   }
 `;
 
-const Cardborder = styled.div`
-  border: 2px solid #111;
-  border-radius: 5px;
-  box-sizing: border-box;
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
-  margin: 0.5rem;
-  margin-left: 3rem;
-  text-align: left;
-  background-color: white;
-  color: #333;
-  font-size: 0.75rem;
-  font-weight: 500;
-  opacity: 0.7;
-  transition: all 0.3s ease-in-out;
-
-  &:hover {
-    box-shadow: 0 0 10px white;
-    transform: scale(1.05);
-    opacity: 1;
-    /* make card fade as scroll out of view */
-  }
-
-  @media screen and (max-width: 750px) {
-    width: calc((100% - 3rem));
-    margin-left: 1rem;
-  }
-`;
-
-const Text = styled.div`
-  font-size: 0.75rem;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-evenly;
-
-  @media screen and (max-width: 750px) {
-    font-size: 0.7rem;
-    justify-content: space-evenly;
-  }
-`;
-const ActivityName = styled.h2`
-  font-size: 1rem;
-  display: flex;
-  flex-direction: row;
-  margin: 15px 0px 0 0px; // top right bottom left
-  text-align: center;
-  justify-content: center;
-  color: ${(props) => props.theme.colour.strava};
-  text-decoration: none;
-`;
 const ScrollToTop = styled(ArrowUpCircleFill)`
   height: 3em;
+  right: 0rem;
   color: ${(props) => props.theme.colour.strava};
   display: flex;
   z-index: 1;
@@ -368,7 +440,12 @@ const ScrollToTop = styled(ArrowUpCircleFill)`
   align-items: center;
   flex-wrap: wrap;
   position: fixed;
-  margin: 0px 10px 40px 90vw;
+  margin: 80vh 10px 40px 90vw;
+
+  @media screen and (max-width: 750px) {
+    top: 5rem;
+    right: 0rem;
+  }
 `;
 
 const ActivityIcon = styled(Activity)`
@@ -383,39 +460,395 @@ const ActivityIcon = styled(Activity)`
   }
 `;
 
-const StopWatchIcon = styled(Stopwatch)`
-  margin: 0px 5px 0px 0px;
-  width: 2em;
-  width: 2em;
-  color: ${(props) => props.theme.colour.strava};
+const PageContainer = styled.div`
+  min-height: 100vh;
+  width: 100%;
+  max-width: none;
+  background: #071018;
+  color: white;
+  padding-top: 5.25rem;
+  padding-bottom: 3rem;
+  overflow-x: hidden;
 
-  @media screen and (max-width: 750px) {
-    width: 1em;
-    height: 2em;
+  @media screen and (max-width: 768px) {
+    padding-top: 4.35rem;
   }
 `;
 
-const ThumbUpIcon = styled(HandThumbsUpFill)`
-  margin: 0px 5px 0px 0px;
-  width: 2em;
-  height: 2em;
-  color: ${(props) => props.theme.colour.strava};
+const AuthMessage = styled.div`
+  position: fixed;
+  top: 5.5rem;
+  left: 50%;
+  z-index: 1100;
+  width: min(90vw, 34rem);
+  transform: translateX(-50%);
+  border: 1px solid rgba(252, 82, 0, 0.45);
+  border-radius: 8px;
+  background: rgba(17, 24, 39, 0.96);
+  color: #ffffff;
+  padding: 0.85rem 1rem;
+  text-align: center;
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.35);
+`;
 
-  @media screen and (max-width: 750px) {
-    width: 1em;
-    height: 2em;
+const OfflineNotice = styled.section`
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 0 1rem;
+  border: 1px solid rgba(252, 82, 0, 0.45);
+  border-radius: 12px;
+  background: rgba(31, 41, 55, 0.95);
+  color: #ffffff;
+  padding: 1rem;
+`;
+
+const OfflineTablePlaceholder = styled(OfflineNotice)`
+  min-height: 14rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  margin-top: 1.5rem;
+`;
+
+const OfflineTitle = styled.h2`
+  margin: 0;
+  color: #ffffff;
+  font-size: 1.1rem;
+  font-weight: 800;
+`;
+
+const OfflineText = styled.p`
+  margin: 0.45rem 0 0;
+  color: #cbd5e1;
+  font-size: 0.95rem;
+  line-height: 1.5;
+`;
+
+const DashboardLayout = styled.div`
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 1.5rem;
+  width: 100%;
+  min-height: calc(100vh - 80px);
+  margin: 0;
+  padding: 1.5rem;
+  padding-top: 0;
+  box-sizing: border-box;
+  background: #071018;
+
+  @media screen and (max-width: 980px) {
+    grid-template-columns: 1fr;
+    padding: 1rem;
+    padding-top: 0;
+    position: sticky;
+  }
+
+  @media screen and (max-width: 560px) {
+    padding: 0.75rem;
+    position: sticky;
   }
 `;
 
-const CalendarIcon = styled(CalendarDateFill)`
-  margin: 0px 10px 0px 0px;
-  width: 2em;
-  height: 2em;
-  color: ${(props) => props.theme.colour.strava};
+const DashboardSidebar = styled.aside`
+  background: rgba(31, 41, 55, 0.8);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 18px;
+  padding: 1rem;
+  height: fit-content;
+  position: sticky;
+  top: 6rem;
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.28);
+  box-sizing: border-box;
 
-  @media screen and (max-width: 750px) {
-    width: 1em;
-    height: 2em;
+  @media screen and (max-width: 980px) {
+    position: static;
+    display: grid;
+    margin-top: 0;
+    grid-template-columns: 1fr;
+    gap: 0.55rem;
+    align-items: end;
+  }
+
+  @media screen and (max-width: 650px) {
+    grid-template-columns: 1fr;
   }
 `;
-export default AthleteActivities;
+
+const SidebarTitle = styled.h2`
+  margin: 0;
+  color: #ffffff;
+  font-size: 1.15rem;
+  font-weight: 800;
+
+  @media screen and (max-width: 980px) {
+    grid-column: 1 / -1;
+  }
+`;
+
+const SidebarText = styled.p`
+  margin: 0.35rem 0 1rem;
+  color: #cbd5e1;
+  font-size: 0.86rem;
+
+  @media screen and (max-width: 980px) {
+    grid-column: 1 / -1;
+    margin-bottom: 0.25rem;
+  }
+`;
+
+const SidebarControl = styled.div`
+  margin-bottom: 0.85rem;
+
+  input {
+    width: 100%;
+    min-height: 52px;
+    border-radius: 12px;
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    background: rgba(255, 255, 255, 0.96);
+    color: #111827;
+    padding: 0 0.85rem;
+    font-size: 0.95rem;
+    outline: none;
+  }
+  select {
+    width: 100%;
+    min-height: 42px;
+    border-radius: 12px;
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    background: rgba(255, 255, 255, 0.96);
+    color: #111827;
+    padding: 0 0.85rem;
+    font-size: 0.95rem;
+    outline: none;
+    @media screen and (max-width: 980px) {
+      display: none;
+    }
+  }
+
+  input:focus,
+  select:focus {
+    border-color: #fc5200;
+    box-shadow: 0 0 0 3px rgba(252, 82, 0, 0.18);
+  }
+
+  @media screen and (max-width: 980px) {
+    margin-bottom: 0;
+  }
+`;
+
+const DashboardMain = styled.main`
+  margin-top: 0;
+  min-width: 0;
+  width: 100%;
+  background: #071018;
+`;
+
+const DashboardChartArea = styled.section`
+  margin-top: 1.25rem;
+  margin-bottom: 1.5rem;
+
+  @media screen and (max-width: 980px) {
+    display: none;
+  }
+`;
+
+const ActivitiesTableContainer = styled.div`
+  background-color: #222;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  margin-top: 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-sizing: border-box;
+`;
+
+const TableHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid #333;
+`;
+
+const TableTitle = styled.h2`
+  color: #fff;
+  font-size: 1.2rem;
+  margin: 0;
+`;
+
+const Table = styled.table`
+  width: 100%;
+  border-collapse: collapse;
+  color: #ccc;
+
+  thead {
+    background-color: #1a1a1a;
+    border-bottom: 2px solid #333;
+  }
+
+  th {
+    padding: 15px;
+    text-align: left;
+    font-weight: 600;
+    color: #fff;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+  }
+
+  td {
+    padding: 15px;
+    border-bottom: 1px solid #333;
+    font-size: 0.9rem;
+  }
+
+  tbody tr {
+    transition: background-color 0.2s ease;
+
+    &:hover {
+      background-color: #2a2a2a;
+    }
+  }
+`;
+const TableRow = styled.tr``;
+
+const ActivityCell = styled.td`
+  display: flex;
+  align-items: center;
+  gap: 12px;
+`;
+
+const ActivityInfo = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+`;
+
+const ActivityTitle = styled.span`
+  color: #fff;
+  font-weight: 500;
+
+  &:hover {
+    text-decoration: underline #ff6b35;
+    color: #ff6b35;
+  }
+`;
+
+const ActivityDate = styled.span`
+  color: #888;
+  font-size: 0.8rem;
+`;
+
+const SportCell = styled.td`
+  color: #ff6b35;
+  font-weight: 500;
+`;
+
+const DateCell = styled.td``;
+
+const DistanceCell = styled.td``;
+
+const TimeCell = styled.td``;
+
+const ElevationCell = styled.td``;
+
+const HRCell = styled.td``;
+
+const KudosCell = styled.td`
+  color: #ff6b35;
+  font-weight: 500;
+`;
+
+// Mobile Styles
+const MobileActivitiesList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 80px;
+`;
+
+const MobileActivityCard = styled.div`
+  background-color: #222;
+  border-radius: 8px;
+  padding: 15px;
+  border: 1px solid #333;
+  transition: all 0.2s ease;
+
+  &:active {
+    background-color: #2a2a2a;
+    transform: scale(0.98);
+  }
+`;
+
+const MobileActivityHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 8px;
+`;
+
+const MobileActivityTitle = styled.h3`
+  color: #fff;
+  margin: 0;
+  font-size: 1rem;
+  flex: 1;
+
+  a {
+    color: #fff;
+    text-decoration: none;
+
+    &:hover {
+      color: #ff6b35;
+    }
+  }
+`;
+
+const SportBadge = styled.span`
+  background-color: #ff6b35;
+  color: #000;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+`;
+
+const MobileActivityDate = styled.p`
+  color: #888;
+  font-size: 0.85rem;
+  margin: 0 0 12px 0;
+`;
+
+const MobileActivityDetails = styled.div`
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #333;
+`;
+
+const DetailItem = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+`;
+
+const DetailLabel = styled.span`
+  color: #888;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+`;
+
+const DetailValue = styled.span`
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 500;
+`;
+
+const MobileActivityFooter = styled.div`
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+`;

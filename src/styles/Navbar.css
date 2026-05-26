@@ -1,142 +1,250 @@
-
 .navigation-layer {
-    /* make navigation bar stay fixed at top of screen when user scolls down */
     position: fixed;
     top: 0;
     left: 0;
+    display: block;
     width: 100%;
-    z-index: 1; 
+    z-index: 1010;
+    pointer-events: none;
+}
+
+.navigation-layer--map-menu-only {
+    position: fixed;
+    height: 0;
 }
 
 .navigation {
-    height: 70px;
+    min-height: 4.75rem;
     width: 100%;
     display: flex;
     align-items: center;
-    position: relative; 
-    padding: 0.5rem 0rem;
-    background-color: #160404;
-    color: black;
-    box-shadow: 0 2px 2px 2px rgba(9, 9, 9, 0.23);
+    gap: 0.85rem;
+    position: relative;
+    box-sizing: border-box;
+    padding: 0.75rem 1rem;
+    pointer-events: none;
 }
 
- 
+.navigation-layer--activities .navigation,
+.navigation-layer--activity-card .navigation,
+.navigation-layer--activity-list .navigation {
+    padding: 0.55rem 0.85rem;
+    background: linear-gradient(90deg, rgba(7, 16, 24, 0.9), rgba(7, 16, 24, 0.34));
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(12px);
+}
+
+.navigation-layer--map-menu-only .navigation {
+    height: 0;
+    padding: 0;
+}
+
+.navigation > * {
+    pointer-events: auto;
+}
+
 .name {
+    display: flex;
+    align-items: center;
     text-decoration: none;
     color: #fff;
     font-size: 1.3rem;
-    margin-left: 1rem;
-}
-
-.navigation-menu {
-    margin-left: auto;
-}
- 
-.navigation-menu ul {
-    display: flex;
-    padding: 0; 
-}
-
-.navigation-menu li { 
-    list-style-type: none;
-    margin: 0 2rem;
-}
-
-.navigation-menu li a { 
-    text-decoration: none;
-    color: #fff;
-    display: block;
-    width: 100%;
-}
-
-.hamburger {  
-    border: 0;
-    height: 40px;
-    width: 40px;
-    padding: 0.5rem;
-    border-radius: 50%;
-    background-color: #ff8316;
-    cursor: pointer;
-    transition: background-color 0.2s ease-in-out; 
-    position: absolute;
-    top: 50%;
-    right: 25px;
-    transform: translateY(-50%);
-    display: none;
-}
-
-.hamburger:hover {
-    background-color: #2642af;
-}
-
-button.hamburger {
-    @media screen and (min-width: 768px) {
-        margin-top: 4rem;
-    }
-
-    @media screen and (max-width: 568px) {
-        margin-left: -7rem;
-    }
-}
-
-@media screen and (max-width: 768px) {
-    .hamburger {
-        display: block;
-    }
-}
-
-@media screen and (max-width: 768px) {
-    .navigation-menu ul {
-        display: none;
-    }
-}
-
-@media screen and (max-width: 768px) {
-    .navigation-menu ul { 
-        position: absolute;
-        top: 60px;
-        z-index: 1;
-        left: 0; 
-        flex-direction: column; 
-        width: 100%;
-        height: calc(20vh);
-        background-color: rgb(10, 1, 1);
-        border-top: 1px solid black;
-    }
-
-    .navigation-menu li { 
-        text-align: center;
-        margin: 0;
-    }
-
-    .navigation-menu li a {
-        color: #fff;
-        width: 100%;
-        padding: 1.5rem 0;
-    }
-
-    .navigation-menu li:hover {
-        background-color: #2642af;
-    }
-}
-
-@media screen and (max-width: 768px) {
-    .navigation-menu.expanded ul {
-        display: block;
-    }
 }
 
 .powered_by_strava {
-    display: block; 
-    width: 150px;
+    display: block;
+    width: 132px;
     height: auto;
-    margin: 0px 0px 0px 90px;    
-   
-@media screen and (max-width: 850px) {
-    margin: 0px 0px 0px 9rem;
+    margin-left: 0.35rem;
+    filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.35));
 }
-    @media screen and (max-width: 768px) {
-        margin: 0px 0px 0px 1rem;
-     
+
+.navigation-menu__strava {
+    display: flex;
+    justify-content: center;
+    padding: 0.5rem 0.75rem 0.25rem;
+}
+
+.navigation-menu__strava .powered_by_strava {
+    width: 128px;
+    margin: 0;
+}
+
+.hamburger {
+    border: 1px solid rgba(255, 255, 255, 0.24);
+    height: 46px;
+    width: 46px;
+    padding: 0.65rem;
+    border-radius: 50%;
+    background: rgba(252, 82, 0, 0.96);
+    color: #111;
+    cursor: pointer;
+    transition:
+        background-color 0.2s ease,
+        border-color 0.2s ease,
+        transform 0.2s ease;
+    position: absolute;
+    top: 0.85rem;
+    right: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(14px);
+    box-shadow: 0 14px 32px rgba(0, 0, 0, 0.28);
+}
+
+.hamburger:hover {
+    background: rgba(252, 82, 0, 1);
+    border-color: rgb(255, 255, 255);
+    transform: translateY(-1px);
+}
+
+.navigation-layer--activity-card .hamburger,
+.navigation-layer--activity-list .hamburger,
+.navigation-layer--map-menu-only .hamburger {
+    background: rgba(252, 82, 0, 0.96);
+    border-color: rgba(255, 255, 255, 0.32);
+}
+
+.navigation-layer--activities .hamburger {
+    background: rgba(252, 82, 0, 0.96);
+    border-color: rgba(255, 255, 255, 0.32);
+}
+
+.navigation-layer--activities .hamburger:hover {
+    background: rgba(252, 82, 0, 1);
+}
+
+.navigation-layer--activity-card .hamburger:hover,
+.navigation-layer--activity-list .hamburger:hover,
+.navigation-layer--map-menu-only .hamburger:hover {
+    background: rgba(252, 82, 0, 1);
+}
+
+.navigation-menu {
+    position: absolute;
+    top: 4.35rem;
+    right: 1rem;
+    width: min(300px, calc(100vw - 2rem));
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-8px);
+    transition:
+        opacity 0.2s ease,
+        transform 0.2s ease,
+        visibility 0.2s ease;
+}
+
+.navigation-menu.expanded {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.navigation-menu ul {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    padding: 0.55rem;
+    margin: 0;
+    list-style: none;
+    background: rgba(18, 18, 18, 0.78);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 14px;
+    box-shadow: 0 22px 54px rgba(0, 0, 0, 0.36);
+    backdrop-filter: blur(18px);
+}
+
+.navigation-menu li {
+    list-style-type: none;
+    margin: 0;
+}
+
+.navigation-menu li a {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.85rem 1rem;
+    border-radius: 9px;
+    color: #fff;
+    text-decoration: none;
+    font-weight: 700;
+    letter-spacing: 0;
+    transition:
+        background-color 0.2s ease,
+        transform 0.2s ease;
+}
+
+.navigation-menu li a:hover,
+.navigation-menu li a:focus {
+    background: rgba(255, 255, 255, 0.12);
+    transform: translateX(2px);
+    background-color: #f9f2f2;
+    color: black;
+}
+
+@media screen and (max-width: 768px) {
+    .navigation-layer {
+        position: fixed;
+    }
+
+    .navigation {
+        gap: 0.55rem;
+        padding: 0.65rem 0.7rem;
+        min-height: 4rem;
+        background: rgba(7, 16, 24, 0.82);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        backdrop-filter: blur(14px);
+    }
+
+    .navigation-layer--map-menu-only .navigation {
+        min-height: 0;
+        background: transparent;
+        border-bottom: 0;
+        backdrop-filter: none;
+    }
+
+    .powered_by_strava {
+        width: 108px;
+        margin-left: 0;
+    }
+
+    .hamburger {
+        top: 0.65rem;
+        right: 0.7rem;
+        height: 42px;
+        width: 42px;
+        padding: 0.6rem;
+    }
+
+    .navigation-menu {
+        top: 4rem;
+        right: 0.7rem;
+        width: min(280px, calc(100vw - 1.4rem));
     }
 }
+
+@media screen and (max-width: 560px) {
+    .powered_by_strava {
+        width: 92px;
+    }
+}
+
+@media screen and (max-width: 420px) {
+    .navigation {
+        gap: 0.45rem;
+        padding-right: 3.55rem;
+    }
+
+    .powered_by_strava {
+        width: 74px;
+    }
+
+    .navigation-menu {
+        left: 0.7rem;
+        right: 0.7rem;
+        width: auto;
+    }
+}
+
+ 

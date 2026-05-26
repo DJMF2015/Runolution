@@ -2,76 +2,127 @@ import React from 'react';
 import styled from 'styled-components';
 import { ArrowRight } from '@styled-icons/bootstrap/ArrowRight';
 import { ArrowLeft } from '@styled-icons/bootstrap/ArrowLeft';
-// NOTE: This component is not used but ,may be used in the future
-const Pagination = ({ onPageChange, pageIndex }) => {
-  // previous
+
+const Pagination = ({ onPageChange, paginationIndex, totalPages }) => {
+  const isFirstPage = paginationIndex <= 1;
+  const isLastPage = paginationIndex >= totalPages;
+
   const handleBackArrow = () => {
-    if (pageIndex === 1) {
-      return onPageChange(1);
+    if (isFirstPage) {
+      return;
     }
-    onPageChange(pageIndex === 0 ? 1 : pageIndex - 1);
+    onPageChange(paginationIndex - 1);
   };
 
-  // next
   const handleNextArrow = () => {
-    console.log(pageIndex);
-    if (onPageChange === 1) {
-      return 1;
+    if (isLastPage) {
+      return;
     }
-    onPageChange(pageIndex === 0 ? 1 : pageIndex + 1);
+    onPageChange(paginationIndex + 1);
   };
+
+  if (!totalPages || totalPages <= 1) {
+    return null;
+  }
 
   return (
-    <>
-      <Wrapper>
-        {
-          <ArrowIconBack
-            style={{
-              height: '65px',
-              width: '85px',
-            }}
-            onClick={handleBackArrow}
-          ></ArrowIconBack>
-        }
+    <Wrapper>
+      <ArrowButton
+        type="button"
+        onClick={handleBackArrow}
+        disabled={isFirstPage}
+        aria-label="Previous page"
+      >
+        <ArrowIconBack />
+      </ArrowButton>
 
-        {
-          <ArrowIconRight
-            style={{
-              height: '65px',
-              width: '85px',
-            }}
-            onClick={handleNextArrow}
-          ></ArrowIconRight>
-        }
-      </Wrapper>
-    </>
+      <PageInfo>
+        Page {paginationIndex} of {totalPages}
+      </PageInfo>
+
+      <ArrowButton
+        type="button"
+        onClick={handleNextArrow}
+        disabled={isLastPage}
+        aria-label="Next page"
+      >
+        <ArrowIconRight />
+      </ArrowButton>
+    </Wrapper>
   );
 };
-const ArrowIconRight = styled(ArrowRight)`
-  color: black;
-  display: inline;
-`;
-const ArrowIconBack = styled(ArrowLeft)`
-  color: black;
-  display: inline;
-  margin-left: 10rem;
-`;
 
-const Wrapper = styled.div`
+export default Pagination;
+
+const Wrapper = styled.nav`
+  width: min(100%, 420px);
+  margin: 1.5rem auto 0;
+  padding: 0.75rem;
   background-color: ghostwhite;
-  position: relative;
-  margin-top: 1rem;
-  margin-left: 25rem;
-  gap: 20rem;
-  display: inline-flex;
-  flex-direction: row;
-  ${ArrowIconRight} ,${ArrowIconBack} {
-    &:hover,
-    &:focus {
-      box-shadow: 0 1px 10px -5px rgba(0.7, 1, 1, 0.35);
-      border-radius: 100px;
-      background-color: ghostwhite;
-    }
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(0.6rem, 3vw, 1.5rem);
+
+  @media screen and (max-width: 520px) {
+    width: calc(100% - 1rem);
+    padding: 0.55rem;
+    gap: 0.5rem;
+  }
+
+  @media screen and (max-width: 360px) {
+    border-radius: 18px;
   }
 `;
-export default Pagination;
+
+const ArrowButton = styled.button`
+  width: clamp(42px, 12vw, 58px);
+  height: clamp(42px, 12vw, 58px);
+  border: none;
+  border-radius: 50%;
+  background-color: #fc5200;
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition:
+    transform 0.18s ease,
+    background-color 0.18s ease,
+    opacity 0.18s ease;
+
+  &:hover:not(:disabled),
+  &:focus-visible:not(:disabled) {
+    background-color: #ff6b35;
+    transform: translateY(-2px);
+    outline: none;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.35;
+  }
+
+  @media screen and (max-width: 360px) {
+    width: 40px;
+    height: 40px;
+  }
+`;
+
+const PageInfo = styled.span`
+  color: #f8fafc;
+  font-size: clamp(0.78rem, 2.8vw, 0.95rem);
+  font-weight: 700;
+  white-space: nowrap;
+`;
+
+const ArrowIconRight = styled(ArrowRight)`
+  width: clamp(1.25rem, 5vw, 1.75rem);
+  height: clamp(1.25rem, 5vw, 1.75rem);
+`;
+
+const ArrowIconBack = styled(ArrowLeft)`
+  width: clamp(1.25rem, 5vw, 1.75rem);
+  height: clamp(1.25rem, 5vw, 1.75rem);
+`;

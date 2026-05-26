@@ -5,6 +5,15 @@ import { RateLimiter } from './rateLimiter';
 
 const stravaRateLimiter = new RateLimiter(100, 15 * 60 * 1000);
 
+const createStravaError = (message, error) => {
+  const status = error?.response?.status;
+  const stravaError = new Error(message);
+  stravaError.status = status;
+  stravaError.response = error?.response;
+  stravaError.originalError = error;
+  return stravaError;
+};
+
 export const getAthleteStats = async (userId, accessToken) => {
   if (await stravaRateLimiter.request()) {
     const apiUrl = `${baseURL}/athletes/${userId}/stats`;
@@ -19,7 +28,10 @@ export const getAthleteStats = async (userId, accessToken) => {
         throw new Error(`Failed to fetch athlete stats. Status: ${response.status}`);
       }
     } catch (error) {
-      throw new Error(`Error while fetching athlete stats: ${error.message}`);
+      throw createStravaError(
+        `Error while fetching athlete stats: ${error.message}`,
+        error,
+      );
     }
   } else {
     throw new Error('Exceeded the Strava rate limit. Please try again later.');
@@ -27,6 +39,7 @@ export const getAthleteStats = async (userId, accessToken) => {
 };
 
 export const getAthleteActivities = async (accessToken, per_page, index) => {
+  console.log(per_page, index);
   if (await stravaRateLimiter.request()) {
     const apiUrl = `${baseURL}/athlete/activities?per_page=${per_page}&page=${index}`;
     try {
@@ -39,7 +52,10 @@ export const getAthleteActivities = async (accessToken, per_page, index) => {
       }
       throw new Error(`Failed to fetch athlete stats. Status: ${response.status}`);
     } catch (error) {
-      throw new Error(`Error while fetching athlete stats: ${error.message}`);
+      throw createStravaError(
+        `Error while fetching athlete activities: ${error.message}`,
+        error,
+      );
     }
   } else {
     throw new Error('Exceeded the Strava rate limit. Please try again later.');
@@ -60,7 +76,10 @@ export const getUsersDetails = async (accessToken) => {
         throw new Error(`Failed to fetch athlete stats. Status: ${response.status}`);
       }
     } catch (error) {
-      throw new Error(`Error while fetching athlete stats: ${error.message}`);
+      throw createStravaError(
+        `Error while fetching athlete details: ${error.message}`,
+        error,
+      );
     }
   } else {
     throw new Error('Exceeded the strava rate limit. Please try again later.');

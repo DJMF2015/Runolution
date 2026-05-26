@@ -7,14 +7,13 @@ const TimeRangeCalendar = (props) => {
   const accessToken = localStorage.getItem('access_token');
   let formatted = getCurrentDate();
   const [activitiesCount, setActivityCounts] = useState(0);
-  const [activityName, setActivityName] = useState([]);
   let date = formattedDate(formatted.currentDate.toISOString().split('T')[0]);
 
   // Get date 360 days ago from today
   const ThreeSixtyDaysAgo = new Date(
     formatted.currentYear,
     formatted.currentMonth,
-    formatted.currentDay - 360
+    formatted.currentDay - 360,
   );
   let formattedSixtyDaysAgo = ThreeSixtyDaysAgo.toISOString().split('T')[0];
 
@@ -38,15 +37,6 @@ const TimeRangeCalendar = (props) => {
       setActivityCounts(multipleActivities);
     };
 
-    const getActivityName = () => {
-      const activityName = [];
-      props?.props.forEach((activity) => {
-        const name = activity?.name;
-        activityName.push(name);
-      });
-      setActivityName(activityName);
-    };
-    getActivityName();
     countActivitiesByDate();
   }, [props?.props]);
 
@@ -69,7 +59,7 @@ const TimeRangeCalendar = (props) => {
             maxValue={Math.round(...Object.values(activitiesCount))}
             emptyColor="#eeeeee"
             colors={['darkorange', 'orange', 'red']}
-            margin={{ top: 40, right: 40, bottom: 10, left: 30 }}
+            margin={{ top: 90, right: 40, bottom: 10, left: 30 }}
             dayBorderWidth={2}
             dayBorderColor="#ffffff"
             legends={[
@@ -98,7 +88,7 @@ export default TimeRangeCalendar;
 
 const StyledCalendar = styled.div`
   height: 35vh;
-  width: 50vw;
+  width: 55vw;
   margin-left: 25rem;
   margin-bottom: -5rem;
   box-shadow: 0px 0 5px #e6e6e6;

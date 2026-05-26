@@ -1,50 +1,98 @@
-const getKmsToMiles = (distance) => {
-  const miles = distance / 1610;
-  return miles.toFixed(2);
+const METRES_PER_KM = 1000;
+const METRES_PER_MILE = 1609.344;
+const FEET_PER_METRE = 3.28084;
+const EVEREST_HEIGHT_METRES = 8848.86;
+
+const formatNumber = (value, options = {}) => {
+  const number = Number(value);
+
+  if (!Number.isFinite(number)) {
+    return '0.00';
+  }
+
+  return number.toLocaleString('en-GB', {
+    minimumFractionDigits: options.minimumFractionDigits ?? 2,
+    maximumFractionDigits: options.maximumFractionDigits ?? 2,
+  });
 };
 
-const getMilesToKms = (distance) => {
-  const kms = distance / 1000;
-  return kms.toFixed(2);
+const getUnitsWithCommas = (data) => {
+  const number = Number(data);
+
+  if (!Number.isFinite(number)) {
+    return '0';
+  }
+
+  return number.toLocaleString('en-GB');
 };
 
-const getMetresToFeet = (data) => {
-  const mtrsToFt = data * 3.28084;
-  return getUnitsWithCommas(mtrsToFt.toFixed(0) + ' ft');
+const getKmsToMiles = (metres) => {
+  const miles = Number(metres || 0) / METRES_PER_MILE;
+  return `${formatNumber(miles)} miles`;
+};
+
+const getMilesToKms = (metres) => {
+  const kms = Number(metres || 0) / METRES_PER_KM;
+  return `${formatNumber(kms)} km`;
+};
+
+const getMetresToMiles = (metres) => {
+  const miles = Number(metres || 0) / METRES_PER_MILE;
+  return `${formatNumber(miles)} miles`;
+};
+
+const getMetresToKm = (metres) => {
+  const kms = Number(metres || 0) / METRES_PER_KM;
+  return `${formatNumber(kms)} km`;
+};
+
+const getMetresToFeet = (metres) => {
+  const feet = Number(metres || 0) * FEET_PER_METRE;
+  return `${formatNumber(feet, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  })} ft`;
 };
 
 const getSecondstoMinutes = (seconds) => {
-  const time = seconds / 60;
-  return Math.round(time.toFixed(2)) + ` mins`;
+  const totalSeconds = Number(seconds || 0);
+  const totalMinutes = Math.round(totalSeconds / 60);
+
+  if (totalMinutes < 60) {
+    return `${totalMinutes} mins`;
+  }
+
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  return `${hours} hr ${minutes} mins`;
 };
 
-// convert to kms/per hour as strava api only gives back speed & velocity in units of mtrs/sec
-const getMstoKmHr = (mtrs) => {
-  const kmHr = (mtrs * 60 * 60) / 1000;
-  return kmHr.toFixed(2) + ` km/hr`;
+const getMstoKmHr = (metresPerSecond) => {
+  const kmHr = (Number(metresPerSecond || 0) * 60 * 60) / 1000;
+  return `${formatNumber(kmHr)} km/hr`;
 };
 
 const getSufferScore = (score) => {
   switch (true) {
     case score >= 150:
-      return `${score}  Tough - watch out for overtraining.`;
+      return `${score} Tough - watch out for overtraining.`;
     case score > 50 && score < 150:
-      return `${score}  Good job managing your effort`;
+      return `${score} Good job managing your effort`;
     case score >= 1 && score <= 50:
-      return `${score}  Easy - good for recovery`;
+      return `${score} Easy - good for recovery`;
     default:
-      console.log('no score');
+      return 'No score';
   }
 };
 
-const getNoOfMtEverests = (data) => {
-  const EVERST_HGHT = 8849;
-  const everests = data / EVERST_HGHT;
-  return everests.toFixed(2);
-};
+const getNoOfMtEverests = (metres) => {
+  const everests = Number(metres || 0) / EVEREST_HEIGHT_METRES;
 
-const getUnitsWithCommas = (data) => {
-  return data.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return formatNumber(everests, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 };
 
 const getCurrentYear = () => {
@@ -53,8 +101,8 @@ const getCurrentYear = () => {
 };
 
 const formattedDate = (date) => {
-  const formatted = date.split('T')[0];
-  return formatted;
+  if (!date) return '';
+  return date.split('T')[0];
 };
 
 const getCurrentDate = () => {
@@ -63,12 +111,16 @@ const getCurrentDate = () => {
   const currentMonth = currentDate.getMonth();
   const currentDay = currentDate.getDate();
   const date = new Date(currentYear, currentMonth, currentDay);
+
   return { date, currentDate, currentYear, currentMonth, currentDay };
 };
 
 export {
   getKmsToMiles,
   getMilesToKms,
+  getMetresToMiles,
+  getMetresToKm,
+  formatNumber,
   getMetresToFeet,
   getMstoKmHr,
   getSufferScore,

@@ -12,12 +12,16 @@ export default function ActivityDropDown(props) {
   }, [props.props]);
 
   const setFilterBySportType = (e) => {
-    props.setFilterBySportType(e.target.value);
+    props.setFilterBySportType(e.target.value === 'Sport Type' ? null : e.target.value);
   };
 
   return (
     <>
-      <DropDown id="filterdropdown" onChange={setFilterBySportType}>
+      <DropDown
+        id="filterdropdown"
+        className={props.className}
+        onChange={setFilterBySportType}
+      >
         {sport.map((Option) => (
           <option key={Option}>{Option}</option>
         ))}
@@ -31,21 +35,11 @@ const DropDown = styled.select`
   align-items: center;
   margin: 0 auto;
   justify-content: center;
-  height: 3vh;
+  height: 4vh;
   background-color: white;
-  width: 10vw;
+  width: 12vw;
   border: 2px solid black;
   border-radius: 7px;
   font-family: 'Montserrat';
   font-size: 1rem;
-
-  @media screen and (max-width: 768px) {
-    margin: 0 auto;
-    margin-top: 7rem;
-    margin-bottom: -5rem;
-    width: 30vw;
-    height: 5vh;
-    font-size: 1rem;
-    background-color: ${(props) => props.theme.colour.ghostwhite};
-  }
 `;
