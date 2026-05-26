@@ -23,11 +23,9 @@ const Logout = () => {
   return (
     <>
       {!loggedIn && (
-        <li>
-          <StyledLoginButton to="/" onClick={handleLogout}>
-            Logout
-          </StyledLoginButton>
-        </li>
+        <StyledLoginButton href="/" onClick={handleLogout}>
+          Logout
+        </StyledLoginButton>
       )}
     </>
   );
@@ -35,31 +33,28 @@ const Logout = () => {
 export default Logout;
 
 const StyledLoginButton = styled.a`
-  font-size: 14px;
-  background-color: #fc5200;
-  border-color: #fc5200;
-  height: auto;
-  margin-left: 1rem;
-  padding: 0.5rem 0.8rem;
-  min-height: unset;
-  line-height: normal;
-  border-radius: 10px;
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 0.95rem;
+  background: linear-gradient(135deg, #fc5200, #ff8a2a);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  padding: 0.85rem 1rem;
+  line-height: 1;
+  border-radius: 8px;
   text-align: center;
   color: #fff;
-  font-weight: 600;
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: 0 12px 24px rgba(252, 82, 0, 0.28);
+  transition:
+    filter 0.2s ease,
+    transform 0.2s ease;
+
   &:hover,
   &:focus {
     text-decoration: none;
     filter: brightness(1.1);
-    scale: 1.1;
-  }
-
-  @media (max-width: 768px) {
-    display: none;
-    margin-left: 0;
-  }
-  @media (max-width: 425px) {
-    display: none;
-    margin-left: 0;
+    transform: translateY(-1px);
   }
 `;

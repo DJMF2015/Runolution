@@ -7,11 +7,13 @@ import PaceZoneBarChart from './BestEffortsChart';
 import ElevationChart from './ElevationBarChart';
 import { useEffect, useState } from 'react';
 import { ArrowUpCircleFill } from '@styled-icons/bootstrap/ArrowUpCircleFill';
+
 export default function ActivityList() {
   const location = useLocation();
   const [detailedActivity, setDetailedActivity] = useState([]);
   const { isVisible, scrollToTop } = useScroll();
   const navigate = useNavigate();
+
   const { from } = location.state;
 
   if (!location.state) {
@@ -31,205 +33,283 @@ export default function ActivityList() {
   }, [from]);
 
   return (
-    <>
-      {isVisible && (
-        <div onClick={scrollToTop}>
-          <ScrollToTop alt="Go to top"></ScrollToTop>
-        </div>
-      )}
+    <PageContainer>
+      {isVisible && <ScrollToTop alt="Go to top" onClick={scrollToTop} />}
 
-      <PaceZoneBarChart props={detailedActivity} />
+      <HeaderCard>
+        <HeaderContent>
+          <ActivityTitle>{from?.name}</ActivityTitle>
+          <BackButton onClick={handleGoBack}>Back</BackButton>
+        </HeaderContent>
+      </HeaderCard>
 
-      <ElevationChart props={detailedActivity} />
+      <ChartsGrid>
+        <ChartCard>
+          <ChartHeading>Best Efforts</ChartHeading>
+          <PaceZoneBarChart props={detailedActivity} />
+        </ChartCard>
 
-      <Container>
-        <Table>
+        <ChartCard>
+          <ChartHeading>Elevation & Effort</ChartHeading>
+          <ElevationChart props={detailedActivity} />
+        </ChartCard>
+      </ChartsGrid>
+
+      <ResponsiveSection>
+        <SectionTitle>Splits</SectionTitle>
+
+        <ResponsiveTable>
           <thead>
-            <th style={{ color: 'red' }}>Segment Efforts</th>
             <tr>
-              <TableHeader>Splits</TableHeader>
-              <TableHeader>Distance</TableHeader>
-              <TableHeader>Elevation Gain (mtrs)</TableHeader>
-              <TableHeader>Elapsed Time</TableHeader>
-              <TableHeader>Average Speed</TableHeader>
-              <TableHeader>Average Cadence</TableHeader>
-              <TableHeader>Average Heartrate</TableHeader>
-              <TableHeader>Max Heartrate</TableHeader>
-              <TableHeader>Pace Zone</TableHeader>
+              <th>Split</th>
+              <th>Distance</th>
+              <th>Elevation</th>
+              <th>Elapsed</th>
+              <th>Speed</th>
+              <th>Cadence</th>
+              <th>Avg HR</th>
+              <th>Max HR</th>
+              <th>Pace Zone</th>
             </tr>
           </thead>
-          <tbody>
-            {detailedActivity &&
-              detailedActivity?.laps &&
-              detailedActivity.laps.map((lap, i) => {
-                return (
-                  <>
-                    <>
-                      <tr>
-                        <TableData>{from.name}</TableData>
-                        <TableData>{getKmsToMiles(lap.distance)}</TableData>
-                        <TableData>{lap.total_elevation_gain}</TableData>
-                        <TableData>{getSecondstoMinutes(lap.elapsed_time)}</TableData>
-                        <TableData>{getMstoKmHr(lap?.average_speed)}</TableData>
-                        <TableData>{lap.average_cadence}</TableData>
-                        <TableData>{lap.average_heartrate}</TableData>
-                        <TableData>{lap.max_heartrate}</TableData>
-                        <TableData>{lap.pace_zone}</TableData>
-                      </tr>
-                    </>
-                  </>
-                );
-              })}
-          </tbody>
-        </Table>
-      </Container>
 
-      <Container>
-        <Table>
+          <tbody>
+            {detailedActivity?.laps?.map((lap) => (
+              <tr key={`${lap.id || lap.split}-${lap.elapsed_time}`}>
+                <td data-label="Split">{from.name}</td>
+                <td data-label="Distance">{getKmsToMiles(lap.distance)}</td>
+                <td data-label="Elevation">{lap.total_elevation_gain}</td>
+                <td data-label="Elapsed">{getSecondstoMinutes(lap.elapsed_time)}</td>
+                <td data-label="Speed">{getMstoKmHr(lap?.average_speed)}</td>
+                <td data-label="Cadence">{lap.average_cadence || '—'}</td>
+                <td data-label="Avg HR">{lap.average_heartrate || '—'}</td>
+                <td data-label="Max HR">{lap.max_heartrate || '—'}</td>
+                <td data-label="Pace Zone">{lap.pace_zone || '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </ResponsiveTable>
+      </ResponsiveSection>
+
+      <ResponsiveSection>
+        <SectionTitle>Segment Efforts</SectionTitle>
+
+        <ResponsiveTable>
           <thead>
-            <th style={{ color: 'red' }}>Segment Efforts</th>
             <tr>
-              <TableHeader>Name</TableHeader>
-              <TableHeader>Distance</TableHeader>
-              <TableHeader>Max Grade</TableHeader>
-              <TableHeader>Average Grade</TableHeader>
-              <TableHeader>Elapsed Time</TableHeader>
-              <TableHeader>Average Heartrate</TableHeader>
-              <TableHeader>Elevation High</TableHeader>
+              <th>Name</th>
+              <th>Distance</th>
+              <th>Max Grade</th>
+              <th>Average Grade</th>
+              <th>Elapsed</th>
+              <th>Avg HR</th>
+              <th>Elevation High</th>
             </tr>
           </thead>
-          <tbody>
-            {detailedActivity &&
-              detailedActivity?.segment_efforts &&
-              detailedActivity.segment_efforts.map((segment, i) => {
-                return (
-                  <tr key={`${segment.id}--${segment.elapsed_time}`}>
-                    <TableData>{segment.name}</TableData>
-                    <TableData>{segment.segment.distance}</TableData>
-                    <TableData>{segment.segment.maximum_grade}</TableData>
-                    <TableData>{segment.segment.average_grade}</TableData>
-                    <TableData>{segment.elapsed_time}</TableData>
-                    <TableData>{segment.average_heartrate}</TableData>
-                    <TableData>{segment.segment.elevation_high}</TableData>
-                  </tr>
-                );
-              })}
-          </tbody>
-        </Table>
-      </Container>
 
-      <StyledBackButton
-        onClick={handleGoBack}
-        style={{ textAlign: 'center', marginLeft: '50vw' }}
-      >
-        Back
-      </StyledBackButton>
-    </>
+          <tbody>
+            {detailedActivity?.segment_efforts?.map((segment) => (
+              <tr key={`${segment.id}-${segment.elapsed_time}`}>
+                <td data-label="Name">{segment.name}</td>
+                <td data-label="Distance">{segment.segment.distance}</td>
+                <td data-label="Max Grade">{segment.segment.maximum_grade}</td>
+                <td data-label="Average Grade">{segment.segment.average_grade}</td>
+                <td data-label="Elapsed">{getSecondstoMinutes(segment.elapsed_time)}</td>
+                <td data-label="Avg HR">{segment.average_heartrate || '—'}</td>
+                <td data-label="Elevation High">{segment.segment.elevation_high}</td>
+              </tr>
+            ))}
+          </tbody>
+        </ResponsiveTable>
+      </ResponsiveSection>
+    </PageContainer>
   );
 }
 
-const Container = styled.div`
-  margin-top: 0.5em;
-  margin: 0.75rem;
-  border-radius: 5px;
-  border: 1px solid black;
-  box-sizing: border-box;
-  box-shadow: 0 3px 8px rgba(0, 0, 1, 0.5);
-  th {
-    background-color: #f2f2f2;
-    color: black;
-    padding: 0.5em;
-    text-align: left;
-    border-bottom: 1px solid #ddd;
-  }
-`;
-
-const StyledBackButton = styled.button`
-  display: relative;
-  position: sticky;
-  min-width: 80px;
-  background-color: #fc5200;
-  height: 50px;
-  width: 8%;
-  text-align: center;
-  line-height: 48px;
-  padding: 6px 12px;
-  font-size: 18px;
-  text-transform: uppercase;
-  border: none;
-  text-decoration: none;
-  border-radius: 10px;
-  text-align: center;
+const PageContainer = styled.div`
+  min-height: 100vh;
+  margin-top: 0;
+  padding: 1.5rem;
+  padding-top: 5.25rem;
+  background:
+    radial-gradient(circle at top left, rgba(252, 82, 0, 0.12), transparent 32%),
+    linear-gradient(180deg, #0f1720 0%, #111820 45%, #171f29 100%);
   color: #fff;
-  font-weight: 600;
-  &:hover,
-  &:focus {
-    text-decoration: none;
-    filter: brightness(1.1);
+
+  @media screen and (max-width: 700px) {
+    padding: 1rem;
+    padding-top: 4.35rem;
   }
 `;
-const Table = styled.table`
-  border-collapse: collapse;
+
+const HeaderCard = styled.div`
+  background: #171f29;
+  border: 1px solid #26313d;
+  border-radius: 16px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.25rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+`;
+
+const HeaderContent = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  min-width: 0;
+
+  @media screen and (max-width: 600px) {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+`;
+
+const ActivityTitle = styled.h1`
+  margin: 0;
+  color: #fff;
+  font-size: clamp(1.2rem, 3vw, 2rem);
+  min-width: 0;
+  overflow-wrap: anywhere;
+`;
+
+const BackButton = styled.button`
+  flex: 0 0 auto;
+  background: #fc5200;
+  color: #fff;
+  border: solid;
+  border-radius: 999px;
+  border-color: ghostwhite;
+  padding: 0.75rem 2.5rem;
+  font-weight: 700;
+  cursor: pointer;
+
+  &:hover {
+    filter: brightness(1.25);
+  }
+
+  @media screen and (max-width: 600px) {
+    border-radius: 999px;
+    padding: 0.5rem 1.75rem;
+  }
+`;
+
+const ChartsGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  min-width: 0;
+
+  @media screen and (max-width: 950px) {
+    grid-template-columns: 1fr;
+  }
+`;
+
+const ChartCard = styled.section`
+  background: #ffffff;
+  border: 1px solid #26313d;
+  border-radius: 16px;
+  padding: 1rem;
+  min-height: 360px;
+  min-width: 0;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+
+  @media screen and (max-width: 700px) {
+    min-height: 300px;
+    padding: 0.75rem;
+    border-radius: 12px;
+  }
+
+  @media screen and (max-width: 420px) {
+    min-height: 280px;
+    padding: 0.6rem;
+  }
+`;
+
+const ChartHeading = styled.h2`
+  margin: 0 0 1rem;
+  color: #111;
+  font-size: 1rem;
+`;
+
+const ResponsiveSection = styled.section`
+  background: #171f29;
+  border: 1px solid #26313d;
+  border-radius: 16px;
+  padding: 1rem;
+  margin-bottom: 1.25rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+  overflow-x: auto;
+`;
+
+const SectionTitle = styled.h2`
+  color: #fff;
+  margin: 0 0 1rem;
+  font-size: 1.1rem;
+`;
+
+const ResponsiveTable = styled.table`
   width: 100%;
-`;
+  border-collapse: collapse;
+  color: #d7dde6;
 
-const TableHeader = styled.th`
-  background-color: #f2f2f2;
-  font-weight: bold;
-  padding: 8px;
-  text-align: left;
+  thead {
+    background: #111820;
+  }
+
+  th,
+  td {
+    padding: 0.85rem;
+    border-bottom: 1px solid #26313d;
+    text-align: left;
+  }
+
+  th {
+    color: #fff;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  tbody tr:hover {
+    background: #1f2a36;
+  }
 
   @media screen and (max-width: 768px) {
-    grid-template-columns: repeat(9, 1fr);
-    grid-template-rows: repeat(8, 1fr);
-    font-size: 12px;
-    grid-gap: 0.5em;
-    padding: 0.5em;
-    text-align: left;
-    border-bottom: 1px solid #ddd;
-  }
-  @media screen and (max-width: 650px) {
-    grid-template-columns: repeat(9, 1fr);
-    grid-template-rows: repeat(8, 1fr);
-    font-size: 10px;
-    grid-gap: 0.25em;
-    padding: 0.25em;
-    text-align: left;
-    border-bottom: 1px solid #ddd;
-  }
-  @media screen and (max-width: 450px) {
-    grid-template-columns: repeat(9, 1fr);
-    grid-template-rows: repeat(8, 1fr);
-    font-size: 8px;
-    grid-gap: 0.15em;
-    padding: 0.15em;
-    text-align: left;
-  }
-`;
+    border-collapse: separate;
+    border-spacing: 0 0.75rem;
 
-const TableData = styled.td`
-  border: 1px solid #ddd;
-  padding: 8px;
-  @media screen and (max-width: 768px) {
-    font-size: 14px;
-    margin-top: 0.5em;
-    border-radius: 5px;
-    padding: 0.5em;
-    text-align: left;
-    border-bottom: 1px solid #ddd;
-  }
-  @media screen and (max-width: 650px) {
-    font-size: 10px;
-    grid-gap: 0.25em;
-    padding: 0.25em;
-    text-align: left;
-    border-bottom: 1px solid #ddd;
-  }
-  @media screen and (max-width: 450px) {
-    font-size: 8px;
-    grid-gap: 0.15em;
-    padding: 0.15em;
-    text-align: left;
+    thead {
+      display: none;
+    }
+
+    tr {
+      display: block;
+      background: #111820;
+      border: 1px solid #26313d;
+      border-radius: 14px;
+      padding: 0.75rem;
+    }
+
+    td {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      border-bottom: 1px solid #26313d;
+      padding: 0.65rem 0;
+      font-size: 0.9rem;
+    }
+
+    td:last-child {
+      border-bottom: none;
+    }
+
+    td::before {
+      content: attr(data-label);
+      color: #9aa4b2;
+      font-weight: 700;
+    }
   }
 `;
 

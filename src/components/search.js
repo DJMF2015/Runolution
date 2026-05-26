@@ -38,7 +38,7 @@ const SearchInput = styled.input`
   border: 1px solid #aaa;
   border-radius: 4px;
   margin: 0 auto;
-  margin-top: 7rem;
+  margin-top: 3rem;
   outline: none;
   padding: 8px;
   box-sizing: border-box;
@@ -62,8 +62,8 @@ const SearchInput = styled.input`
     width: 50%;
     padding: 10px;
     margin-right: 6rem;
-    margin-top: 7rem;
-    margin-bottom: 1rem;
+    margin: 0 auto;
+    margin-bottom: 1.5rem;
   }
   @media screen and (max-width: 800px) {
     display: flex;
@@ -77,8 +77,8 @@ const SearchInput = styled.input`
     width: 50%;
     padding: 10px;
     margin-right: 6rem;
-    margin-top: 7rem;
     margin-bottom: 1rem;
+    margin: 0 auto;
   }
   @media screen and (max-width: 600px) {
     display: flex;
@@ -91,8 +91,9 @@ const SearchInput = styled.input`
     font-size: 18px;
     width: 65%;
     padding: 8px;
-    margin-top: 6rem;
     margin-bottom: 0rem;
+    margin: 0 auto;
+    margin-bottom: 2rem;
   }
 `;
 
@@ -101,6 +102,9 @@ const StyledInput = styled.div`
   position: relative;
   &.inputWithIcon {
     position: relative;
+  }
+
+  @media screen and (max-width: 600px) {
   }
 `;
 

@@ -14,7 +14,7 @@ const TimeRangeCalendar = (props) => {
   const ThreeSixtyDaysAgo = new Date(
     formatted.currentYear,
     formatted.currentMonth,
-    formatted.currentDay - 360
+    formatted.currentDay - 360,
   );
   let formattedSixtyDaysAgo = ThreeSixtyDaysAgo.toISOString().split('T')[0];
 
@@ -69,7 +69,7 @@ const TimeRangeCalendar = (props) => {
             maxValue={Math.round(...Object.values(activitiesCount))}
             emptyColor="#eeeeee"
             colors={['darkorange', 'orange', 'red']}
-            margin={{ top: 40, right: 40, bottom: 10, left: 30 }}
+            margin={{ top: 90, right: 40, bottom: 10, left: 30 }}
             dayBorderWidth={2}
             dayBorderColor="#ffffff"
             legends={[
@@ -98,7 +98,7 @@ export default TimeRangeCalendar;
 
 const StyledCalendar = styled.div`
   height: 35vh;
-  width: 50vw;
+  width: 55vw;
   margin-left: 25rem;
   margin-bottom: -5rem;
   box-shadow: 0px 0 5px #e6e6e6;

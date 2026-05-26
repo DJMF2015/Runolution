@@ -6,8 +6,8 @@ import { client_id } from '../utils/config';
 
 const Login = () => {
   const [logout, setLoggedOut] = useState(false);
-  const redirectUrl = 'http://runolution.vercel.app/redirect';
-
+  // const redirectUrl = 'http://runolution.vercel.app/redirect';
+  const redirectUrl = 'http://localhost:3000/redirect';
   const handleLogin = () => {
     setLoggedOut(!logout);
     window.location = `http://www.strava.com/oauth/authorize?client_id=${client_id}&response_type=code&redirect_uri=${redirectUrl}&approval_prompt=force&scope=read_all,activity:read_all,profile:read_all`;
@@ -103,13 +103,4 @@ const ImageButton = styled.img`
     width: 85%;
     height: 10rem;
   }
-`;
-
-const StyledText = styled.h1`
-  display: flex;
-  font-size: 3rem;
-  margin: 0 auto;
-  text-align: center;
-  color: ${(props) => props.theme.colour.white};
-  font-style: italic;
 `;
