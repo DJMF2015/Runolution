@@ -4,7 +4,7 @@ import { getExchangeCodeFromURL, getAccessToken, catchErrors } from './helpers';
 
 const Redirect = () => {
   const navigate = useNavigate();
-  const [payload, setPayload] = useState([]);
+  const [, setPayload] = useState([]);
   const [error, setError] = useState(null);
 
   useEffect(() => {

@@ -1,6 +1,5 @@
 import React from 'react';
 import { Line } from 'react-chartjs-2';
-import { getMilesToKms } from '../utils/functions';
 import {
   Chart as ChartJS,
   LineElement,
@@ -37,7 +36,6 @@ const metresToMiles = (metres) => {
 };
 
 const calculateEffortScore = (activity) => {
-  const distanceMiles = metresToMiles(activity.distance);
   const elevation = activity.total_elevation_gain || 0;
   const heartRate = activity.average_heartrate || 0;
   const pace = speedToPace(activity.average_speed);
@@ -98,11 +96,6 @@ const StravaMetricsChart = ({ activities = [] }) => {
     3,
   );
 
-  const distanceData = movingAverage(
-    recentActivities.map((activity) => metresToMiles(activity.distance || 0)),
-    3,
-  );
-
   const effortData = movingAverage(
     recentActivities.map((activity) => calculateEffortScore(activity)),
     3,
@@ -144,17 +137,7 @@ const StravaMetricsChart = ({ activities = [] }) => {
         borderWidth: 2,
         yAxisID: 'y2',
       },
-      //   {
-      //     label: 'Distance (miles)',
-      //     data: distanceData,
-      //     borderColor: '#22c55e',
-      //     backgroundColor: 'rgba(34, 197, 94, 0.12)',
-      //     tension: 0.4,
-      //     pointRadius: 2,
-      //     pointHoverRadius: 5,
-      //     borderWidth: 2,
-      //     yAxisID: 'y',
-      //   },
+
       {
         label: 'Effort Score',
         data: effortData,
@@ -218,10 +201,6 @@ const StravaMetricsChart = ({ activities = [] }) => {
           display: true,
           text: 'Elevation / Effort',
         },
-        // title: {
-        //   display: true,
-        //   text: 'Distance / Effort',
-        // },
         grid: {
           color: 'rgba(0, 0, 0, 0.06)',
         },
