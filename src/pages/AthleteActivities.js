@@ -189,9 +189,7 @@ const AthleteActivities = () => {
           <h1 className={LoadingWheel.title}>Loading activities</h1>
           <p className={LoadingWheel.message}>
             Preparing{' '}
-            <span className={LoadingWheel.count}>
-              {state.activityLoadingState || 0}
-            </span>{' '}
+            <span className={LoadingWheel.count}>{state.activityLoadingState || 0}</span>{' '}
             Strava activities for your dashboard.
           </p>
           <div className={LoadingWheel.dots} aria-hidden="true">
