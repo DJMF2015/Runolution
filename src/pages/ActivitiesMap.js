@@ -3,7 +3,7 @@ import polyline from '@mapbox/polyline';
 import { ArrowUpCircleFill } from '@styled-icons/bootstrap/ArrowUpCircleFill';
 import { FiLayers } from 'react-icons/fi';
 import { getAthleteActivities } from '../utils/functions';
-import { catchErrors } from '../utils/helpers';
+import { fetchTokenInfo } from '../utils/athleteActivitiesFunctions';
 import { formattedDate } from '../utils/conversion';
 import ActivityDropDown from '../components/ActivityDropDown';
 import addActivitiesLayers from '../components/MapActivityLayers';
@@ -82,7 +82,16 @@ const ActivitiesMap = () => {
           nodes: polylines,
         }));
       } else if (data === null && access_token) {
-        const stravaActivityResponse = await fetchStravaActivities(access_token);
+        const currentAccessToken = await fetchTokenInfo();
+        if (!currentAccessToken) {
+          setState((prevState) => ({
+            ...prevState,
+            loading: false,
+          }));
+          return;
+        }
+
+        const stravaActivityResponse = await fetchStravaActivities(currentAccessToken);
         polylines = getDataPolylines(stravaActivityResponse);
         localStorage.setItem('activities', JSON.stringify(stravaActivityResponse));
         setState((prevState) => ({
@@ -96,7 +105,13 @@ const ActivitiesMap = () => {
       }
     }
 
-    catchErrors(fetchData());
+    fetchData().catch((error) => {
+      console.error(error);
+      setState((prevState) => ({
+        ...prevState,
+        loading: false,
+      }));
+    });
     // eslint-disable-next-line
   }, []);
 

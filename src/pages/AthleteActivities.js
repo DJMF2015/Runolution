@@ -89,8 +89,7 @@ const AthleteActivities = () => {
 
     async function loadAthlete() {
       try {
-        await fetchTokenInfo();
-        const payload = JSON.parse(localStorage.getItem('access_token'));
+        const payload = await fetchTokenInfo();
         if (!payload) {
           return;
         }
@@ -122,8 +121,7 @@ const AthleteActivities = () => {
 
     async function loadActivities() {
       try {
-        await fetchTokenInfo();
-        const currentAccessToken = JSON.parse(localStorage.getItem('access_token'));
+        const currentAccessToken = await fetchTokenInfo();
         if (!currentAccessToken) {
           return;
         }

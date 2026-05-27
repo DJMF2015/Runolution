@@ -68,15 +68,14 @@ export const fetchData = async (accessToken, setLoading, setActivityLoadingState
  * @returns {Promise<void>}
  */
 export const fetchTokenInfo = async () => {
-  try {
-    const expires_at = localStorage.getItem('expires_at');
-    const expires_in = localStorage.getItem('expires_in');
-    if (expires_at && expires_in) {
-      await checkIfTokenExpired(expires_in, expires_at);
-    }
-  } catch (error) {
-    console.error('Error fetching token info:', error);
+  const expires_at = localStorage.getItem('expires_at');
+  const expires_in = localStorage.getItem('expires_in');
+
+  if (expires_at && expires_in) {
+    return checkIfTokenExpired(expires_in, expires_at);
   }
+
+  return JSON.parse(localStorage.getItem('access_token'));
 };
 
 /**
