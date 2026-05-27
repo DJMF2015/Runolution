@@ -22,7 +22,8 @@ const EMPTY_FEATURE_COLLECTION = {
   type: 'FeatureCollection',
   features: [],
 };
-const addActivitiesLayers = (map) => {
+
+const addTerrainSource = (map) => {
   if (!map.getSource('mapbox-dem')) {
     map.addSource('mapbox-dem', {
       type: 'raster-dem',
@@ -31,6 +32,10 @@ const addActivitiesLayers = (map) => {
       maxzoom: 14,
     });
   }
+};
+
+const addActivitiesLayers = (map) => {
+  addTerrainSource(map);
 
   map.setTerrain({
     source: 'mapbox-dem',
@@ -82,6 +87,71 @@ const addActivitiesLayers = (map) => {
         'line-color': getActivityColourExpression,
         'line-width': 2,
         'line-opacity': 0.92,
+      },
+    });
+  }
+};
+
+export const addActivityMapLayers = (map, data) => {
+  if (!map || !data) {
+    return;
+  }
+
+  map.setFog({
+    'horizon-blend': 0.1,
+    'space-color': 'rgb(10, 10, 10)',
+    'star-intensity': 1,
+  });
+
+  addTerrainSource(map);
+
+  if (!map.getLayer('terrain-data')) {
+    map.addLayer({
+      id: 'terrain-data',
+      type: 'line',
+      source: {
+        type: 'vector',
+        url: 'mapbox://mapbox.mapbox-terrain-v2',
+      },
+      'source-layer': 'contour',
+    });
+  }
+
+  map.setTerrain({
+    source: 'mapbox-dem',
+    exaggeration: 2.0,
+  });
+
+  if (!map.getLayer('sky')) {
+    map.addLayer({
+      id: 'sky',
+      type: 'sky',
+      paint: {
+        'sky-type': 'atmosphere',
+        'sky-atmosphere-sun': [0, 1.0],
+        'sky-atmosphere-sun-intensity': 5,
+      },
+    });
+  }
+
+  if (!map.getSource('linepath')) {
+    map.addSource('linepath', {
+      type: 'geojson',
+      lineMetrics: true,
+      data,
+    });
+  } else {
+    map.getSource('linepath').setData(data);
+  }
+
+  if (!map.getLayer('line-dashed')) {
+    map.addLayer({
+      type: 'line',
+      source: 'linepath',
+      id: 'line-dashed',
+      paint: {
+        'line-width': 5,
+        'line-gradient': ['interpolate', ['linear'], ['line-progress'], 1, 'red'],
       },
     });
   }

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import polyline from '@mapbox/polyline';
 import { ArrowUpCircleFill } from '@styled-icons/bootstrap/ArrowUpCircleFill';
+import { FiLayers } from 'react-icons/fi';
 import { getAthleteActivities } from '../utils/functions';
 import { catchErrors } from '../utils/helpers';
 import { formattedDate } from '../utils/conversion';
@@ -55,6 +56,7 @@ const ActivitiesMap = () => {
   const currentMapStyleRef = useRef('street');
   const [isMapLoaded, setIsMapLoaded] = useState(false);
   const [mapStyle, setMapStyle] = useState('street');
+  const [isMapStyleOpen, setIsMapStyleOpen] = useState(false);
   const expires_in = localStorage.getItem('expires_in');
   const mapboxAccessToken = process.env.REACT_APP_MAPBOX_KEY;
   let access_token = JSON.parse(localStorage.getItem('access_token'));
@@ -354,9 +356,7 @@ const ActivitiesMap = () => {
           <h1 className={LoadingWheel.title}>Building your heatmap</h1>
           <p className={LoadingWheel.message}>
             Plotting{' '}
-            <span className={LoadingWheel.count}>
-              {state.activityLoadingState || 0}
-            </span>{' '}
+            <span className={LoadingWheel.count}>{state.activityLoadingState || 0}</span>{' '}
             activities onto the map.
           </p>
           <div className={LoadingWheel.dots} aria-hidden="true">
@@ -368,6 +368,25 @@ const ActivitiesMap = () => {
       </div>
     );
   }
+
+  const mapStyleButtons = (
+    <>
+      <MapStyleButton
+        type="button"
+        $active={mapStyle === 'street'}
+        onClick={() => setMapStyle('street')}
+      >
+        Street
+      </MapStyleButton>
+      <MapStyleButton
+        type="button"
+        $active={mapStyle === 'satellite'}
+        onClick={() => setMapStyle('satellite')}
+      >
+        Satellite
+      </MapStyleButton>
+    </>
+  );
 
   return (
     <>
@@ -410,20 +429,62 @@ const ActivitiesMap = () => {
 
           <MapWrapper>
             {windowWidth < 785 && (
-              <MobileFilterPanel>
-                <ActivityDropDown
-                  className="mobile-map-filter"
-                  props={state.nodes}
-                  setFilterBySportType={setFilteredSportType}
-                />
-                <MobileSearchInput
-                  type="text"
-                  value={searchTxt}
-                  placeholder="Search by activity name..."
-                  aria-label="Search by activity name"
-                  onChange={(e) => setSearchTxt(e.target.value)}
-                />
-              </MobileFilterPanel>
+              <MobileMapControls>
+                <MobileFilterPanel>
+                  <ActivityDropDown
+                    className="mobile-map-filter"
+                    props={state.nodes}
+                    setFilterBySportType={setFilteredSportType}
+                  />
+                  <MobileSearchInput
+                    type="text"
+                    value={searchTxt}
+                    placeholder="Search activities"
+                    aria-label="Search by activity name"
+                    onChange={(e) => setSearchTxt(e.target.value)}
+                  />
+                </MobileFilterPanel>
+              </MobileMapControls>
+            )}
+
+            {windowWidth < 785 && mapboxAccessToken && (
+              <MobileMapStyleControl>
+                {isMapStyleOpen && (
+                  <MobileMapStylePopup aria-label="Choose map style">
+                    <MobileMapStyleButton
+                      type="button"
+                      $active={mapStyle === 'street'}
+                      onClick={() => {
+                        setMapStyle('street');
+                        setIsMapStyleOpen(false);
+                      }}
+                    >
+                      Streets
+                    </MobileMapStyleButton>
+                    <MobileMapStyleButton
+                      type="button"
+                      $active={mapStyle === 'satellite'}
+                      onClick={() => {
+                        setMapStyle('satellite');
+                        setIsMapStyleOpen(false);
+                      }}
+                    >
+                      Satellite
+                    </MobileMapStyleButton>
+                  </MobileMapStylePopup>
+                )}
+                <MobileMapStyleIconButton
+                  type="button"
+                  aria-label="Open map style options"
+                  aria-expanded={isMapStyleOpen}
+                  onClick={() => setIsMapStyleOpen((isOpen) => !isOpen)}
+                >
+                  <MobileMapStyleIcon aria-hidden="true" />
+                  <MobileMapStyleButtonLabel>
+                    {mapStyle === 'satellite' ? 'Satellite' : 'Streets'}
+                  </MobileMapStyleButtonLabel>
+                </MobileMapStyleIconButton>
+              </MobileMapStyleControl>
             )}
 
             {!mapboxAccessToken && (
@@ -437,22 +498,7 @@ const ActivitiesMap = () => {
             )}
 
             {mapboxAccessToken && (
-              <MapStyleToggle aria-label="Map style">
-                <MapStyleButton
-                  type="button"
-                  $active={mapStyle === 'street'}
-                  onClick={() => setMapStyle('street')}
-                >
-                  Street
-                </MapStyleButton>
-                <MapStyleButton
-                  type="button"
-                  $active={mapStyle === 'satellite'}
-                  onClick={() => setMapStyle('satellite')}
-                >
-                  Satellite
-                </MapStyleButton>
-              </MapStyleToggle>
+              <MapStyleToggle aria-label="Map style">{mapStyleButtons}</MapStyleToggle>
             )}
             <MapCanvas ref={mapContainer} />
           </MapWrapper>
@@ -490,83 +536,94 @@ const MapCanvas = styled.div`
   height: 100%;
 `;
 
-const MobileFilterPanel = styled.div`
+const MobileMapControls = styled.div`
   display: none;
 
   @media screen and (max-width: 785px) {
     position: absolute;
-    top: 0.75rem;
-    left: 0.75rem;
-    z-index: 3;
-    display: grid;
-    grid-template-columns: minmax(110px, 0.85fr) minmax(0, 1.15fr);
-    gap: 0.55rem;
-    width: min(100% - 5.5rem, 520px);
-    padding: 0.55rem;
-    box-sizing: border-box;
-    background:
-      linear-gradient(135deg, rgba(252, 82, 0, 0.94), rgba(31, 41, 55, 0.9)),
-      repeating-linear-gradient(
-        135deg,
-        transparent 0,
-        transparent 8px,
-        rgba(0, 0, 0, 0.18) 8px,
-        rgba(0, 0, 0, 0.18) 10px
-      );
-    background-blend-mode: normal, multiply;
-    border: 1px solid rgba(255, 255, 255, 0.32);
-    border-radius: 8px;
-    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.36);
-    backdrop-filter: blur(14px);
-  }
-
-  @media screen and (max-width: 520px) {
-    top: 4.15rem;
+    top: max(0.7rem, env(safe-area-inset-top));
     left: 0.65rem;
     right: 0.65rem;
-    grid-template-columns: 1fr;
-    width: auto;
+    z-index: 4;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 2rem;
+    gap: 0.55rem;
+    align-items: stretch;
+    max-width: 42rem;
+    margin: 0 auto;
+    padding: 0.45rem;
+    box-sizing: border-box;
   }
+
+  @media screen and (max-width: 360px) {
+    left: 0.45rem;
+    right: 0.45rem;
+    grid-template-columns: minmax(0, 1fr) 5.35rem;
+    gap: 0.4rem;
+    padding: 0.4rem;
+  }
+`;
+
+const MobileFilterPanel = styled.div`
+  display: grid;
+  grid-template-columns: minmax(8rem, 0.8fr) minmax(0, 1.2fr);
+  gap: 0.45rem;
+  min-width: 0;
 
   .mobile-map-filter {
     width: 100%;
     min-width: 0;
-    height: 2.65rem;
+    height: 2.35rem;
     margin: 0;
-    padding: 0 2rem 0 0.75rem;
+    padding: 0 1.75rem 0 0.65rem;
     box-sizing: border-box;
-    color: #111827;
-    background-color: #fffaf6;
-    border: 1px solid rgba(17, 24, 39, 0.35);
+    color: #0f172a;
+    background-color: rgba(255, 255, 255, 0.96);
+    border: 1px solid rgba(255, 255, 255, 0.76);
     border-radius: 6px;
-    font-size: 0.95rem;
+    font-size: 0.84rem;
     font-weight: 700;
     outline: none;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.2);
   }
 
   .mobile-map-filter:focus {
-    border-color: #111827;
+    border-color: #fc5200;
     box-shadow:
-      0 0 0 2px rgba(255, 255, 255, 0.72),
-      inset 0 1px 0 rgba(255, 255, 255, 0.7);
+      0 0 0 2px rgba(252, 82, 0, 0.28),
+      0 6px 16px rgba(15, 23, 42, 0.2);
+  }
+
+  @media screen and (max-width: 520px) {
+    grid-template-columns: 1fr;
+  }
+
+  @media screen and (max-width: 360px) {
+    gap: 0.35rem;
+
+    .mobile-map-filter {
+      height: 2.15rem;
+      font-size: 0.78rem;
+      padding-left: 0.55rem;
+    }
   }
 `;
 
 const MobileSearchInput = styled.input`
   width: 100%;
   min-width: 0;
-  height: 2.65rem;
-  padding: 0 0.85rem;
+  height: 2.35rem;
+  padding: 0 0.7rem;
   box-sizing: border-box;
-  color: #111827;
-  background: #fffaf6;
-  border: 1px solid rgba(17, 24, 39, 0.35);
+  color: #0f172a;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(13, 12, 12, 0.76);
   border-radius: 6px;
-  font-size: 0.95rem;
-  font-weight: 650;
+  font-size: 0.84rem;
+  font-weight: 700;
   outline: none;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  border-color: rgba(15, 23, 42, 0.2);
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.2);
 
   &::placeholder {
     color: #6b7280;
@@ -574,10 +631,17 @@ const MobileSearchInput = styled.input`
   }
 
   &:focus {
-    border-color: #111827;
+    border-color: #fc5200;
     box-shadow:
-      0 0 0 2px rgba(255, 255, 255, 0.72),
-      inset 0 1px 0 rgba(255, 255, 255, 0.7);
+      0 0 0 2px rgba(252, 82, 0, 0.28),
+      0 6px 16px rgba(15, 23, 42, 0.2);
+  }
+
+  @media screen and (max-width: 380px) {
+    display: none;
+    height: 2.15rem;
+    padding: 0 0.55rem;
+    font-size: 0.78rem;
   }
 `;
 
@@ -610,13 +674,7 @@ const MapStyleToggle = styled.div`
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.24);
 
   @media screen and (max-width: 785px) {
-    top: 1rem;
-    right: 4rem;
-  }
-
-  @media screen and (max-width: 420px) {
-    top: 4.25rem;
-    right: 0.75rem;
+    display: none;
   }
 `;
 
@@ -638,6 +696,120 @@ const MapStyleButton = styled.button`
 
   &:hover {
     background: ${(props) => (props.$active ? '#ffffff' : 'rgba(255, 255, 255, 0.18)')};
+  }
+`;
+
+const MobileMapStyleControl = styled.div`
+  display: none;
+
+  @media screen and (max-width: 785px) {
+    position: absolute;
+    right: 0.75rem;
+    bottom: max(0.85rem, env(safe-area-inset-bottom));
+    z-index: 4;
+    display: grid;
+    justify-items: end;
+    gap: 0.6rem;
+  }
+`;
+
+const MobileMapStylePopup = styled.div`
+  display: grid;
+  gap: 0.45rem;
+  width: min(13rem, calc(100vw - 1.5rem));
+  padding: 0.55rem;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(15, 23, 42, 0.96), rgba(31, 41, 55, 0.92)),
+    linear-gradient(135deg, rgba(252, 82, 0, 0.24), rgba(59, 130, 246, 0.16));
+  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.38);
+  backdrop-filter: blur(16px);
+`;
+
+const MobileMapStyleIconButton = styled.button`
+  display: inline-flex;
+  min-width: 0;
+  min-height: 3rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  padding: 0 0.8rem;
+  color: #ffffff;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 999px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.34);
+  cursor: pointer;
+  backdrop-filter: blur(14px);
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    transform 160ms ease;
+
+  &:hover,
+  &:focus-visible {
+    background: rgba(252, 82, 0, 0.92);
+    border-color: rgba(255, 255, 255, 0.72);
+    outline: none;
+    transform: translateY(-1px);
+  }
+
+  @media screen and (max-width: 420px) {
+    width: 3.1rem;
+    min-height: 3.1rem;
+    padding: 0;
+  }
+`;
+
+const MobileMapStyleIcon = styled(FiLayers)`
+  width: 1.25rem;
+  height: 1.25rem;
+  flex: 0 0 auto;
+`;
+
+const MobileMapStyleButtonLabel = styled.span`
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1;
+
+  @media screen and (max-width: 420px) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+`;
+
+const MobileMapStyleButton = styled.button`
+  min-width: 0;
+  min-height: 2.55rem;
+  padding: 0 0.9rem;
+  color: ${(props) => (props.$active ? '#111827' : '#ffffff')};
+  background: ${(props) => (props.$active ? '#ffffff' : 'rgba(255, 255, 255, 0.1)')};
+  border: 0;
+  border-radius: 6px;
+  font-size: 0.86rem;
+  font-weight: 800;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    background 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+
+  &:hover,
+  &:focus-visible {
+    background: ${(props) => (props.$active ? '#ffffff' : 'rgba(255, 255, 255, 0.18)')};
+    outline: none;
+    transform: translateY(-1px);
+  }
+
+  @media screen and (max-width: 420px) {
+    min-height: 2.45rem;
+    font-size: 0.82rem;
   }
 `;
 
@@ -670,7 +842,7 @@ const SideNavigation = styled.div`
     margin-bottom: 0.5em;
     border-radius: 0.5em;
     margin-top: 10px;
-    border: 1px solid white;
+    border: 3px solid black;
     padding: 5px;
     outline: none;
   }

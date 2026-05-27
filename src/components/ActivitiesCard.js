@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { ArrowUpCircleFill } from '@styled-icons/bootstrap/ArrowUpCircleFill';
+import { FiLayers } from 'react-icons/fi';
 import styled from 'styled-components';
 import { useScroll } from '../utils/hooks';
 import MapCoordinatesHelper from '../utils/mapCoordinates';
@@ -55,6 +56,7 @@ export default function ActivitiesCard() {
   );
   const [detailError, setDetailError] = React.useState(null);
   const [mapStyle, setMapStyle] = useState('street');
+  const [isMapStyleOpen, setIsMapStyleOpen] = useState(false);
 
   const location = useLocation();
   const from = location.state?.from;
@@ -292,22 +294,41 @@ export default function ActivitiesCard() {
         </SideNavigation>
 
         <MapShell>
-          <MapStyleToggle aria-label="Map style">
-            <MapStyleButton
+          <MapStyleControl>
+            {isMapStyleOpen && (
+              <MapStylePopup aria-label="Choose map style">
+                <MapStyleButton
+                  type="button"
+                  $active={mapStyle === 'street'}
+                  onClick={() => {
+                    setMapStyle('street');
+                    setIsMapStyleOpen(false);
+                  }}
+                >
+                  Streets
+                </MapStyleButton>
+                <MapStyleButton
+                  type="button"
+                  $active={mapStyle === 'satellite'}
+                  onClick={() => {
+                    setMapStyle('satellite');
+                    setIsMapStyleOpen(false);
+                  }}
+                >
+                  Satellite
+                </MapStyleButton>
+              </MapStylePopup>
+            )}
+            <MapStyleIconButton
               type="button"
-              $active={mapStyle === 'street'}
-              onClick={() => setMapStyle('street')}
+              aria-label="Open map style options"
+              aria-expanded={isMapStyleOpen}
+              onClick={() => setIsMapStyleOpen((isOpen) => !isOpen)}
             >
-              Streets
-            </MapStyleButton>
-            <MapStyleButton
-              type="button"
-              $active={mapStyle === 'satellite'}
-              onClick={() => setMapStyle('satellite')}
-            >
-              Satellite
-            </MapStyleButton>
-          </MapStyleToggle>
+              <MapStyleIcon aria-hidden="true" />
+              <MapStyleButtonLabel>{mapStyle === 'satellite' ? 'Satellite' : 'Streets'}</MapStyleButtonLabel>
+            </MapStyleIconButton>
+          </MapStyleControl>
           <Map id="map" ref={(el) => (mapContainer.current = el)}></Map>
         </MapShell>
       </div>
@@ -443,55 +464,118 @@ const Map = styled.div`
   }
 `;
 
-const MapStyleToggle = styled.div`
+const MapStyleControl = styled.div`
   position: absolute;
-  top: 1rem;
-  right: 4.25rem;
+  right: 1rem;
+  bottom: 1rem;
   z-index: 1020;
-  display: flex;
-  overflow: hidden;
-  background: rgba(15, 23, 42, 0.88);
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  border-radius: 8px;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.24);
+  display: grid;
+  justify-items: end;
+  gap: 0.6rem;
 
   @media screen and (max-width: 750px) {
-    top: 2.75rem;
     right: 0.75rem;
-    max-width: calc(100% - 1.5rem);
+    bottom: max(0.85rem, env(safe-area-inset-bottom));
+  }
+`;
+
+const MapStylePopup = styled.div`
+  display: grid;
+  gap: 0.45rem;
+  width: min(13rem, calc(100vw - 1.5rem));
+  padding: 0.55rem;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(15, 23, 42, 0.96), rgba(31, 41, 55, 0.92)),
+    linear-gradient(135deg, rgba(252, 82, 0, 0.24), rgba(59, 130, 246, 0.16));
+  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.38);
+  backdrop-filter: blur(16px);
+`;
+
+const MapStyleIconButton = styled.button`
+  display: inline-flex;
+  min-width: 0;
+  min-height: 3rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  padding: 0 0.8rem;
+  color: #ffffff;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 999px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.34);
+  cursor: pointer;
+  backdrop-filter: blur(14px);
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    transform 160ms ease;
+
+  &:hover,
+  &:focus-visible {
+    background: rgba(252, 82, 0, 0.92);
+    border-color: rgba(255, 255, 255, 0.72);
+    outline: none;
+    transform: translateY(-1px);
   }
 
-  @media screen and (max-width: 350px) {
-    left: 0.75rem;
-    right: 0.75rem;
+  @media screen and (max-width: 420px) {
+    width: 3.1rem;
+    min-height: 3.1rem;
+    padding: 0;
+  }
+`;
+
+const MapStyleIcon = styled(FiLayers)`
+  width: 1.25rem;
+  height: 1.25rem;
+  flex: 0 0 auto;
+`;
+
+const MapStyleButtonLabel = styled.span`
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1;
+
+  @media screen and (max-width: 420px) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
   }
 `;
 
 const MapStyleButton = styled.button`
-  min-width: 86px;
-  min-height: 40px;
-  padding: 0 0.8rem;
+  min-width: 0;
+  min-height: 2.55rem;
+  padding: 0 0.9rem;
   color: ${(props) => (props.$active ? '#111827' : '#ffffff')};
-  background: ${(props) => (props.$active ? '#ffffff' : 'transparent')};
+  background: ${(props) => (props.$active ? '#ffffff' : 'rgba(255, 255, 255, 0.1)')};
   border: 0;
-  border-right: 1px solid rgba(255, 255, 255, 0.25);
-  font-size: 0.88rem;
-  font-weight: 700;
+  border-radius: 6px;
+  font-size: 0.86rem;
+  font-weight: 800;
   cursor: pointer;
-
-  &:last-child {
-    border-right: 0;
-  }
+  text-align: left;
+  transition:
+    background 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
 
   &:hover,
   &:focus-visible {
     background: ${(props) => (props.$active ? '#ffffff' : 'rgba(255, 255, 255, 0.18)')};
     outline: none;
+    transform: translateY(-1px);
   }
 
-  @media screen and (max-width: 350px) {
-    flex: 1;
-    min-width: 0;
+  @media screen and (max-width: 420px) {
+    min-height: 2.45rem;
+    font-size: 0.82rem;
   }
 `;
 
@@ -506,14 +590,14 @@ const ScrollToTop = styled(ArrowUpCircleFill)`
   flex-wrap: wrap;
   position: fixed;
   right: 1rem;
-  bottom: 1rem;
+  bottom: 5rem;
   cursor: pointer;
   filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.45));
 
   @media screen and (max-width: 750px) {
     width: 2.75rem;
     height: 2.75rem;
-    right: 1rem;
+    right: 0.85rem;
     bottom: 12.75rem;
   }
 `;

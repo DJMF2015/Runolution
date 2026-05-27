@@ -46,9 +46,12 @@ const Layout = () => {
               </a>
               {athlete && (
                 <AthleteMeta>
-                  <AthleteName>{athlete?.firstname + ' ' + athlete?.lastname}</AthleteName>
+                  <AthleteName>
+                    {athlete?.firstname + ' ' + athlete?.lastname}
+                  </AthleteName>
                   <AthleteFollowers>
-                    {athlete?.follower_count > 0 && athlete?.follower_count + ' followers'}
+                    {athlete?.follower_count > 0 &&
+                      athlete?.follower_count + ' followers'}
                   </AthleteFollowers>
                 </AthleteMeta>
               )}
