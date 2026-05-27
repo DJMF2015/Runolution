@@ -1,125 +1,5 @@
-// import React from 'react';
-// import { getSecondstoMinutes } from '../utils/conversion';
-// import {
-//   Chart as ChartJS,
-//   CategoryScale,
-//   LinearScale,
-//   BarElement,
-//   Title,
-//   PointElement,
-//   LineElement,
-//   Filler,
-//   Tooltip,
-//   Legend,
-// } from 'chart.js';
-// import { Line } from 'react-chartjs-2';
-// ChartJS.register(
-//   CategoryScale,
-//   LinearScale,
-//   BarElement,
-//   PointElement,
-//   LineElement,
-//   Title,
-//   Tooltip,
-//   Legend,
-//   Filler,
-// );
-
-// export const options = {
-//   responsive: true,
-//   maintainAspectRatio: false,
-//   plugins: {
-//     legend: {
-//       position: 'bottom',
-//       labels: {
-//         color: '#111',
-//       },
-//     },
-//     title: {
-//       display: false,
-//     },
-//   },
-//   scales: {
-//     y: {
-//       ticks: {
-//         color: '#333',
-//       },
-//       grid: {
-//         color: '#eeeeee',
-//       },
-//     },
-//     y1: {
-//       ticks: {
-//         color: '#333',
-//       },
-//       grid: {
-//         drawOnChartArea: false,
-//       },
-//     },
-//     x: {
-//       ticks: {
-//         color: '#333',
-//       },
-//       grid: {
-//         color: '#eeeeee',
-//       },
-//     },
-//   },
-// };
-
-// export default function PaceZoneChart(props) {
-//   const labelNames = props?.props?.best_efforts?.map((effort) => effort.name);
-
-//   const elapsedTime = props.props.best_efforts
-//     ? props.props.laps.map((effort) => effort.elapsed_time)
-//     : [];
-//   const formattedElapsedTime = elapsedTime
-//     .map((time) => {
-//       const mins = getSecondstoMinutes(time);
-
-//       return parseFloat(mins);
-//     })
-//     .sort((a, b) => a - b);
-
-//   const segment_efforts = props.props.segment_efforts
-//     ? props.props.segment_efforts.map((segment) => segment.average_watts)
-//     : [];
-//   const data = {
-//     labels: labelNames || [],
-
-//     datasets: [
-//       {
-//         label: elapsedTime !== undefined ? 'Elapsed Time (mins)' : '',
-//         data: formattedElapsedTime || [],
-//         fill: true,
-//         borderColor: 'rgb(53, 162, 235)',
-//         backgroundColor: 'rgba(53, 162, 235, 0.5)',
-//         borderWidth: 2,
-//       },
-//       {
-//         label: elapsedTime !== undefined ? 'Average Watts (mins)' : '',
-//         data: segment_efforts || [],
-//         fill: true,
-//         borderColor: 'rgb(53, 162, 235)',
-//         backgroundColor: 'red',
-//         borderWidth: 2,
-//       },
-//     ],
-//   };
-
-//   return (
-//     <>
-//       <div style={{ marginTop: '-630px', marginLeft: '10px' }}>
-//         <div className="chart" style={{ width: '50vw', height: '330px' }}>
-//           <Line width={75} height={50} data={data} options={options} />
-//         </div>
-//       </div>
-//     </>
-//   );
-// }
 import React from 'react';
 import styled from 'styled-components';
-import { getSecondstoMinutes } from '../utils/conversion';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -142,164 +22,354 @@ ChartJS.register(
   Filler,
 );
 
-export const options = {
-  responsive: true,
-  maintainAspectRatio: false,
-  interaction: {
-    mode: 'index',
-    intersect: false,
-  },
-  plugins: {
-    legend: {
-      position: 'bottom',
-      labels: {
-        color: '#111',
-        boxWidth: 12,
-        padding: 10,
-        font: {
-          size: 11,
+const METRES_PER_KM = 1000;
+const METRES_PER_MILE = 1609.344;
+
+const toNumber = (value, fallback = 0) => {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+};
+
+const secondsToPace = (seconds) => {
+  const totalSeconds = Math.round(toNumber(seconds));
+  const minutes = Math.floor(totalSeconds / 60);
+  const remainder = totalSeconds % 60;
+  return `${minutes}:${String(remainder).padStart(2, '0')}`;
+};
+
+const formatPace = (paceMinutes) => secondsToPace(paceMinutes * 60);
+
+const getAxisRange = (values, fallbackMax, paddingRatio = 0.16) => {
+  const numericValues = values.filter((value) => Number.isFinite(value));
+
+  if (!numericValues.length) {
+    return {
+      min: 0,
+      max: fallbackMax,
+    };
+  }
+
+  const minValue = Math.min(...numericValues);
+  const maxValue = Math.max(...numericValues);
+  const spread = Math.max(maxValue - minValue, Math.abs(maxValue) * 0.1, 1);
+  const padding = spread * paddingRatio;
+
+  return {
+    min: Math.floor(Math.min(0, minValue - padding)),
+    max: Math.ceil(maxValue + padding),
+  };
+};
+
+const getSplitSource = (activity) => {
+  if (activity?.splits_standard?.length) {
+    return {
+      unitLabel: 'Mile',
+      unitDistance: METRES_PER_MILE,
+      rows: activity.splits_standard,
+    };
+  }
+
+  if (activity?.splits_metric?.length) {
+    return {
+      unitLabel: 'Km',
+      unitDistance: METRES_PER_KM,
+      rows: activity.splits_metric,
+    };
+  }
+
+  return {
+    unitLabel: 'Lap',
+    unitDistance: null,
+    rows: activity?.laps || [],
+  };
+};
+
+const getPaceMinutesPerKm = (row) => {
+  const distanceKm = toNumber(row.distance) / METRES_PER_KM;
+
+  if (!distanceKm) {
+    return null;
+  }
+
+  return toNumber(row.elapsed_time) / 60 / distanceKm;
+};
+
+const getAverage = (values, fallback = null) => {
+  const numericValues = values.filter((value) => Number.isFinite(value));
+
+  if (!numericValues.length) {
+    return fallback;
+  }
+
+  return numericValues.reduce((sum, value) => sum + value, 0) / numericValues.length;
+};
+
+const getGradeAdjustedSplits = (activity) => {
+  const { unitLabel, unitDistance, rows } = getSplitSource(activity);
+  const splitRows = rows.filter((row) => toNumber(row.distance) > 0 && row.elapsed_time);
+  const paces = splitRows.map(getPaceMinutesPerKm);
+  const heartRates = splitRows.map((row) => toNumber(row.average_heartrate, null));
+  const avgPace = getAverage(paces);
+  const avgHeartRate = getAverage(heartRates);
+
+  if (!splitRows.length || !avgPace) {
+    return [];
+  }
+
+  return splitRows.map((row, index) => {
+    const distance = toNumber(row.distance, unitDistance || METRES_PER_KM);
+    const distanceKm = distance / METRES_PER_KM;
+    const pace = getPaceMinutesPerKm(row);
+    const heartRate = toNumber(row.average_heartrate, null);
+    const elevation = toNumber(row.elevation_difference || row.total_elevation_gain);
+    const climbingPerKm = distanceKm ? Math.max(elevation, 0) / distanceKm : 0;
+    const paceScore = pace ? avgPace / pace : 1;
+    const heartRateScore = heartRate && avgHeartRate ? heartRate / avgHeartRate : 1;
+    const elevationScore = 1 + climbingPerKm / 100;
+    const gradeAdjustedScore = Number(
+      (paceScore * heartRateScore * elevationScore * 100).toFixed(1),
+    );
+
+    return {
+      label: `${unitLabel} ${row.split || index + 1}`,
+      elevation,
+      climbingPerKm,
+      pace,
+      gradeAdjustedScore,
+      heartRate,
+    };
+  });
+};
+
+const getChartOptions = (elevationValues, gradeAdjustedScores) => {
+  const elevationRange = getAxisRange(elevationValues, 50, 0.2);
+  const effortRange = getAxisRange(gradeAdjustedScores, 120, 0.18);
+
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: {
+      mode: 'index',
+      intersect: false,
+    },
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: {
+          color: '#0b0b0b',
+          boxWidth: 12,
+          usePointStyle: true,
+          padding: 14,
+          font: {
+            size: 12,
+            weight: '700',
+          },
+        },
+      },
+      tooltip: {
+        backgroundColor: 'rgba(15, 23, 42, 0.96)',
+        borderColor: 'rgba(252, 82, 0, 0.45)',
+        borderWidth: 1,
+        titleColor: '#ffffff',
+        bodyColor: '#e5e7eb',
+        padding: 12,
+        displayColors: true,
+        callbacks: {
+          afterBody: (items) => {
+            const index = items[0]?.dataIndex;
+            const raw = items[0]?.chart?.data?.datasets?.[0]?.meta?.[index];
+
+            if (!raw) {
+              return [];
+            }
+
+            return [
+              `Pace: ${formatPace(raw.pace)} /km`,
+              `Climb: ${raw.climbingPerKm.toFixed(1)} m/km`,
+              raw.heartRate ? `Avg HR: ${Math.round(raw.heartRate)} bpm` : '',
+            ].filter(Boolean);
+          },
+          label: (context) => {
+            if (context.dataset.yAxisID === 'effort') {
+              return `Grade adjusted effort: ${context.parsed.y}`;
+            }
+            return `Elevation: ${context.parsed.y} m`;
+          },
         },
       },
     },
-    title: {
-      display: false,
+    scales: {
+      x: {
+        ticks: {
+          color: '#080808',
+          autoSkip: true,
+          maxRotation: 0,
+          minRotation: 0,
+          maxTicksLimit: 8,
+          font: {
+            size: 11,
+            weight: '700',
+          },
+        },
+        grid: {
+          display: false,
+        },
+      },
+      elevation: {
+        type: 'linear',
+        position: 'left',
+        min: elevationRange.min,
+        suggestedMax: elevationRange.max,
+        ticks: {
+          color: '#000000',
+          maxTicksLimit: 6,
+          callback: (value) => `${value}m`,
+        },
+        grid: {
+          color: 'rgba(0, 0, 0, 0.18)',
+        },
+        title: {
+          display: true,
+          text: 'Elevation change',
+          color: '#000000',
+          font: {
+            size: 12,
+            weight: '800',
+          },
+        },
+      },
+      effort: {
+        type: 'linear',
+        position: 'right',
+        min: Math.max(0, effortRange.min),
+        suggestedMax: effortRange.max,
+        ticks: {
+          color: '#000000',
+          maxTicksLimit: 6,
+          callback: (value) => `${value}`,
+        },
+        grid: {
+          drawOnChartArea: false,
+        },
+        title: {
+          display: true,
+          text: 'Grade adjusted effort',
+          color: '#000000',
+          font: {
+            size: 12,
+            weight: '800',
+          },
+        },
+      },
     },
-  },
-  scales: {
-    x: {
-      ticks: {
-        color: '#333',
-        autoSkip: true,
-        maxRotation: 0,
-        minRotation: 0,
-        maxTicksLimit: 5,
-      },
-      grid: {
-        color: '#eeeeee',
-      },
-    },
-    y: {
-      type: 'linear',
-      position: 'left',
-      ticks: {
-        color: '#333',
-        maxTicksLimit: 5,
-      },
-      grid: {
-        color: '#eeeeee',
-      },
-      title: {
-        display: true,
-        text: 'Elapsed Time / Elevation',
-        color: '#333',
-      },
-    },
-    y1: {
-      type: 'linear',
-      position: 'right',
-      ticks: {
-        color: '#333',
-        maxTicksLimit: 5,
-      },
-      grid: {
-        drawOnChartArea: false,
-      },
-      title: {
-        display: true,
-        text: 'Watts',
-        color: '#333',
-      },
-    },
-  },
+  };
 };
 
 export default function ElevationBarChart({ props }) {
-  const activity = props || {};
+  const splitData = getGradeAdjustedSplits(props || {});
 
-  const laps = activity?.laps || [];
-  const splits = activity?.splits_standard || [];
-  const segments = activity?.segment_efforts || [];
-
-  const labels =
-    splits.length > 0
-      ? splits.map((split) => `Split ${split.split}`)
-      : laps.map((lap, index) => `Lap ${lap.split || index + 1}`);
-
-  const elapsedTimes = laps.map((lap) => {
-    const mins = getSecondstoMinutes(lap.elapsed_time);
-    return parseFloat(mins);
-  });
-
-  const elevation =
-    splits.length > 0
-      ? splits.map((split) => split.elevation_difference || 0)
-      : laps.map((lap) => lap.total_elevation_gain || 0);
-
-  const averageWatts =
-    laps.length > 0
-      ? laps.map((lap) => lap.average_watts || 0)
-      : segments.map((segment) => segment.average_watts || 0);
-
-  const hasData =
-    labels.length > 0 ||
-    elapsedTimes.length > 0 ||
-    elevation.length > 0 ||
-    averageWatts.length > 0;
-
-  if (!hasData) {
-    return <EmptyChart>No elevation data available for this activity.</EmptyChart>;
+  if (!splitData.length) {
+    return <EmptyChart>No split elevation data available for this activity.</EmptyChart>;
   }
+
+  const labels = splitData.map((split) => split.label);
+  const elevationValues = splitData.map((split) => split.elevation);
+  const gradeAdjustedScores = splitData.map((split) => split.gradeAdjustedScore);
+  const options = getChartOptions(elevationValues, gradeAdjustedScores);
 
   const data = {
     labels,
     datasets: [
       {
-        label: 'Elapsed Time (mins)',
-        data: elapsedTimes,
-        fill: true,
-        borderColor: '#fc5200',
-        backgroundColor: 'rgba(252, 82, 0, 0.16)',
-        pointBackgroundColor: '#fc5200',
+        label: 'Elevation change',
+        data: elevationValues,
+        meta: splitData,
+        fill: 'origin',
+        borderColor: '#22c55e',
+        backgroundColor: 'rgba(17, 17, 17, 0.18)',
+        pointBackgroundColor: '#dcfce7',
+        pointBorderColor: '#15803d',
+        pointRadius: 4,
+        pointHoverRadius: 6,
         tension: 0.35,
         borderWidth: 3,
-        yAxisID: 'y',
+        yAxisID: 'elevation',
       },
       {
-        label: 'Elevation Difference',
-        data: elevation,
-        fill: true,
-        borderColor: '#2563eb',
-        backgroundColor: 'rgba(37, 99, 235, 0.12)',
-        pointBackgroundColor: '#2563eb',
-        tension: 0.35,
-        borderWidth: 2,
-        yAxisID: 'y',
-      },
-      {
-        label: 'Average Watts',
-        data: averageWatts,
+        label: 'Grade adjusted effort',
+        data: gradeAdjustedScores,
         fill: false,
-        borderColor: '#111827',
-        backgroundColor: '#111827',
-        pointBackgroundColor: '#111827',
-        tension: 0.35,
-        borderWidth: 2,
-        yAxisID: 'y1',
+        borderColor: '#fb923c',
+        backgroundColor: '#fb923c',
+        pointBackgroundColor: '#ffedd5',
+        pointBorderColor: '#c2410c',
+        pointRadius: 4,
+        pointHoverRadius: 6,
+        tension: 0.32,
+        borderWidth: 3,
+        yAxisID: 'effort',
       },
     ],
   };
 
   return (
-    <ChartWrapper>
-      <Line data={data} options={options} />
-    </ChartWrapper>
+    <ChartPanel>
+      <ChartHeader>
+        <ChartTitle>Elevation & Grade Adjusted Pace</ChartTitle>
+        <ChartSubtitle>
+          Elevation is shaded; effort adjusts pace by heart rate and climbing per
+          kilometre.
+        </ChartSubtitle>
+      </ChartHeader>
+      <ChartWrapper>
+        <Line data={data} options={options} />
+      </ChartWrapper>
+    </ChartPanel>
   );
 }
+
+const ChartPanel = styled.div`
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  padding: 1rem;
+  box-sizing: border-box;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 14px;
+  /* background-color:; */
+  /* background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.94)),
+    radial-gradient(circle at top right, rgba(34, 197, 94, 0.18), transparent 36%); */
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.24);
+
+  @media screen and (max-width: 700px) {
+    padding: 0.85rem;
+    border-radius: 12px;
+  }
+`;
+
+const ChartHeader = styled.div`
+  margin-bottom: 0.85rem;
+`;
+
+const ChartTitle = styled.h3`
+  margin: 0;
+  color: #000000;
+  font-size: 1rem;
+  line-height: 1.2;
+`;
+
+const ChartSubtitle = styled.p`
+  margin: 0.25rem 0 0;
+  color: #000000;
+  font-size: 0.82rem;
+  line-height: 1.35;
+`;
 
 const ChartWrapper = styled.div`
   width: 100%;
   max-width: 100%;
-  height: 300px;
+  height: 340px;
   min-width: 0;
   position: relative;
   overflow: hidden;
@@ -309,11 +379,11 @@ const ChartWrapper = styled.div`
   }
 
   @media screen and (max-width: 700px) {
-    height: 250px;
+    height: 310px;
   }
 
   @media screen and (max-width: 420px) {
-    height: 230px;
+    height: 285px;
   }
 `;
 
@@ -326,9 +396,10 @@ const EmptyChart = styled.div`
   padding: 1rem;
   box-sizing: border-box;
   text-align: center;
-  color: #666;
-  background: #fff;
-  border-radius: 12px;
+  color: #000000;
+  background: rgba(15, 23, 42, 0.94);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 14px;
 
   @media screen and (max-width: 700px) {
     height: 250px;
