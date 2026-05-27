@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { ArrowUpCircleFill } from '@styled-icons/bootstrap/ArrowUpCircleFill';
-import { FiLayers } from 'react-icons/fi';
+import { FiBox, FiLayers } from 'react-icons/fi';
 import styled from 'styled-components';
 import { useScroll } from '../utils/hooks';
 import MapCoordinatesHelper from '../utils/mapCoordinates';
@@ -42,6 +42,30 @@ const getRouteBounds = (coordinates) => {
   );
 };
 
+const getRouteMapPadding = () => {
+  if (typeof window !== 'undefined' && window.innerWidth <= 750) {
+    return { top: 40, bottom: 120, left: 40, right: 40 };
+  }
+
+  return { top: 60, bottom: 80, left: 320, right: 80 };
+};
+
+const fitRouteToMap = (map, coordinates, isThreeDimensional, duration = 1200) => {
+  const bounds = getRouteBounds(coordinates);
+
+  if (!map || !bounds) {
+    return;
+  }
+
+  map.fitBounds(bounds, {
+    padding: getRouteMapPadding(),
+    duration,
+    pitch: isThreeDimensional ? 55 : 0,
+    bearing: isThreeDimensional ? -18 : 0,
+    maxZoom: isThreeDimensional ? 15 : 16,
+  });
+};
+
 export default function ActivitiesCard() {
   const { isVisible, scrollToTop } = useScroll();
   const [athleteData, setAthleteData] = React.useState([
@@ -57,6 +81,7 @@ export default function ActivitiesCard() {
   const [detailError, setDetailError] = React.useState(null);
   const [mapStyle, setMapStyle] = useState('street');
   const [isMapStyleOpen, setIsMapStyleOpen] = useState(false);
+  const [isThreeDimensional, setIsThreeDimensional] = useState(false);
 
   const location = useLocation();
   const from = location.state?.from;
@@ -131,7 +156,7 @@ export default function ActivitiesCard() {
       antialias: true,
       center: routeCenter,
       zoom: 12,
-      pitch: 55,
+      pitch: 0,
       bearing: 0,
       interactive: true,
       hash: false,
@@ -149,16 +174,7 @@ export default function ActivitiesCard() {
       map.addControl(new mapboxgl.FullscreenControl());
       map.addControl(new mapboxgl.ScaleControl());
 
-      const bounds = getRouteBounds(routeCoordinates);
-
-      if (bounds) {
-        map.fitBounds(bounds, {
-          padding: { top: 60, bottom: 60, left: 280, right: 60 },
-          duration: 2000,
-          pitch: 55,
-          maxZoom: 15,
-        });
-      }
+      fitRouteToMap(map, routeCoordinates, false, 1800);
     });
     return () => {
       map.remove();
@@ -166,6 +182,15 @@ export default function ActivitiesCard() {
       currentMapStyleRef.current = 'street';
     };
   }, [data, from?.end_latlng, isOnline, routeCenter, routeCoordinates]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) {
+      return;
+    }
+
+    fitRouteToMap(map, routeCoordinates, isThreeDimensional, 900);
+  }, [isThreeDimensional, routeCoordinates]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -295,6 +320,15 @@ export default function ActivitiesCard() {
 
         <MapShell>
           <MapStyleControl>
+            <MapViewModeButton
+              type="button"
+              aria-label={`Switch to ${isThreeDimensional ? '2D' : '3D'} map view`}
+              $active={isThreeDimensional}
+              onClick={() => setIsThreeDimensional((enabled) => !enabled)}
+            >
+              <MapViewModeIcon aria-hidden="true" />
+              <MapStyleButtonLabel>{isThreeDimensional ? '3D' : '2D'}</MapStyleButtonLabel>
+            </MapViewModeButton>
             {isMapStyleOpen && (
               <MapStylePopup aria-label="Choose map style">
                 <MapStyleButton
@@ -326,7 +360,9 @@ export default function ActivitiesCard() {
               onClick={() => setIsMapStyleOpen((isOpen) => !isOpen)}
             >
               <MapStyleIcon aria-hidden="true" />
-              <MapStyleButtonLabel>{mapStyle === 'satellite' ? 'Satellite' : 'Streets'}</MapStyleButtonLabel>
+              <MapStyleButtonLabel>
+                {mapStyle === 'satellite' ? 'Satellite' : 'Streets'}
+              </MapStyleButtonLabel>
             </MapStyleIconButton>
           </MapStyleControl>
           <Map id="map" ref={(el) => (mapContainer.current = el)}></Map>
@@ -528,9 +564,28 @@ const MapStyleIconButton = styled.button`
   }
 `;
 
+const MapViewModeButton = styled(MapStyleIconButton)`
+  min-height: 2.75rem;
+  padding: 0 0.72rem;
+  background: ${(props) =>
+    props.$active ? 'rgba(252, 82, 0, 0.94)' : 'rgba(15, 23, 42, 0.9)'};
+
+  @media screen and (max-width: 420px) {
+    width: 2.9rem;
+    min-height: 2.9rem;
+    padding: 0;
+  }
+`;
+
 const MapStyleIcon = styled(FiLayers)`
   width: 1.25rem;
   height: 1.25rem;
+  flex: 0 0 auto;
+`;
+
+const MapViewModeIcon = styled(FiBox)`
+  width: 1.2rem;
+  height: 1.2rem;
   flex: 0 0 auto;
 `;
 
