@@ -2,9 +2,11 @@ import React from 'react';
 import styled from 'styled-components';
 import {
   Chart as ChartJS,
+  BarController,
   BarElement,
   CategoryScale,
   LinearScale,
+  LineController,
   PointElement,
   LineElement,
   Filler,
@@ -14,9 +16,11 @@ import {
 import { Chart } from 'react-chartjs-2';
 
 ChartJS.register(
+  BarController,
   BarElement,
   CategoryScale,
   LinearScale,
+  LineController,
   PointElement,
   LineElement,
   Tooltip,
