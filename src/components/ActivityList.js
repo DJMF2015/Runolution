@@ -21,7 +21,7 @@ export default function ActivityList() {
   }
 
   const handleGoBack = () => {
-    navigate(-1);
+    navigate('/');
   };
 
   useEffect(() => {
@@ -324,4 +324,9 @@ const ScrollToTop = styled(ArrowUpCircleFill)`
   opacity: 0.7;
   color: ${(props) => props.theme.colour.strava};
   margin: 60px 0px 200px 90vw;
+
+  @media screen and (max-width: 750px) {
+    right: 2rem;
+    bottom: -8rem;
+  }
 `;

@@ -48,7 +48,6 @@ export const useScroll = () => {
 export const useLocalStorageState = ({ key, state, setState, stateKey }) => {
   const [hasLoadedFromStorage, setHasLoadedFromStorage] = useState(false);
   const valueToStore = state[stateKey];
-  console.log({ key, state, setState, stateKey });
   useEffect(() => {
     try {
       const item = localStorage.getItem(key);

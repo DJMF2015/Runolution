@@ -39,7 +39,6 @@ export const getAthleteStats = async (userId, accessToken) => {
 };
 
 export const getAthleteActivities = async (accessToken, per_page, index) => {
-  console.log(per_page, index);
   if (await stravaRateLimiter.request()) {
     const apiUrl = `${baseURL}/athlete/activities?per_page=${per_page}&page=${index}`;
     try {
@@ -94,7 +93,10 @@ export const getUsersClubs = async (accessToken) => {
       });
       return response;
     } catch (error) {
-      console.log(error);
+      throw new Error(
+        'Error while retrieving activities. Unable to fetch ',
+        `${error.message}`,
+      );
     }
   } else {
     throw new Error('Exceeded the Strava rate limit. Please try again later.');

@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { ArrowUpCircleFill } from '@styled-icons/bootstrap/ArrowUpCircleFill';
+import { FiBox, FiChevronDown, FiChevronLeft, FiLayers, FiMenu } from 'react-icons/fi';
 import styled from 'styled-components';
 import { useScroll } from '../utils/hooks';
 import MapCoordinatesHelper from '../utils/mapCoordinates';
 import { getSufferScore, getMilesToKms, getMetresToFeet } from '../utils/conversion';
+import { addActivityMapLayers } from './MapActivityLayers';
 import mapboxgl from 'mapbox-gl';
 import * as turf from '@turf/turf';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -40,76 +42,42 @@ const getRouteBounds = (coordinates) => {
   );
 };
 
-const addActivityMapLayers = (map, data) => {
-  if (!map || !data) {
+const getRouteMapPadding = (isNavigationCollapsed) => {
+  if (typeof window !== 'undefined' && window.innerWidth <= 800) {
+    if (isNavigationCollapsed) {
+      return { top: 96, bottom: 110, left: 36, right: 36 };
+    }
+
+    return { top: 96, bottom: 260, left: 36, right: 36 };
+  }
+
+  if (isNavigationCollapsed) {
+    return { top: 86, bottom: 80, left: 80, right: 80 };
+  }
+
+  return { top: 86, bottom: 80, left: 360, right: 80 };
+};
+
+const fitRouteToMap = (
+  map,
+  coordinates,
+  isThreeDimensional,
+  isNavigationCollapsed,
+  duration = 1200,
+) => {
+  const bounds = getRouteBounds(coordinates);
+
+  if (!map || !bounds) {
     return;
   }
 
-  map.setFog({
-    'horizon-blend': 0.1,
-    'space-color': 'rgb(10, 10, 10)',
-    'star-intensity': 1,
+  map.fitBounds(bounds, {
+    padding: getRouteMapPadding(isNavigationCollapsed),
+    duration,
+    pitch: isThreeDimensional ? 55 : 0,
+    bearing: isThreeDimensional ? -18 : 0,
+    maxZoom: isThreeDimensional ? 15 : 16,
   });
-
-  if (!map.getSource('mapbox-dem')) {
-    map.addSource('mapbox-dem', {
-      type: 'raster-dem',
-      url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
-      tileSize: 512,
-      maxzoom: 14,
-    });
-  }
-
-  if (!map.getLayer('terrain-data')) {
-    map.addLayer({
-      id: 'terrain-data',
-      type: 'line',
-      source: {
-        type: 'vector',
-        url: 'mapbox://mapbox.mapbox-terrain-v2',
-      },
-      'source-layer': 'contour',
-    });
-  }
-
-  map.setTerrain({
-    source: 'mapbox-dem',
-    exaggeration: 2.0,
-  });
-
-  if (!map.getLayer('sky')) {
-    map.addLayer({
-      id: 'sky',
-      type: 'sky',
-      paint: {
-        'sky-type': 'atmosphere',
-        'sky-atmosphere-sun': [0, 1.0],
-        'sky-atmosphere-sun-intensity': 5,
-      },
-    });
-  }
-
-  if (!map.getSource('linepath')) {
-    map.addSource('linepath', {
-      type: 'geojson',
-      lineMetrics: true,
-      data,
-    });
-  } else {
-    map.getSource('linepath').setData(data);
-  }
-
-  if (!map.getLayer('line-dashed')) {
-    map.addLayer({
-      type: 'line',
-      source: 'linepath',
-      id: 'line-dashed',
-      paint: {
-        'line-width': 5,
-        'line-gradient': ['interpolate', ['linear'], ['line-progress'], 1, 'red'],
-      },
-    });
-  }
 };
 
 export default function ActivitiesCard() {
@@ -126,6 +94,9 @@ export default function ActivitiesCard() {
   );
   const [detailError, setDetailError] = React.useState(null);
   const [mapStyle, setMapStyle] = useState('street');
+  const [isMapStyleOpen, setIsMapStyleOpen] = useState(false);
+  const [isThreeDimensional, setIsThreeDimensional] = useState(false);
+  const [isActivityNavCollapsed, setIsActivityNavCollapsed] = useState(false);
 
   const location = useLocation();
   const from = location.state?.from;
@@ -135,12 +106,21 @@ export default function ActivitiesCard() {
   const mapContainer = useRef(null);
   const mapRef = useRef(null);
   const currentMapStyleRef = useRef('street');
+  const isActivityNavCollapsedRef = useRef(false);
   const data = useMemo(() => getActivityLineFeature(coordinates), [coordinates]);
   const routeCoordinates = useMemo(() => data?.geometry?.coordinates || [], [data]);
 
   const routeCenter = useMemo(() => {
     return data ? turf.center(data).geometry.coordinates : [-3.21698, 55.89107];
   }, [data]);
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, [from?.id]);
+
+  useEffect(() => {
+    isActivityNavCollapsedRef.current = isActivityNavCollapsed;
+  }, [isActivityNavCollapsed]);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -196,7 +176,7 @@ export default function ActivitiesCard() {
       antialias: true,
       center: routeCenter,
       zoom: 12,
-      pitch: 55,
+      pitch: 0,
       bearing: 0,
       interactive: true,
       hash: false,
@@ -214,29 +194,29 @@ export default function ActivitiesCard() {
       map.addControl(new mapboxgl.FullscreenControl());
       map.addControl(new mapboxgl.ScaleControl());
 
-      const bounds = getRouteBounds(routeCoordinates);
-
-      if (bounds) {
-        map.fitBounds(bounds, {
-          padding: { top: 60, bottom: 60, left: 280, right: 60 },
-          duration: 2000,
-          pitch: 55,
-          maxZoom: 15,
-        });
-      }
+      fitRouteToMap(map, routeCoordinates, false, false, 1800);
     });
     return () => {
       map.remove();
       mapRef.current = null;
       currentMapStyleRef.current = 'street';
     };
-  }, [
-    data,
-    from?.end_latlng,
-    isOnline,
-    routeCenter,
-    routeCoordinates,
-  ]);
+  }, [data, from?.end_latlng, isOnline, routeCenter, routeCoordinates]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) {
+      return;
+    }
+
+    fitRouteToMap(
+      map,
+      routeCoordinates,
+      isThreeDimensional,
+      isActivityNavCollapsedRef.current,
+      900,
+    );
+  }, [isThreeDimensional, routeCoordinates]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -290,143 +270,248 @@ export default function ActivitiesCard() {
 
   return (
     <>
-      {isVisible && <ScrollToTop alt="Go to top" onClick={scrollToTop} />}
-      <div style={{ backgroundColor: 'black' }}>
-        <SideNavigation>
-          <CardHeaders>
-            <h3>{from?.name}</h3>
-            <ActivityCard props={from?.average_heartrate}>
-              {from?.average_heartrate && getSufferScore(from?.average_heartrate)}{' '}
-            </ActivityCard>
-            <LinkText>
-              <Link
-                style={{ color: 'white', margin: '10px 12px' }}
-                to="/splits"
-                state={{ from: from }}
-              >
-                View Splits
-              </Link>
-            </LinkText>
-            <LinkText>
-              <Link style={{ color: 'white' }} to="/">
-                Go Back
-              </Link>
-            </LinkText>
-            <Text>
-              {' '}
-              <h3>Kudos: {from?.kudos_count} </h3>
-            </Text>
-            {detailError && <ErrorText>{detailError}</ErrorText>}
-            {athleteData?.kudosoers && (
-              <div>
-                <Text>
-                  {athleteData?.kudosoers.map((kudoer, index) => {
-                    return <span key={index}>{kudoer.firstname + ', '}</span>;
-                  })}
-                </Text>
-                <Text>
-                  <h4>Comments: {from?.comment_count}</h4>
-                </Text>
-                <Text>
-                  {athleteData?.comments && (
-                    <div>
-                      {athleteData.comments.map((comment, index) => {
-                        return (
-                          <>
-                            <span key={index}>
-                              {comment.athlete.firstname + ' '}{' '}
-                              {comment.athlete.lastname + ' '}{' '}
-                            </span>
-                            <p>
-                              <i> {comment.text}</i>
-                            </p>
-                          </>
-                        );
-                      })}
-                    </div>
-                  )}
-                </Text>
-                <Text>
-                  <h4>Distance:</h4> {getMilesToKms(from.distance)}
-                </Text>
-                <Text>
-                  <h4>Total Elevation:</h4> {getMetresToFeet(from.total_elevation_gain)}
-                </Text>
-                <Text>{athleteData.detailedActivity?.description}</Text>
-              </div>
+      {isVisible && (
+        <ScrollToTop
+          alt="Go to top"
+          $navCollapsed={isActivityNavCollapsed}
+          onClick={scrollToTop}
+        />
+      )}
+      <PageShell>
+        <SideNavigation
+          aria-label="Activity details"
+          id="activity-detail-navigation"
+          $collapsed={isActivityNavCollapsed}
+        >
+          <ActivityNavToggle
+            type="button"
+            aria-controls="activity-detail-navigation"
+            aria-expanded={!isActivityNavCollapsed}
+            aria-label={
+              isActivityNavCollapsed
+                ? 'Show activity detail navigation'
+                : 'Hide activity detail navigation'
+            }
+            $collapsed={isActivityNavCollapsed}
+            onClick={() => setIsActivityNavCollapsed((isCollapsed) => !isCollapsed)}
+          >
+            <FiMenu aria-hidden="true" />
+            <ToggleText $collapsed={isActivityNavCollapsed}>
+              {isActivityNavCollapsed ? 'Map view' : 'Details'}
+            </ToggleText>
+            {isActivityNavCollapsed ? (
+              <FiChevronLeft aria-hidden="true" />
+            ) : (
+              <FiChevronDown aria-hidden="true" />
             )}
-            {primaryPhotoUrl && <ActivityPhoto alt="" src={primaryPhotoUrl} />}
+          </ActivityNavToggle>
+          {!isActivityNavCollapsed && (
+            <CardHeaders>
+              <ActivitySummaryHeader>
+                <ActivityTitle>{from?.name}</ActivityTitle>
+                {from?.average_heartrate && (
+                  <ActivityCard props={from?.average_heartrate}>
+                    {getSufferScore(from?.average_heartrate)}
+                  </ActivityCard>
+                )}
+              </ActivitySummaryHeader>
+              <NavActions>
+                <ActionLink to="/splits" state={{ from: from }}>
+                  View Splits
+                </ActionLink>
+                <ActionLink to="/">Go Back</ActionLink>
+              </NavActions>
+              <ActivityStatsGrid>
+                <ActivityStat>
+                  <span>Kudos</span>
+                  <strong>{from?.kudos_count}</strong>
+                </ActivityStat>
+                <ActivityStat>
+                  <span>Comments</span>
+                  <strong>{from?.comment_count}</strong>
+                </ActivityStat>
+                <ActivityStat>
+                  <span>Distance</span>
+                  <strong>{getMilesToKms(from.distance)}</strong>
+                </ActivityStat>
+                <ActivityStat>
+                  <span>Elevation</span>
+                  <strong>{getMetresToFeet(from.total_elevation_gain)}</strong>
+                </ActivityStat>
+              </ActivityStatsGrid>
+              {detailError && <ErrorText>{detailError}</ErrorText>}
+              {athleteData?.kudosoers && (
+                <ActivityDetails>
+                  <Text>
+                    <TextLabel>Kudos from</TextLabel>
+                    {athleteData?.kudosoers.map((kudoer, index) => {
+                      return <span key={index}>{kudoer.firstname + ', '}</span>;
+                    })}
+                  </Text>
+                  <Text>
+                    <TextLabel>Comments</TextLabel>
+                  </Text>
+                  <Text>
+                    {athleteData?.comments && (
+                      <div>
+                        {athleteData.comments.map((comment, index) => {
+                          return (
+                            <React.Fragment key={index}>
+                              <span>
+                                {comment.athlete.firstname + ' '}{' '}
+                                {comment.athlete.lastname + ' '}{' '}
+                              </span>
+                              <p>
+                                <i> {comment.text}</i>
+                              </p>
+                            </React.Fragment>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </Text>
+                  {athleteData.detailedActivity?.description && (
+                    <Text>{athleteData.detailedActivity.description}</Text>
+                  )}
+                </ActivityDetails>
+              )}
+              {primaryPhotoUrl && <ActivityPhoto alt="" src={primaryPhotoUrl} />}
 
-            <Text>Achievements: {athleteData?.detailedActivity?.achievement_count}</Text>
-            <Text>PR's: {athleteData?.detailedActivity?.pr_count}</Text>
-          </CardHeaders>
+              <CompactStats>
+                <Text>
+                  Achievements: {athleteData?.detailedActivity?.achievement_count}
+                </Text>
+                <Text>PR's: {athleteData?.detailedActivity?.pr_count}</Text>
+              </CompactStats>
+            </CardHeaders>
+          )}
         </SideNavigation>
 
         <MapShell>
-          <MapStyleToggle aria-label="Map style">
-            <MapStyleButton
+          <MapStyleControl $navCollapsed={isActivityNavCollapsed}>
+            <MapViewModeButton
               type="button"
-              $active={mapStyle === 'street'}
-              onClick={() => setMapStyle('street')}
+              aria-label={`Switch to ${isThreeDimensional ? '2D' : '3D'} map view`}
+              $active={isThreeDimensional}
+              onClick={() => setIsThreeDimensional((enabled) => !enabled)}
             >
-              Streets
-            </MapStyleButton>
-            <MapStyleButton
+              <MapViewModeIcon aria-hidden="true" />
+              <MapStyleButtonLabel>
+                {isThreeDimensional ? '3D' : '2D'}
+              </MapStyleButtonLabel>
+            </MapViewModeButton>
+            {isMapStyleOpen && (
+              <MapStylePopup aria-label="Choose map style">
+                <MapStyleButton
+                  type="button"
+                  $active={mapStyle === 'street'}
+                  onClick={() => {
+                    setMapStyle('street');
+                    setIsMapStyleOpen(false);
+                  }}
+                >
+                  Streets
+                </MapStyleButton>
+                <MapStyleButton
+                  type="button"
+                  $active={mapStyle === 'satellite'}
+                  onClick={() => {
+                    setMapStyle('satellite');
+                    setIsMapStyleOpen(false);
+                  }}
+                >
+                  Satellite
+                </MapStyleButton>
+              </MapStylePopup>
+            )}
+            <MapStyleIconButton
               type="button"
-              $active={mapStyle === 'satellite'}
-              onClick={() => setMapStyle('satellite')}
+              aria-label="Open map style options"
+              aria-expanded={isMapStyleOpen}
+              onClick={() => setIsMapStyleOpen((isOpen) => !isOpen)}
             >
-              Satellite
-            </MapStyleButton>
-          </MapStyleToggle>
+              <MapStyleIcon aria-hidden="true" />
+              <MapStyleButtonLabel>
+                {mapStyle === 'satellite' ? 'Satellite' : 'Streets'}
+              </MapStyleButtonLabel>
+            </MapStyleIconButton>
+          </MapStyleControl>
           <Map id="map" ref={(el) => (mapContainer.current = el)}></Map>
         </MapShell>
-      </div>
+      </PageShell>
     </>
   );
 }
 
+const PageShell = styled.div`
+  min-height: 100vh;
+  background: #020617;
+`;
+
 const CardHeaders = styled.div`
   position: relative;
-  text-align: center;
-  margin-top: 0.5rem;
   color: ${(props) => props.theme.colour.white};
-  margin: 5px 5px;
-  font-style: bold;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  margin: 0;
   font-family: Verdana, Geneva, Tahoma, sans-serif;
   font-size: 1rem;
 
   @media screen and (max-width: 600px) {
-    top: 0;
     width: 100%;
-    margin: 0;
+    gap: 0.62rem;
     font-size: 0.92rem;
-
-    h3 {
-      margin: 0.35rem 0;
-      overflow-wrap: anywhere;
-    }
   }
 `;
 
 const Text = styled.div`
   font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
-  font-size: 0.9rem;
-  margin: 0px 0px;
+  font-size: 0.92rem;
+  margin: 0;
   text-align: left;
+  line-height: 1.45;
+  color: #dbeafe;
+  overflow-wrap: anywhere;
+
+  h3,
+  h4,
+  p {
+    margin: 0.25rem 0;
+  }
+
+  h3,
+  h4 {
+    color: #ffffff;
+    font-size: 0.95rem;
+  }
+
   @media screen and (max-width: 600px) {
     display: block;
     width: 100%;
-    margin: 0.5rem 0;
+    margin: 0;
     line-height: 1.35;
-    overflow-wrap: anywhere;
-
-    h3,
-    h4,
-    p {
-      margin: 0.25rem 0;
-    }
   }
+`;
+
+const TextLabel = styled.span`
+  display: block;
+  margin-bottom: 0.25rem;
+  color: #ffffff;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+`;
+
+const ActivityDetails = styled.div`
+  display: grid;
+  gap: 0.72rem;
+  padding-top: 0.25rem;
+`;
+
+const CompactStats = styled.div`
+  display: grid;
+  gap: 0.25rem;
 `;
 
 const ErrorText = styled(Text)`
@@ -466,41 +551,25 @@ const UnavailableText = styled.p`
   line-height: 1.5;
 `;
 
-const LinkText = styled.div`
-  font-family: Arial, Helvetica, sans-serif;
-  color: 'white';
-  font-size: 1rem;
-  color: ${(props) => props.theme.colour.red};
-  font: bold;
-  position: relative;
-  display: inline;
-  text-align: left;
-  color: white;
-  @media screen and (max-width: 600px) {
-    display: inline-flex;
-    margin-top: 0.5rem;
-    font-size: 1rem;
-    margin-right: 0.5rem;
-    text-align: center;
-  }
-`;
-
 const ActivityCard = styled.h3`
-  position: relative;
   text-align: center;
-  background-color: ${(props) => props.theme.colour.ghostwhite};
   background: ${(props) =>
     props.props >= 150
       ? props.theme.colour.red
       : props.props > 50 && props.props < 150
         ? props.theme.colour.green
         : props.theme.colour.transparent};
+  min-width: 4.75rem;
+  margin: 0;
+  padding: 0.45rem 0.7rem;
+  border-radius: 8px;
+  color: #ffffff;
+  font-size: 0.9rem;
+  line-height: 1.2;
 
   @media screen and (max-width: 600px) {
-    margin: 0.65rem auto;
-    padding: 0.35rem;
-    border-radius: 8px;
-    text-align: center;
+    min-width: auto;
+    padding: 0.4rem 0.65rem;
   }
 `;
 
@@ -520,62 +589,154 @@ const Map = styled.div`
   width: 100%;
   height: 100vh;
 
-  @media screen and (max-width: 750px) {
+  @media screen and (max-width: 800px) {
     width: 100%;
     height: 100vh;
     margin: 0 auto;
   }
 `;
 
-const MapStyleToggle = styled.div`
+const MapStyleControl = styled.div`
   position: absolute;
-  top: 1rem;
-  right: 4.25rem;
+  right: 1rem;
+  bottom: 1rem;
   z-index: 1020;
-  display: flex;
-  overflow: hidden;
-  background: rgba(15, 23, 42, 0.88);
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  border-radius: 8px;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.24);
+  display: grid;
+  justify-items: end;
+  gap: 0.6rem;
 
-  @media screen and (max-width: 750px) {
-    top: 2.75rem;
+  @media screen and (max-width: 800px) {
     right: 0.75rem;
-    max-width: calc(100% - 1.5rem);
+    bottom: ${(props) =>
+      props.$navCollapsed
+        ? 'calc(max(0.85rem, env(safe-area-inset-bottom)) + 4rem)'
+        : 'calc(max(0.85rem, env(safe-area-inset-bottom)) + min(34vh, 17rem) + 0.75rem)'};
   }
 
-  @media screen and (max-width: 350px) {
-    left: 0.75rem;
-    right: 0.75rem;
+  @media screen and (max-width: 420px) {
+    bottom: ${(props) =>
+      props.$navCollapsed
+        ? 'calc(max(0.75rem, env(safe-area-inset-bottom)) + 4rem)'
+        : 'calc(max(0.75rem, env(safe-area-inset-bottom)) + min(30vh, 14.5rem) + 0.65rem)'};
+  }
+`;
+
+const MapStylePopup = styled.div`
+  display: grid;
+  gap: 0.45rem;
+  width: min(13rem, calc(100vw - 1.5rem));
+  padding: 0.55rem;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(15, 23, 42, 0.96), rgba(31, 41, 55, 0.92)),
+    linear-gradient(135deg, rgba(252, 82, 0, 0.24), rgba(59, 130, 246, 0.16));
+  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.38);
+  backdrop-filter: blur(16px);
+`;
+
+const MapStyleIconButton = styled.button`
+  display: inline-flex;
+  min-width: 0;
+  min-height: 3rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  padding: 0 0.8rem;
+  color: #ffffff;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 999px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.34);
+  cursor: pointer;
+  backdrop-filter: blur(14px);
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    transform 160ms ease;
+
+  &:hover,
+  &:focus-visible {
+    background: rgba(252, 82, 0, 0.92);
+    border-color: rgba(255, 255, 255, 0.72);
+    outline: none;
+    transform: translateY(-1px);
+  }
+
+  @media screen and (max-width: 420px) {
+    width: 3.1rem;
+    min-height: 3.1rem;
+    padding: 0;
+  }
+`;
+
+const MapViewModeButton = styled(MapStyleIconButton)`
+  min-height: 2.75rem;
+  padding: 0 0.72rem;
+  background: ${(props) =>
+    props.$active ? 'rgba(252, 82, 0, 0.94)' : 'rgba(15, 23, 42, 0.9)'};
+
+  @media screen and (max-width: 420px) {
+    width: 2.9rem;
+    min-height: 2.9rem;
+    padding: 0;
+  }
+`;
+
+const MapStyleIcon = styled(FiLayers)`
+  width: 1.25rem;
+  height: 1.25rem;
+  flex: 0 0 auto;
+`;
+
+const MapViewModeIcon = styled(FiBox)`
+  width: 1.2rem;
+  height: 1.2rem;
+  flex: 0 0 auto;
+`;
+
+const MapStyleButtonLabel = styled.span`
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1;
+
+  @media screen and (max-width: 420px) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
   }
 `;
 
 const MapStyleButton = styled.button`
-  min-width: 86px;
-  min-height: 40px;
-  padding: 0 0.8rem;
+  min-width: 0;
+  min-height: 2.55rem;
+  padding: 0 0.9rem;
   color: ${(props) => (props.$active ? '#111827' : '#ffffff')};
-  background: ${(props) => (props.$active ? '#ffffff' : 'transparent')};
+  background: ${(props) => (props.$active ? '#ffffff' : 'rgba(255, 255, 255, 0.1)')};
   border: 0;
-  border-right: 1px solid rgba(255, 255, 255, 0.25);
-  font-size: 0.88rem;
-  font-weight: 700;
+  border-radius: 6px;
+  font-size: 0.86rem;
+  font-weight: 800;
   cursor: pointer;
-
-  &:last-child {
-    border-right: 0;
-  }
+  text-align: left;
+  transition:
+    background 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
 
   &:hover,
   &:focus-visible {
     background: ${(props) => (props.$active ? '#ffffff' : 'rgba(255, 255, 255, 0.18)')};
     outline: none;
+    transform: translateY(-1px);
   }
 
-  @media screen and (max-width: 350px) {
-    flex: 1;
-    min-width: 0;
+  @media screen and (max-width: 420px) {
+    min-height: 2.45rem;
+    font-size: 0.82rem;
   }
 `;
 
@@ -590,80 +751,259 @@ const ScrollToTop = styled(ArrowUpCircleFill)`
   flex-wrap: wrap;
   position: fixed;
   right: 1rem;
-  bottom: 1rem;
+  bottom: 5rem;
   cursor: pointer;
   filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.45));
 
   @media screen and (max-width: 750px) {
     width: 2.75rem;
     height: 2.75rem;
-    right: 0.75rem;
-    bottom: 0.75rem;
-    bottom: 4rem;
+    right: 0.85rem;
+    bottom: ${(props) =>
+      props.$navCollapsed
+        ? 'calc(max(0.85rem, env(safe-area-inset-bottom)) + 8rem)'
+        : 'calc(max(0.85rem, env(safe-area-inset-bottom)) + min(34vh, 17rem) + 4.8rem)'};
+  }
+
+  @media screen and (max-width: 420px) {
+    bottom: ${(props) =>
+      props.$navCollapsed
+        ? 'calc(max(0.75rem, env(safe-area-inset-bottom)) + 7.8rem)'
+        : 'calc(max(0.75rem, env(safe-area-inset-bottom)) + min(30vh, 14.5rem) + 4.55rem)'};
   }
 `;
 
-const SideNavigation = styled.div`
-  height: calc(105vh - 4rem);
-  width: 250px;
+const SideNavigation = styled.aside`
+  height: calc(100dvh - 4.75rem);
+  width: ${(props) => (props.$collapsed ? '4.35rem' : 'clamp(280px, 24vw, 340px)')};
   display: block;
   position: fixed;
-  border-right: 3px solid grey;
+  border-right: 1px solid rgba(252, 82, 0, 0.5);
   z-index: 1000;
-  top: 3rem;
+  top: 4.75rem;
   left: 0;
   scroll-behavior: smooth;
-  padding: 1rem;
-  overflow-y: auto;
+  padding: ${(props) => (props.$collapsed ? '0.62rem' : '1.05rem')};
+  overflow-y: ${(props) => (props.$collapsed ? 'hidden' : 'auto')};
   box-sizing: border-box;
-  background-color: rgba(17, 17, 17, 0.94);
+  background:
+    linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(2, 6, 23, 0.98)),
+    linear-gradient(135deg, rgba(252, 82, 0, 0.18), rgba(14, 165, 233, 0.12));
   color: white;
+  box-shadow: 18px 0 42px rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(18px);
+  transition:
+    width 160ms ease,
+    padding 160ms ease,
+    max-height 220ms ease,
+    opacity 180ms ease;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(252, 82, 0, 0.72) rgba(15, 23, 42, 0.72);
 
-  @media screen and (max-width: 750px) {
-    width: 100%;
-    max-height: 44vh;
-    position: relative;
-    display: block;
-    top: 3rem;
-    z-index: 2;
-    color: white;
-    border-right: none;
-    border-bottom: 3px solid grey;
-    overflow-y: auto;
-    padding: 1rem 0.85rem;
-    background: rgba(17, 17, 17, 0.98);
+  @media screen and (max-width: 980px) {
+    width: ${(props) => (props.$collapsed ? '4.15rem' : '260px')};
+    padding: ${(props) => (props.$collapsed ? '0.58rem' : '0.9rem')};
   }
 
-  @media screen and (max-width: 350px) {
-    max-height: 52vh;
-    padding: 0.85rem 0.7rem;
+  @media screen and (max-width: 800px) {
+    top: auto;
+    left: 0.75rem;
+    right: 0.75rem;
+    bottom: max(0.75rem, env(safe-area-inset-bottom));
+    width: auto;
+    height: auto;
+    max-height: ${(props) => (props.$collapsed ? '3.75rem' : 'min(34vh, 17rem)')};
+    z-index: 1005;
+    border: 1px solid rgba(252, 82, 0, 0.46);
+    border-radius: 14px;
+    overflow-y: ${(props) => (props.$collapsed ? 'hidden' : 'auto')};
+    padding: ${(props) => (props.$collapsed ? '0.48rem' : '0.82rem')};
+    background:
+      linear-gradient(135deg, rgba(15, 23, 42, 0.96), rgba(2, 6, 23, 0.96)),
+      linear-gradient(135deg, rgba(252, 82, 0, 0.22), rgba(14, 165, 233, 0.14));
+    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.48);
+  }
+
+  @media screen and (max-width: 420px) {
+    left: 0.55rem;
+    right: 0.55rem;
+    max-height: ${(props) => (props.$collapsed ? '3.55rem' : 'min(30vh, 14.5rem)')};
+    padding: ${(props) => (props.$collapsed ? '0.42rem' : '0.72rem')};
+    border-radius: 12px;
   }
   /* customise scrollbar for modern browser except firefox*/
   ::-webkit-scrollbar {
-    width: 10px;
+    width: 8px;
   }
   ::-webkit-scrollbar-track {
-    box-shadow: inset 0 0 5px grey;
-    border-radius: 10px;
+    background: rgba(15, 23, 42, 0.6);
+    border-radius: 999px;
   }
-  ::-webkit-scollbar-thumb {
-    background: #888;
-    border-radius: 10px;
+  ::-webkit-scrollbar-thumb {
+    background: rgba(252, 82, 0, 0.72);
+    border-radius: 999px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #555;
+    background: rgba(252, 82, 0, 0.95);
   }
-  ::-webkit-scrollbar-thumb:active {
-    background-color: #555;
+`;
+
+const ActivityNavToggle = styled.button`
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  width: 100%;
+  min-width: 3rem;
+  min-height: 3rem;
+  padding: 0 0.75rem;
+  margin-bottom: ${(props) => (props.$collapsed ? 0 : '0.85rem')};
+  border: 1px solid rgba(255, 255, 255, 0.36);
+  border-radius: 12px;
+  background:
+    linear-gradient(135deg, rgba(252, 82, 0, 0.98), rgba(234, 88, 12, 0.94)), #fc5200;
+  color: #ffffff;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.42);
+  cursor: pointer;
+  font-weight: 800;
+  line-height: 1;
+  backdrop-filter: blur(14px);
+  transition:
+    background 160ms ease,
+    transform 160ms ease,
+    border-radius 160ms ease;
+
+  svg {
+    width: 1.22rem;
+    height: 1.22rem;
+    flex: 0 0 auto;
   }
-  ::-webkit-scrollbar-thumb:window-inactive {
-    background-color: #555;
+
+  &:hover,
+  &:focus-visible {
+    background:
+      linear-gradient(135deg, rgba(255, 105, 36, 1), rgba(252, 82, 0, 1)), #fc5200;
+    outline: none;
+    transform: translateY(-1px);
   }
-  ::-webkit-scrollbar-thumb:horizontal {
-    background-color: #555;
+
+  @media screen and (max-width: 800px) {
+    position: relative;
+    min-height: 2.8rem;
+    margin-bottom: ${(props) => (props.$collapsed ? 0 : '0.7rem')};
   }
-  ::-webkit-scrollbar-thumb:vertical {
-    background-color: #555;
+
+  @media screen and (max-width: 420px) {
+    min-height: 2.8rem;
+    min-width: 2.8rem;
+    padding: 0 0.65rem;
+  }
+`;
+
+const ToggleText = styled.span`
+  font-size: 0.82rem;
+  letter-spacing: 0;
+  white-space: nowrap;
+  display: ${(props) => (props.$collapsed ? 'none' : 'inline')};
+
+  @media screen and (max-width: 800px) {
+    display: inline;
+  }
+
+  @media screen and (max-width: 420px) {
+    font-size: 0.78rem;
+  }
+`;
+
+const ActivitySummaryHeader = styled.div`
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.85rem;
+
+  @media screen and (max-width: 600px) {
+    align-items: center;
+  }
+`;
+
+const ActivityTitle = styled.h3`
+  margin: 0;
+  color: #ffffff;
+  font-size: 1.05rem;
+  line-height: 1.25;
+  text-align: left;
+  overflow-wrap: anywhere;
+
+  @media screen and (max-width: 600px) {
+    font-size: 0.98rem;
+  }
+`;
+
+const NavActions = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.55rem;
+`;
+
+const ActionLink = styled(Link)`
+  display: inline-flex;
+  min-height: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(252, 82, 0, 0.48);
+  border-radius: 8px;
+  background: rgba(252, 82, 0, 0.16);
+  color: #ffffff;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 0.92rem;
+  font-weight: 700;
+  padding: 0 0.55rem;
+  text-decoration: none;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    transform 160ms ease;
+
+  &:hover,
+  &:focus-visible {
+    background: rgba(252, 82, 0, 0.28);
+    border-color: rgba(252, 82, 0, 0.86);
+    outline: none;
+    transform: translateY(-1px);
+  }
+`;
+
+const ActivityStatsGrid = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.55rem;
+`;
+
+const ActivityStat = styled.div`
+  min-width: 0;
+  padding: 0.7rem;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.72);
+  text-align: left;
+
+  span {
+    display: block;
+    color: #9ca3af;
+    font-size: 0.74rem;
+    letter-spacing: 0;
+  }
+
+  strong {
+    display: block;
+    margin-top: 0.15rem;
+    color: #ffffff;
+    font-size: clamp(0.98rem, 1.8vw, 1.25rem);
+    line-height: 1.15;
+    overflow-wrap: anywhere;
   }
 `;
 
