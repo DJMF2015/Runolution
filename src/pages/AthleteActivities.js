@@ -267,7 +267,10 @@ const AthleteActivities = () => {
                 <DesktopOnly>
                   <ActivitiesTableContainer>
                     <TableHeader>
-                      <TableTitle>Recent Activities</TableTitle>
+                      <TableTitleGroup>
+                        <TableTitle>Recent Activities</TableTitle>
+                        <TableSubtitle>Select an activity name to open its map view.</TableSubtitle>
+                      </TableTitleGroup>
                     </TableHeader>
 
                     <Table>
@@ -293,18 +296,16 @@ const AthleteActivities = () => {
                               <ActivityInfo>
                                 <ActivityTitle>
                                   {activity.map?.summary_polyline ? (
-                                    <Link
+                                    <ActivityLink
                                       to="/activity"
                                       state={{ from: activity }}
-                                      style={{
-                                        textDecoration: 'none',
-                                        color: 'inherit',
-                                      }}
+                                      aria-label={`Open ${activity.name} activity map`}
                                     >
-                                      {activity.name}
-                                    </Link>
+                                      <span>{activity.name}</span>
+                                      <OpenHint>Open</OpenHint>
+                                    </ActivityLink>
                                   ) : (
-                                    activity.name
+                                    <UnavailableActivityName>{activity.name}</UnavailableActivityName>
                                   )}
                                 </ActivityTitle>
 
@@ -345,11 +346,16 @@ const AthleteActivities = () => {
                         <MobileActivityHeader>
                           <MobileActivityTitle>
                             {activity.map?.summary_polyline ? (
-                              <Link to="/activity" state={{ from: activity }}>
-                                {activity.name}
-                              </Link>
+                              <MobileActivityLink
+                                to="/activity"
+                                state={{ from: activity }}
+                                aria-label={`Open ${activity.name} activity map`}
+                              >
+                                <span>{activity.name}</span>
+                                <MobileOpenHint>Open map</MobileOpenHint>
+                              </MobileActivityLink>
                             ) : (
-                              activity.name
+                              <UnavailableActivityName>{activity.name}</UnavailableActivityName>
                             )}
                           </MobileActivityTitle>
 
@@ -667,10 +673,21 @@ const TableHeader = styled.div`
   border-bottom: 1px solid #333;
 `;
 
+const TableTitleGroup = styled.div`
+  display: grid;
+  gap: 0.25rem;
+`;
+
 const TableTitle = styled.h2`
   color: #fff;
   font-size: 1.2rem;
   margin: 0;
+`;
+
+const TableSubtitle = styled.p`
+  margin: 0;
+  color: #cbd5e1;
+  font-size: 0.86rem;
 `;
 
 const Table = styled.table`
@@ -723,11 +740,52 @@ const ActivityInfo = styled.div`
 const ActivityTitle = styled.span`
   color: #fff;
   font-weight: 500;
+`;
 
-  &:hover {
-    text-decoration: underline #ff6b35;
-    color: #ff6b35;
+const ActivityLink = styled(Link)`
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.55rem;
+  color: #ffffff;
+  text-decoration: none;
+  font-weight: 800;
+  line-height: 1.25;
+  transition:
+    color 160ms ease,
+    transform 160ms ease;
+
+  span:first-child {
+    border-bottom: 2px solid rgba(252, 82, 0, 0.58);
   }
+
+  &:hover,
+  &:focus-visible {
+    color: #ff8a4c;
+    outline: none;
+    transform: translateX(2px);
+  }
+
+  &:focus-visible span:first-child {
+    box-shadow: 0 0 0 3px rgba(252, 82, 0, 0.24);
+    border-radius: 4px;
+  }
+`;
+
+const OpenHint = styled.span`
+  flex: 0 0 auto;
+  padding: 0.18rem 0.48rem;
+  border: 1px solid rgba(252, 82, 0, 0.55);
+  border-radius: 999px;
+  background: rgba(252, 82, 0, 0.16);
+  color: #ffb088;
+  font-size: 0.68rem;
+  font-weight: 900;
+  text-transform: uppercase;
+`;
+
+const UnavailableActivityName = styled.span`
+  color: #cbd5e1;
 `;
 
 const ActivityDate = styled.span`
@@ -789,15 +847,38 @@ const MobileActivityTitle = styled.h3`
   margin: 0;
   font-size: 1rem;
   flex: 1;
+`;
 
-  a {
-    color: #fff;
-    text-decoration: none;
+const MobileActivityLink = styled(Link)`
+  display: grid;
+  gap: 0.45rem;
+  color: #ffffff;
+  text-decoration: none;
+  font-weight: 800;
 
-    &:hover {
-      color: #ff6b35;
-    }
+  span:first-child {
+    text-decoration: underline;
+    text-decoration-color: rgba(252, 82, 0, 0.8);
+    text-decoration-thickness: 2px;
+    text-underline-offset: 3px;
   }
+
+  &:hover,
+  &:focus-visible {
+    color: #ff8a4c;
+    outline: none;
+  }
+`;
+
+const MobileOpenHint = styled.span`
+  width: fit-content;
+  padding: 0.28rem 0.62rem;
+  border-radius: 999px;
+  background: rgba(252, 82, 0, 0.2);
+  border: 1px solid rgba(252, 82, 0, 0.62);
+  color: #ffb088;
+  font-size: 0.72rem;
+  font-weight: 900;
 `;
 
 const SportBadge = styled.span`
