@@ -3,6 +3,8 @@ import styled from 'styled-components';
 import {
   Chart as ChartJS,
   BarElement,
+  BarController,
+  LineController,
   CategoryScale,
   LinearScale,
   PointElement,
@@ -18,6 +20,8 @@ ChartJS.register(
   CategoryScale,
   LinearScale,
   PointElement,
+  BarController,
+  LineController,
   LineElement,
   Tooltip,
   Legend,
