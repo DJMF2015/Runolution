@@ -58,7 +58,7 @@ const Wrapper = styled.nav`
   width: min(100%, 420px);
   margin: 1.5rem auto 0;
   padding: 0.75rem;
-  background-color: ghostwhite;
+  /* background-color: ghostwhite; */
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 999px;
   display: flex;
@@ -118,11 +118,9 @@ const PageInfo = styled.span`
 `;
 
 const ArrowIconRight = styled(ArrowRight)`
-  width: clamp(1.25rem, 5vw, 1.75rem);
-  height: clamp(1.25rem, 5vw, 1.75rem);
+  color: white;
 `;
 
 const ArrowIconBack = styled(ArrowLeft)`
-  width: clamp(1.25rem, 5vw, 1.75rem);
-  height: clamp(1.25rem, 5vw, 1.75rem);
+  color: white;
 `;
