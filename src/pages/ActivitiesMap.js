@@ -19,7 +19,6 @@ import {
   MAP_STYLES,
   MAX_ACTIVITY_ZOOM,
   MAX_SIDEBAR_RESULTS,
-  MIN_ACTIVITY_ZOOM,
   createActivityPopupContent,
   filterMapActivities,
   getBoundsForCoordinates,
