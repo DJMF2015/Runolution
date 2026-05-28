@@ -85,7 +85,7 @@ const addActivitiesLayers = (map) => {
       },
       paint: {
         'line-color': getActivityColourExpression,
-        'line-width': 2,
+        'line-width': 2.5,
         'line-opacity': 0.92,
       },
     });
@@ -98,7 +98,7 @@ export const addActivityMapLayers = (map, data) => {
   }
 
   map.setFog({
-    'horizon-blend': 0.1,
+    'horizon-blend': 0.2,
     'space-color': 'rgb(10, 10, 10)',
     'star-intensity': 1,
   });
@@ -119,7 +119,7 @@ export const addActivityMapLayers = (map, data) => {
 
   map.setTerrain({
     source: 'mapbox-dem',
-    exaggeration: 2.0,
+    exaggeration: 1.5,
   });
 
   if (!map.getLayer('sky')) {

@@ -1,10 +1,8 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import polyline from '@mapbox/polyline';
+import React, { useState, useEffect, useMemo, useRef, useDeferredValue } from 'react';
 import { ArrowUpCircleFill } from '@styled-icons/bootstrap/ArrowUpCircleFill';
-import { FiLayers } from 'react-icons/fi';
+import { FiBox, FiLayers } from 'react-icons/fi';
 import { getAthleteActivities } from '../utils/functions';
 import { fetchTokenInfo } from '../utils/athleteActivitiesFunctions';
-import { formattedDate } from '../utils/conversion';
 import ActivityDropDown from '../components/ActivityDropDown';
 import addActivitiesLayers from '../components/MapActivityLayers';
 import Login from '../components/Login';
@@ -14,32 +12,28 @@ import { useGetWindowWidth, useScroll } from '../utils/hooks';
 import LoadingWheel from '../styles/Loading.module.css';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import {
+  DEFAULT_MAP_CENTER,
+  DEFAULT_MAP_ZOOM,
+  EMPTY_FEATURE_COLLECTION,
+  MAP_STYLES,
+  MAX_ACTIVITY_ZOOM,
+  MAX_SIDEBAR_RESULTS,
+  MIN_ACTIVITY_ZOOM,
+  createActivityPopupContent,
+  filterMapActivities,
+  getBoundsForCoordinates,
+  getCameraFitKey,
+  getDataPolylines,
+  getMapViewCamera,
+  getRouteCoordinates,
+  getRouteFeatureCollection,
+} from '../utils/activityMap';
 
 const initialState = {
   nodes: [],
   loading: false,
   activityLoadingState: null,
-};
-
-const EMPTY_FEATURE_COLLECTION = {
-  type: 'FeatureCollection',
-  features: [],
-};
-
-const MAP_STYLES = {
-  street: 'mapbox://styles/mapbox/streets-v12',
-  satellite: 'mapbox://styles/mapbox/satellite-streets-v12',
-};
-
-const DEFAULT_MAP_CENTER = [-3.21698, 55.89107];
-const DEFAULT_MAP_ZOOM = 10;
-const MIN_ACTIVITY_ZOOM = 8;
-const MAX_ACTIVITY_ZOOM = 13;
-
-const getBoundsForMostCoordinates = (coordinates) => {
-  if (coordinates.length === 0) {
-    return null;
-  }
 };
 
 const ActivitiesMap = () => {
@@ -57,6 +51,10 @@ const ActivitiesMap = () => {
   const [isMapLoaded, setIsMapLoaded] = useState(false);
   const [mapStyle, setMapStyle] = useState('street');
   const [isMapStyleOpen, setIsMapStyleOpen] = useState(false);
+  const [isThreeDimensional, setIsThreeDimensional] = useState(false);
+  const lastCameraFitKeyRef = useRef(null);
+  const isThreeDimensionalRef = useRef(false);
+  const deferredSearchTxt = useDeferredValue(searchTxt);
   const expires_in = localStorage.getItem('expires_in');
   const mapboxAccessToken = process.env.REACT_APP_MAPBOX_KEY;
   let access_token = JSON.parse(localStorage.getItem('access_token'));
@@ -115,23 +113,6 @@ const ActivitiesMap = () => {
     // eslint-disable-next-line
   }, []);
 
-  const getDataPolylines = (activities) => {
-    return activities
-      .filter((activity) => activity?.map?.summary_polyline)
-      .map((activity) => {
-        const activityPositions = polyline.decode(activity.map.summary_polyline);
-        return {
-          activityPositions,
-          activityCoordinates: activityPositions.map(([lat, lng]) => [lng, lat]),
-          activityName: activity.name,
-          activityDate: formattedDate(activity.start_date_local),
-          activityType: activity.type || activity.sport_type,
-          activityId: activity.id,
-        };
-      })
-      .filter((activity) => activity.activityCoordinates.length > 1);
-  };
-
   const setMapLoading = (loading) => {
     setState((prevState) => ({
       ...prevState,
@@ -176,38 +157,26 @@ const ActivitiesMap = () => {
     return stravaActivityResponse;
   };
 
-  let filteredName = state.nodes.filter((activity) => {
-    return activity.activityName.toLowerCase().includes(searchTxt.toLowerCase());
-  });
+  const filteredName = useMemo(() => {
+    return filterMapActivities(state.nodes, deferredSearchTxt, filteredSportType);
+  }, [deferredSearchTxt, filteredSportType, state.nodes]);
 
-  if (filteredSportType) {
-    filteredName = filteredName.filter((activity) => {
-      return activity.activityType === filteredSportType;
-    });
-  }
+  const sidebarActivities = useMemo(
+    () => filteredName.slice(0, MAX_SIDEBAR_RESULTS),
+    [filteredName],
+  );
 
   const routeFeatureCollection = useMemo(() => {
-    return {
-      type: 'FeatureCollection',
-      features: filteredName.map((activity) => ({
-        type: 'Feature',
-        properties: {
-          activityId: activity.activityId,
-          activityName: activity.activityName,
-          activityDate: activity.activityDate,
-          activityType: activity.activityType,
-        },
-        geometry: {
-          type: 'LineString',
-          coordinates: activity.activityCoordinates,
-        },
-      })),
-    };
+    return getRouteFeatureCollection(filteredName);
   }, [filteredName]);
 
   useEffect(() => {
     routeFeatureCollectionRef.current = routeFeatureCollection;
   }, [routeFeatureCollection]);
+
+  useEffect(() => {
+    isThreeDimensionalRef.current = isThreeDimensional;
+  }, [isThreeDimensional]);
 
   useEffect(() => {
     if (!access_token || !mapboxAccessToken || !mapContainer.current || mapRef.current) {
@@ -265,27 +234,10 @@ const ActivitiesMap = () => {
           return;
         }
 
-        const { activityId, activityName, activityDate, activityType } =
-          feature.properties;
-
-        const popupContent = document.createElement('div');
-        const popupTitle = document.createElement('strong');
-        const popupMeta = document.createElement('div');
-        const popupLink = document.createElement('a');
-
-        popupTitle.textContent = activityName;
-        popupMeta.textContent = `${activityDate} ${activityType}`;
-        popupLink.href = `https://www.strava.com/activities/${activityId}`;
-        popupLink.target = '_blank';
-        popupLink.rel = 'noreferrer';
-        popupLink.textContent = 'View on Strava';
-
-        popupContent.appendChild(popupTitle);
-        popupContent.appendChild(document.createElement('br'));
-        popupContent.appendChild(popupMeta);
-        popupContent.appendChild(popupLink);
-
-        popupRef.current.setLngLat(coordinates).setDOMContent(popupContent).addTo(map);
+        popupRef.current
+          .setLngLat(coordinates)
+          .setDOMContent(createActivityPopupContent(feature.properties))
+          .addTo(map);
       });
 
       setIsMapLoaded(true);
@@ -320,20 +272,42 @@ const ActivitiesMap = () => {
       return;
     }
 
+    map.easeTo({
+      ...getMapViewCamera(isThreeDimensional),
+      duration: 650,
+    });
+  }, [isMapLoaded, isThreeDimensional]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !isMapLoaded) {
+      return;
+    }
+
     const source = map.getSource('activities');
     if (source) {
       source.setData(routeFeatureCollection);
     }
 
-    const coordinates = routeFeatureCollection.features.flatMap((feature) => {
-      return feature.geometry.coordinates;
+    const cameraFitKey = getCameraFitKey({
+      filteredSportType,
+      activityCount: state.nodes.length,
+      isMobile: windowWidth < 785,
     });
+
+    if (lastCameraFitKeyRef.current === cameraFitKey) {
+      return;
+    }
+
+    lastCameraFitKeyRef.current = cameraFitKey;
+
+    const coordinates = getRouteCoordinates(routeFeatureCollection);
 
     if (coordinates.length === 0) {
       return;
     }
 
-    const bounds = getBoundsForMostCoordinates(coordinates);
+    const bounds = getBoundsForCoordinates(coordinates);
     if (!bounds) {
       return;
     }
@@ -351,15 +325,13 @@ const ActivitiesMap = () => {
     if (!camera) {
       return;
     }
-
-    map.easeTo({
-      center: camera.center,
-      zoom: Math.max(camera.zoom || DEFAULT_MAP_ZOOM, MIN_ACTIVITY_ZOOM),
-      bearing: 0,
-      pitch: 0,
-      duration: 1200,
-    });
-  }, [routeFeatureCollection, isMapLoaded, windowWidth]);
+  }, [
+    filteredSportType,
+    routeFeatureCollection,
+    isMapLoaded,
+    state.nodes.length,
+    windowWidth,
+  ]);
 
   if (state.loading && access_token) {
     return (
@@ -389,6 +361,7 @@ const ActivitiesMap = () => {
       <MapStyleButton
         type="button"
         $active={mapStyle === 'street'}
+        aria-pressed={mapStyle === 'street'}
         onClick={() => setMapStyle('street')}
       >
         Street
@@ -396,6 +369,7 @@ const ActivitiesMap = () => {
       <MapStyleButton
         type="button"
         $active={mapStyle === 'satellite'}
+        aria-pressed={mapStyle === 'satellite'}
         onClick={() => setMapStyle('satellite')}
       >
         Satellite
@@ -409,8 +383,13 @@ const ActivitiesMap = () => {
         <Login />
       ) : (
         <>
-          <SideNavigation>
+          <SideNavigation aria-labelledby="heatmap-sidebar-title">
+            <SidebarHeader>
+              <SidebarTitle id="heatmap-sidebar-title">Heatmap Controls</SidebarTitle>
+              <SidebarText>Filter and open mapped Strava activities.</SidebarText>
+            </SidebarHeader>
             <ActivityDropDown
+              className="desktop-map-filter"
               props={state.nodes}
               setFilterBySportType={setFilteredSportType}
             />
@@ -423,23 +402,32 @@ const ActivitiesMap = () => {
               className="search__input"
               type="text"
               placeholder="Search by activity name..."
-              aria-label="Search"
+              aria-label="Search activities by name"
               onChange={(e) => setSearchTxt(e.target.value)}
             />
 
-            {filteredName &&
-              filteredName.map((activity, i) => (
-                <a
-                  href={`https://www.strava.com/activities/${activity.activityId}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  key={i}
-                >
-                  {activity.activityDate + ' '}
-                  {activity.activityName + ' '}
-                  {activity.activityType + ' '}
-                </a>
-              ))}
+            <ActivityResults aria-label="Matching activities" aria-live="polite">
+              {sidebarActivities &&
+                sidebarActivities.map((activity, i) => (
+                  <ActivityResultLink
+                    href={`https://www.strava.com/activities/${activity.activityId}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    key={i}
+                    aria-label={`Open ${activity.activityName} on Strava`}
+                  >
+                    <ResultDate>{activity.activityDate}</ResultDate>
+                    <ResultName>{activity.activityName}</ResultName>
+                    <ResultType>{activity.activityType}</ResultType>
+                  </ActivityResultLink>
+                ))}
+              {filteredName.length > MAX_SIDEBAR_RESULTS && (
+                <ResultLimitNote>
+                  Showing {MAX_SIDEBAR_RESULTS} of {filteredName.length}. Refine the
+                  search to narrow results.
+                </ResultLimitNote>
+              )}
+            </ActivityResults>
           </SideNavigation>
 
           <MapWrapper>
@@ -464,6 +452,17 @@ const ActivitiesMap = () => {
 
             {windowWidth < 785 && mapboxAccessToken && (
               <MobileMapStyleControl>
+                <MapViewModeButton
+                  type="button"
+                  aria-label={`Switch to ${isThreeDimensional ? '2D' : '3D'} map view`}
+                  $active={isThreeDimensional}
+                  onClick={() => setIsThreeDimensional((enabled) => !enabled)}
+                >
+                  <MapViewModeIcon aria-hidden="true" />
+                  <MobileMapStyleButtonLabel>
+                    {isThreeDimensional ? '3D' : '2D'}
+                  </MobileMapStyleButtonLabel>
+                </MapViewModeButton>
                 {isMapStyleOpen && (
                   <MobileMapStylePopup aria-label="Choose map style">
                     <MobileMapStyleButton
@@ -513,7 +512,22 @@ const ActivitiesMap = () => {
             )}
 
             {mapboxAccessToken && (
-              <MapStyleToggle aria-label="Map style">{mapStyleButtons}</MapStyleToggle>
+              <>
+                <MapViewModeControl>
+                  <MapViewModeButton
+                    type="button"
+                    aria-label={`Switch to ${isThreeDimensional ? '2D' : '3D'} map view`}
+                    $active={isThreeDimensional}
+                    onClick={() => setIsThreeDimensional((enabled) => !enabled)}
+                  >
+                    <MapViewModeIcon aria-hidden="true" />
+                    <MobileMapStyleButtonLabel>
+                      {isThreeDimensional ? '3D' : '2D'}
+                    </MobileMapStyleButtonLabel>
+                  </MapViewModeButton>
+                </MapViewModeControl>
+                <MapStyleToggle aria-label="Map style">{mapStyleButtons}</MapStyleToggle>
+              </>
             )}
             <MapCanvas ref={mapContainer} />
           </MapWrapper>
@@ -679,7 +693,7 @@ const MapNotice = styled.div`
 const MapStyleToggle = styled.div`
   position: absolute;
   top: 1rem;
-  right: 4.75rem;
+  right: 3.75rem;
   z-index: 2;
   display: flex;
   overflow: hidden;
@@ -693,7 +707,19 @@ const MapStyleToggle = styled.div`
   }
 `;
 
+const MapViewModeControl = styled.div`
+  position: absolute;
+  top: 1rem;
+  right: 14rem;
+  z-index: 2;
+
+  @media screen and (max-width: 785px) {
+    display: none;
+  }
+`;
+
 const MapStyleButton = styled.button`
+  left: 2rem;
   min-width: 78px;
   min-height: 36px;
   padding: 0 0.8rem;
@@ -732,6 +758,7 @@ const MobileMapStylePopup = styled.div`
   display: grid;
   gap: 0.45rem;
   width: min(13rem, calc(100vw - 1.5rem));
+  margin-left: 2rem;
   padding: 0.55rem;
   border: 1px solid rgba(255, 255, 255, 0.28);
   border-radius: 8px;
@@ -775,6 +802,25 @@ const MobileMapStyleIconButton = styled.button`
     min-height: 3.1rem;
     padding: 0;
   }
+`;
+
+const MapViewModeButton = styled(MobileMapStyleIconButton)`
+  min-height: 2.75rem;
+  padding: 0 0.72rem;
+  background: ${(props) =>
+    props.$active ? 'rgba(252, 82, 0, 0.94)' : 'rgba(15, 23, 42, 0.9)'};
+
+  @media screen and (max-width: 420px) {
+    width: 2.9rem;
+    min-height: 2.9rem;
+    padding: 0;
+  }
+`;
+
+const MapViewModeIcon = styled(FiBox)`
+  width: 1.2rem;
+  height: 1.2rem;
+  flex: 0 0 auto;
 `;
 
 const MobileMapStyleIcon = styled(FiLayers)`
@@ -828,46 +874,84 @@ const MobileMapStyleButton = styled.button`
   }
 `;
 
-const SideNavigation = styled.div`
-  height: 100%;
-  margin-top: -2.5rem;
-  width: 230px;
+const SideNavigation = styled.aside`
+  height: calc(100vh - 1.5rem);
+  width: clamp(250px, 22vw, 320px);
   display: block;
   position: fixed;
-  z-index: 1;
-  top: 2em;
-  left: 0;
+  z-index: 3;
+  top: 0.75rem;
+  left: 0.75rem;
   scroll-behavior: smooth;
-  overflow-y: scroll;
-  padding-top: 20px;
-  background-color: #111;
-  opacity: 0.8;
+  overflow-y: auto;
+  padding: 1rem;
+  box-sizing: border-box;
+  border: 1px solid rgba(252, 82, 0, 0.46);
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, rgba(15, 23, 42, 0.96), rgba(2, 6, 23, 0.96)),
+    linear-gradient(135deg, rgba(252, 82, 0, 0.18), rgba(14, 165, 233, 0.12));
   color: white;
+  box-shadow: 0 22px 52px rgba(0, 0, 0, 0.44);
+  backdrop-filter: blur(18px);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(252, 82, 0, 0.78) rgba(15, 23, 42, 0.7);
 
-  @media screen and (max-width: 750px) {
+  @media screen and (max-width: 785px) {
     display: none;
   }
 
-  .search__input {
-    width: 90%;
-    height: 20px;
-    font-size: 1rem;
-    display: inline-block;
-    margin: 0px 0px 0px 5px;
-    margin-bottom: 0.5em;
-    border-radius: 0.5em;
-    margin-top: 10px;
-    border: 3px solid black;
-    padding: 5px;
+  .desktop-map-filter {
+    width: 100%;
+    min-width: 0;
+    height: 2.75rem;
+    margin: 0 0 0.75rem;
+    padding: 0 2rem 0 0.8rem;
+    box-sizing: border-box;
+    color: #0f172a;
+    background-color: rgba(255, 255, 255, 0.96);
+    border: 1px solid rgba(226, 232, 240, 0.9);
+    border-radius: 8px;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 0.92rem;
+    font-weight: 800;
     outline: none;
+    box-shadow: 0 10px 22px rgba(2, 6, 23, 0.22);
+  }
+
+  .desktop-map-filter:focus {
+    border-color: #fc5200;
+    box-shadow:
+      0 0 0 3px rgba(252, 82, 0, 0.24),
+      0 10px 22px rgba(2, 6, 23, 0.22);
+  }
+
+  .search__input {
+    width: 100%;
+    min-height: 2.75rem;
+    display: block;
+    margin: 0 0 0.85rem;
+    padding: 0 0.85rem;
+    box-sizing: border-box;
+    border: 1px solid rgba(226, 232, 240, 0.9);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.96);
+    color: #111827;
+    font-size: 0.92rem;
+    font-weight: 700;
+    outline: none;
+    box-shadow: 0 10px 22px rgba(2, 6, 23, 0.22);
   }
 
   .search__input:focus {
-    border: 1px solid red;
+    border-color: #fc5200;
+    box-shadow:
+      0 0 0 3px rgba(252, 82, 0, 0.24),
+      0 10px 22px rgba(2, 6, 23, 0.22);
   }
+
   .search__input::placeholder {
-    color: gray;
-    align-items: center;
+    color: #64748b;
   }
 
   .screenshot__button {
@@ -891,45 +975,97 @@ const SideNavigation = styled.div`
   }
   /* customise scrollbar for modern browser except firefox*/
   ::-webkit-scrollbar {
-    width: 10px;
+    width: 8px;
   }
   ::-webkit-scrollbar-track {
-    box-shadow: inset 0 0 5px grey;
-    border-radius: 10px;
+    background: rgba(15, 23, 42, 0.62);
+    border-radius: 999px;
   }
-  ::-webkit-scollbar-thumb {
-    background: #888;
-    border-radius: 10px;
+  ::-webkit-scrollbar-thumb {
+    background: rgba(252, 82, 0, 0.78);
+    border-radius: 999px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #555;
+    background: rgba(252, 82, 0, 0.96);
   }
+`;
 
-  ::-webkit-scrollbar-thumb:active {
-    background-color: #555;
-  }
-  ::-webkit-scrollbar-thumb:window-inactive {
-    background-color: #555;
-  }
-  ::-webkit-scrollbar-thumb:horizontal {
-    background-color: #555;
-  }
-  ::-webkit-scrollbar-thumb:vertical {
-    background-color: #555;
-  }
+const SidebarHeader = styled.header`
+  margin-bottom: 0.9rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+`;
 
-  a {
-    padding: 5px 3px 3px 20px;
-    line-break: 2px;
-    margin-top: 2px;
-    text-decoration: none;
-    font-size: 12px;
-    color: white;
-    display: block;
-  }
+const SidebarTitle = styled.h2`
+  margin: 0;
+  color: #ffffff;
+  font-size: 1.08rem;
+  font-weight: 900;
+  line-height: 1.2;
+`;
 
-  a:hover {
-    color: white;
-    text-decoration: underline;
+const SidebarText = styled.p`
+  margin: 0.35rem 0 0;
+  color: #cbd5e1;
+  font-size: 0.84rem;
+  line-height: 1.4;
+`;
+
+const ActivityResults = styled.nav`
+  display: grid;
+  gap: 0.55rem;
+`;
+
+const ActivityResultLink = styled.a`
+  display: grid;
+  gap: 0.16rem;
+  padding: 0.72rem 0.78rem;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.68);
+  color: #ffffff;
+  text-decoration: none;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    transform 160ms ease;
+
+  &:hover,
+  &:focus-visible {
+    background: rgba(252, 82, 0, 0.18);
+    border-color: rgba(252, 82, 0, 0.62);
+    outline: none;
+    transform: translateX(2px);
   }
+`;
+
+const ResultDate = styled.span`
+  color: #93c5fd;
+  font-size: 0.72rem;
+  font-weight: 800;
+`;
+
+const ResultName = styled.span`
+  color: #ffffff;
+  font-size: 0.88rem;
+  font-weight: 800;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+`;
+
+const ResultType = styled.span`
+  color: #cbd5e1;
+  font-size: 0.74rem;
+  font-weight: 700;
+`;
+
+const ResultLimitNote = styled.p`
+  margin: 0.35rem 0 0;
+  padding: 0.65rem 0.72rem;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.58);
+  color: #cbd5e1;
+  font-size: 0.78rem;
+  line-height: 1.4;
 `;
