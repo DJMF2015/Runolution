@@ -4,30 +4,30 @@ import { FiBox, FiLayers } from 'react-icons/fi';
 import { getAthleteActivities } from '../utils/functions';
 import { fetchTokenInfo } from '../utils/athleteActivitiesFunctions';
 import ActivityDropDown from '../components/ActivityDropDown';
-import addActivitiesLayers from '../components/MapActivityLayers';
+import Search from '../components/search';
+import addActivitiesLayers from '../utils/MapActivityLayers';
 import Login from '../components/Login';
 import styled from 'styled-components';
-import { removeDataAfterDuration } from '../utils/helpers';
-import { useGetWindowWidth, useScroll } from '../utils/hooks';
+import { hasStoredData, removeDataAfterDuration } from '../utils/helpers';
+import { useGetWindowWidth } from '../hooks/useWindowWidth';
+import { useScroll } from '../hooks/useScroll';
 import LoadingWheel from '../styles/Loading.module.css';
-import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import {
-  DEFAULT_MAP_CENTER,
-  DEFAULT_MAP_ZOOM,
   EMPTY_FEATURE_COLLECTION,
-  MAP_STYLES,
-  MAX_ACTIVITY_ZOOM,
   MAX_SIDEBAR_RESULTS,
-  createActivityPopupContent,
+  addActivitiesMapControls,
+  bindActivityLineInteractions,
+  createActivitiesMap,
+  createActivityPopup,
   filterMapActivities,
-  getBoundsForCoordinates,
-  getCameraFitKey,
   getDataPolylines,
   getMapViewCamera,
-  getRouteCoordinates,
   getRouteFeatureCollection,
+  setActivitiesSourceData,
+  updateActivitiesMapData,
 } from '../utils/activityMap';
+import { ACTIVITY_DETAIL_MAP_STYLES } from '../utils/mapStyles';
 
 const initialState = {
   nodes: [],
@@ -51,12 +51,12 @@ const ActivitiesMap = () => {
   const [mapStyle, setMapStyle] = useState('street');
   const [isMapStyleOpen, setIsMapStyleOpen] = useState(false);
   const [isThreeDimensional, setIsThreeDimensional] = useState(false);
-  const lastCameraFitKeyRef = useRef(null);
   const isThreeDimensionalRef = useRef(false);
   const deferredSearchTxt = useDeferredValue(searchTxt);
   const expires_in = localStorage.getItem('expires_in');
   const mapboxAccessToken = process.env.REACT_APP_MAPBOX_KEY;
   let access_token = JSON.parse(localStorage.getItem('access_token'));
+  const hasCachedActivities = state.nodes.length > 0 || hasStoredData('activities');
 
   useEffect(() => {
     setState((prevState) => ({
@@ -178,67 +178,29 @@ const ActivitiesMap = () => {
   }, [isThreeDimensional]);
 
   useEffect(() => {
-    if (!access_token || !mapboxAccessToken || !mapContainer.current || mapRef.current) {
+    if (!mapboxAccessToken || !mapContainer.current || mapRef.current) {
       return;
     }
     const onlineStatus = navigator.onLine;
     if (!onlineStatus) {
       setIsOffline(true);
     }
-    mapboxgl.accessToken = mapboxAccessToken;
-
-    const map = new mapboxgl.Map({
+    const map = createActivitiesMap({
       container: mapContainer.current,
-      style: MAP_STYLES.street,
-      center: DEFAULT_MAP_CENTER,
-      zoom: DEFAULT_MAP_ZOOM,
-      pitch: 0,
-      bearing: 0,
-      antialias: true,
-      projection: 'mercator',
+      accessToken: mapboxAccessToken,
     });
 
     mapRef.current = map;
-    popupRef.current = new mapboxgl.Popup({
-      closeButton: true,
-      closeOnClick: true,
-      maxWidth: '280px',
-    });
-
-    map.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), 'top-right');
-    map.addControl(new mapboxgl.FullscreenControl(), 'top-right');
-    map.addControl(new mapboxgl.ScaleControl(), 'bottom-left');
+    popupRef.current = createActivityPopup();
+    addActivitiesMapControls(map);
 
     map.on('style.load', () => {
       addActivitiesLayers(map);
-      const source = map.getSource('activities');
-      if (source) {
-        source.setData(routeFeatureCollectionRef.current);
-      }
+      setActivitiesSourceData(map, routeFeatureCollectionRef.current);
     });
 
     map.on('load', () => {
-      map.on('mouseenter', 'activities-lines', () => {
-        map.getCanvas().style.cursor = 'pointer';
-      });
-
-      map.on('mouseleave', 'activities-lines', () => {
-        map.getCanvas().style.cursor = '';
-      });
-
-      map.on('click', 'activities-lines', (event) => {
-        const feature = event.features?.[0];
-        const coordinates = event.lngLat;
-        if (!feature || !popupRef.current) {
-          return;
-        }
-
-        popupRef.current
-          .setLngLat(coordinates)
-          .setDOMContent(createActivityPopupContent(feature.properties))
-          .addTo(map);
-      });
-
+      bindActivityLineInteractions(map, popupRef);
       setIsMapLoaded(true);
     });
 
@@ -249,11 +211,11 @@ const ActivitiesMap = () => {
       popupRef.current = null;
       setIsMapLoaded(false);
     };
-  }, [access_token, mapboxAccessToken]);
+  }, [mapboxAccessToken]);
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !isMapLoaded || !MAP_STYLES[mapStyle]) {
+    if (!map || !isMapLoaded || !ACTIVITY_DETAIL_MAP_STYLES[mapStyle]) {
       return;
     }
 
@@ -262,7 +224,7 @@ const ActivitiesMap = () => {
     }
 
     currentMapStyleRef.current = mapStyle;
-    map.setStyle(MAP_STYLES[mapStyle]);
+    map.setStyle(ACTIVITY_DETAIL_MAP_STYLES[mapStyle]);
   }, [isMapLoaded, mapStyle]);
 
   useEffect(() => {
@@ -283,47 +245,7 @@ const ActivitiesMap = () => {
       return;
     }
 
-    const source = map.getSource('activities');
-    if (source) {
-      source.setData(routeFeatureCollection);
-    }
-
-    const cameraFitKey = getCameraFitKey({
-      filteredSportType,
-      activityCount: state.nodes.length,
-      isMobile: windowWidth < 785,
-    });
-
-    if (lastCameraFitKeyRef.current === cameraFitKey) {
-      return;
-    }
-
-    lastCameraFitKeyRef.current = cameraFitKey;
-
-    const coordinates = getRouteCoordinates(routeFeatureCollection);
-
-    if (coordinates.length === 0) {
-      return;
-    }
-
-    const bounds = getBoundsForCoordinates(coordinates);
-    if (!bounds) {
-      return;
-    }
-
-    const camera = map.cameraForBounds(bounds, {
-      padding: {
-        top: 90,
-        right: 60,
-        bottom: 60,
-        left: windowWidth < 785 ? 40 : 280,
-      },
-      maxZoom: MAX_ACTIVITY_ZOOM,
-    });
-
-    if (!camera) {
-      return;
-    }
+    updateActivitiesMapData(map, routeFeatureCollection, windowWidth);
   }, [
     filteredSportType,
     routeFeatureCollection,
@@ -378,7 +300,7 @@ const ActivitiesMap = () => {
 
   return (
     <>
-      {!access_token || expires_in === 0 ? (
+      {(!access_token || expires_in === 0) && !hasCachedActivities ? (
         <Login />
       ) : (
         <>
@@ -397,14 +319,13 @@ const ActivitiesMap = () => {
                 <ScrollToTop alt="Go to top"></ScrollToTop>
               </div>
             )}
-            <input
+            <Search
               className="search__input"
-              type="text"
+              searchTxt={searchTxt}
+              updateSearchTxt={setSearchTxt}
               placeholder="Search by activity name..."
               aria-label="Search activities by name"
-              onChange={(e) => setSearchTxt(e.target.value)}
             />
-
             <ActivityResults aria-label="Matching activities" aria-live="polite">
               {sidebarActivities &&
                 sidebarActivities.map((activity, i) => (
@@ -438,12 +359,12 @@ const ActivitiesMap = () => {
                     props={state.nodes}
                     setFilterBySportType={setFilteredSportType}
                   />
-                  <MobileSearchInput
-                    type="text"
-                    value={searchTxt}
+                  <Search
+                    className="mobile-map-search"
+                    searchTxt={searchTxt}
+                    updateSearchTxt={setSearchTxt}
                     placeholder="Search activities"
                     aria-label="Search by activity name"
-                    onChange={(e) => setSearchTxt(e.target.value)}
                   />
                 </MobileFilterPanel>
               </MobileMapControls>
@@ -459,7 +380,7 @@ const ActivitiesMap = () => {
                 >
                   <MapViewModeIcon aria-hidden="true" />
                   <MobileMapStyleButtonLabel>
-                    {isThreeDimensional ? '3D' : '2D'}
+                    {isThreeDimensional ? '2D' : '3D'}
                   </MobileMapStyleButtonLabel>
                 </MapViewModeButton>
                 {isMapStyleOpen && (
@@ -622,6 +543,35 @@ const MobileFilterPanel = styled.div`
       0 6px 16px rgba(15, 23, 42, 0.2);
   }
 
+  .mobile-map-search {
+    width: 100%;
+    min-width: 0;
+    height: 2.35rem;
+    margin: 0;
+    padding: 0 0.7rem;
+    box-sizing: border-box;
+    color: #0f172a;
+    background: rgba(255, 255, 255, 0.96);
+    border: 1px solid rgba(15, 23, 42, 0.2);
+    border-radius: 6px;
+    font-size: 0.84rem;
+    font-weight: 700;
+    outline: none;
+    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.2);
+  }
+
+  .mobile-map-search::placeholder {
+    color: #6b7280;
+    font-weight: 600;
+  }
+
+  .mobile-map-search:focus {
+    border-color: #fc5200;
+    box-shadow:
+      0 0 0 2px rgba(252, 82, 0, 0.28),
+      0 6px 16px rgba(15, 23, 42, 0.2);
+  }
+
   @media screen and (max-width: 520px) {
     grid-template-columns: 1fr;
   }
@@ -634,42 +584,12 @@ const MobileFilterPanel = styled.div`
       font-size: 0.78rem;
       padding-left: 0.55rem;
     }
-  }
-`;
 
-const MobileSearchInput = styled.input`
-  width: 100%;
-  min-width: 0;
-  height: 2.35rem;
-  padding: 0 0.7rem;
-  box-sizing: border-box;
-  color: #0f172a;
-  background: rgba(255, 255, 255, 0.96);
-  border: 1px solid rgba(13, 12, 12, 0.76);
-  border-radius: 6px;
-  font-size: 0.84rem;
-  font-weight: 700;
-  outline: none;
-  border-color: rgba(15, 23, 42, 0.2);
-  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.2);
-
-  &::placeholder {
-    color: #6b7280;
-    font-weight: 600;
-  }
-
-  &:focus {
-    border-color: #fc5200;
-    box-shadow:
-      0 0 0 2px rgba(252, 82, 0, 0.28),
-      0 6px 16px rgba(15, 23, 42, 0.2);
-  }
-
-  @media screen and (max-width: 380px) {
-    display: none;
-    height: 2.15rem;
-    padding: 0 0.55rem;
-    font-size: 0.78rem;
+    .mobile-map-search {
+      height: 2.15rem;
+      padding: 0 0.55rem;
+      font-size: 0.78rem;
+    }
   }
 `;
 
