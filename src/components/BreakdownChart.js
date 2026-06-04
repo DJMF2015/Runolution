@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { getAthleteStats } from '../utils/functions';
+import { fetchTokenInfo } from '../utils/athleteActivitiesFunctions';
 import { isUnauthorizedError } from '../utils/helpers';
 import styled from 'styled-components';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
@@ -92,7 +93,6 @@ export const options = {
 
 const BreakdownChart = ({ props, onAuthError }) => {
   const athlete = JSON.parse(localStorage.getItem('athlete'));
-  const access_token = JSON.parse(localStorage.getItem('access_token'));
   const activities = useMemo(() => (Array.isArray(props) ? props : []), [props]);
   const [allTimeTotals, setAllTimeTotals] = useState({
     ride: 0,
@@ -103,13 +103,20 @@ const BreakdownChart = ({ props, onAuthError }) => {
 
   useEffect(() => {
     async function fetchData() {
-      if (!athlete?.id || !access_token) {
+      if (!athlete?.id) {
         setIsLoading(false);
         return;
       }
 
       try {
-        const athleteStats = await getAthleteStats(athlete.id, access_token);
+        const accessToken = await fetchTokenInfo();
+
+        if (!accessToken) {
+          setIsLoading(false);
+          return;
+        }
+
+        const athleteStats = await getAthleteStats(athlete.id, accessToken);
         const stats = athleteStats?.data || {};
 
         setAllTimeTotals({
@@ -130,7 +137,7 @@ const BreakdownChart = ({ props, onAuthError }) => {
     }
 
     fetchData();
-  }, [athlete?.id, access_token, onAuthError]);
+  }, [athlete?.id, onAuthError]);
 
   const recentTotals = useMemo(() => {
     return ACTIVITY_TYPES.reduce((totals, type) => {
@@ -146,7 +153,12 @@ const BreakdownChart = ({ props, onAuthError }) => {
     0,
   );
   const loadedActivityCount = activities.length;
-  const hasData = totalAllTimeActivities > 0 || loadedActivityCount > 0;
+  const hasAllTimeData = totalAllTimeActivities > 0;
+  const displayTotals = hasAllTimeData ? allTimeTotals : recentTotals;
+  const displayTotalActivities = hasAllTimeData
+    ? totalAllTimeActivities
+    : Object.values(recentTotals).reduce((sum, value) => sum + value, 0);
+  const hasData = displayTotalActivities > 0 || loadedActivityCount > 0;
 
   if (isLoading) {
     return <ChartShell>Loading activity breakdown...</ChartShell>;
@@ -160,8 +172,8 @@ const BreakdownChart = ({ props, onAuthError }) => {
     labels: ACTIVITY_TYPES.map((type) => type.label),
     datasets: [
       {
-        label: 'All time',
-        data: ACTIVITY_TYPES.map((type) => allTimeTotals[type.key]),
+        label: hasAllTimeData ? 'All time' : 'Loaded',
+        data: ACTIVITY_TYPES.map((type) => displayTotals[type.key]),
         backgroundColor: ACTIVITY_TYPES.map((type) => type.colour),
         borderColor: '#0f172a',
         borderRadius: 8,
@@ -169,16 +181,20 @@ const BreakdownChart = ({ props, onAuthError }) => {
         hoverOffset: 10,
         spacing: 3,
       },
-      {
-        label: 'Loaded',
-        data: ACTIVITY_TYPES.map((type) => recentTotals[type.key]),
-        backgroundColor: ACTIVITY_TYPES.map((type) => type.softColour),
-        borderColor: '#0f172a',
-        borderRadius: 8,
-        borderWidth: 3,
-        hoverOffset: 8,
-        spacing: 3,
-      },
+      ...(hasAllTimeData
+        ? [
+            {
+              label: 'Loaded',
+              data: ACTIVITY_TYPES.map((type) => recentTotals[type.key]),
+              backgroundColor: ACTIVITY_TYPES.map((type) => type.softColour),
+              borderColor: '#0f172a',
+              borderRadius: 8,
+              borderWidth: 3,
+              hoverOffset: 8,
+              spacing: 3,
+            },
+          ]
+        : []),
     ],
   };
 
@@ -197,18 +213,18 @@ const BreakdownChart = ({ props, onAuthError }) => {
         <ChartCanvasWrap>
           <Doughnut data={data} options={options} />
           <CentreMetric>
-            <CentreValue>{totalAllTimeActivities.toLocaleString('en-GB')}</CentreValue>
-            <CentreLabel>all time</CentreLabel>
+            <CentreValue>{displayTotalActivities.toLocaleString('en-GB')}</CentreValue>
+            <CentreLabel>{hasAllTimeData ? 'all time' : 'loaded'}</CentreLabel>
           </CentreMetric>
         </ChartCanvasWrap>
 
         <StatsList>
           {ACTIVITY_TYPES.map((type) => {
-            const allTime = allTimeTotals[type.key];
+            const displayTotal = displayTotals[type.key];
             const recent = recentTotals[type.key];
             const percentage =
-              totalAllTimeActivities > 0
-                ? Math.round((allTime / totalAllTimeActivities) * 100)
+              displayTotalActivities > 0
+                ? Math.round((displayTotal / displayTotalActivities) * 100)
                 : 0;
 
             return (
@@ -218,7 +234,7 @@ const BreakdownChart = ({ props, onAuthError }) => {
                 <StatContent>
                   <StatTopLine>
                     <StatLabel>{type.label}</StatLabel>
-                    <StatValue>{allTime.toLocaleString('en-GB')}</StatValue>
+                    <StatValue>{displayTotal.toLocaleString('en-GB')}</StatValue>
                   </StatTopLine>
 
                   <ProgressTrack>
@@ -231,7 +247,8 @@ const BreakdownChart = ({ props, onAuthError }) => {
                   </ProgressTrack>
 
                   <StatMeta>
-                    {percentage}% of all time / {recent.toLocaleString('en-GB')} loaded
+                    {percentage}% {hasAllTimeData ? 'of all time' : 'of loaded'} /{' '}
+                    {recent.toLocaleString('en-GB')} loaded
                   </StatMeta>
                 </StatContent>
               </StatRow>
