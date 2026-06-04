@@ -22,6 +22,9 @@ export class RateLimiter {
     } else {
       // Not enough tokens, wait until next interval
       const waitTime = this.intervalDuration - (elapsedTime % this.intervalDuration);
+      console.log(
+        `Rate limit exceeded. Waiting for ${Math.ceil(waitTime / 1000)} seconds before retrying...`,
+      );
       await sleep(waitTime);
       this.lastResetTime = Date.now();
       this.tokens = this.requestsPerInterval - 1;
