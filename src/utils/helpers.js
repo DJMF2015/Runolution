@@ -9,14 +9,33 @@ const STRAVA_AUTH_KEYS = [
   'expires_at',
 ];
 
+/**
+ * Removes only Strava authentication values from localStorage.
+ * Cached activity and athlete data are intentionally left untouched so the app
+ * can still render stored data without a live session.
+ */
 export const clearStravaAuth = () => {
   STRAVA_AUTH_KEYS.forEach((key) => localStorage.removeItem(key));
 };
 
+/**
+ * Checks whether a localStorage key exists without parsing the stored value.
+ */
+export const hasStoredData = (key) => {
+  return localStorage.getItem(key) !== null;
+};
+
+/**
+ * Normalizes the different auth error shapes used by Axios and local token
+ * checks into a single boolean guard.
+ */
 export const isUnauthorizedError = (error) => {
   return error?.isAuthError || error?.status === 401 || error?.response?.status === 401;
 };
 
+/**
+ * Wraps an underlying Axios/token error with auth-specific metadata.
+ */
 const createAuthError = (message, error) => {
   const authError = new Error(`${message} ${error.message}`);
   authError.isAuthError = true;
@@ -25,7 +44,20 @@ const createAuthError = (message, error) => {
   return authError;
 };
 
-// get exchange token from URL to retrieve the access token
+const postOAuthTokenRequest = (params) => {
+  return axios.post(auth_link, new URLSearchParams(params), {
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+  });
+};
+
+/**
+ * Extracts the Strava OAuth exchange code from the redirect URL.
+ *
+ * @param {string|null} token - Code query-string value from the redirect route.
+ * @returns {string|undefined} OAuth code used for the token exchange.
+ */
 export const getExchangeCodeFromURL = (token) => {
   if (token && window.location.href.includes('code')) {
     const authToken = window.location.href.split('=code')[0].split('&')[1].split('=')[1];
@@ -33,12 +65,18 @@ export const getExchangeCodeFromURL = (token) => {
   }
 };
 
-// get new access token  from local storage if it exists and if not expired set to local storage
+/**
+ * Exchanges a Strava OAuth code for an access/refresh token payload and stores
+ * the resulting credentials in localStorage.
+ */
 export const getAccessToken = async (authCode) => {
   try {
-    const response = await axios.post(
-      `${auth_link}?client_id=${client_id}&client_secret=${client_secret}&code=${authCode}&grant_type=authorization_code`
-    );
+    const response = await postOAuthTokenRequest({
+      client_id,
+      client_secret,
+      code: authCode,
+      grant_type: 'authorization_code',
+    });
     if (response.data) {
       storePayloadToLocalStorage(response.data);
     }
@@ -48,7 +86,9 @@ export const getAccessToken = async (authCode) => {
   }
 };
 
-//get new access token using refresh token if the current access token has expired and set to local storage
+/**
+ * Refreshes the Strava access token using the stored refresh token.
+ */
 export const getNewAccessToken = async () => {
   const refreshToken = JSON.parse(localStorage.getItem('refresh_token'));
 
@@ -59,9 +99,12 @@ export const getNewAccessToken = async () => {
   }
 
   try {
-    const response = await axios.post(
-      `${auth_link}?client_id=${client_id}&client_secret=${client_secret}&refresh_token=${refreshToken}&grant_type=refresh_token`
-    );
+    const response = await postOAuthTokenRequest({
+      client_id,
+      client_secret,
+      refresh_token: refreshToken,
+      grant_type: 'refresh_token',
+    });
     if (response.data) {
       storePayloadToLocalStorage(response.data);
     }
@@ -72,10 +115,11 @@ export const getNewAccessToken = async () => {
 };
 
 /**
+ * Returns a valid access token, refreshing it shortly before expiry when needed.
  *
- * @param {function} expires_in
- * @param {function} expires_at
- * @returns  check if token has expired and if so get new access token
+ * @param {number|string} expires_in - Strava expiry duration stored from auth.
+ * @param {number|string} expires_at - Unix timestamp, in seconds, for expiry.
+ * @returns {Promise<string|null>} Current or refreshed access token.
  */
 export const checkIfTokenExpired = async (expires_in, expires_at) => {
   const accessToken = JSON.parse(localStorage.getItem('access_token'));
@@ -95,11 +139,13 @@ export const checkIfTokenExpired = async (expires_in, expires_at) => {
 };
 
 /**
+ * Removes stale cached data once it is older than the provided retention window.
+ * Stored values without a `timestamp` field are currently left to existing
+ * parsing/date behavior.
  *
- * @param  {data} key
- * @param {integer} durationInDays
+ * @param {string} key - localStorage key to check.
+ * @param {number} durationInDays - Maximum cache age in days.
  */
-// Utility function to remove data from local storage after 6 days to comply with Strava's regulations
 export const removeDataAfterDuration = (key, durationInDays) => {
   const storedData = localStorage.getItem(key);
 
@@ -121,9 +167,9 @@ export const removeDataAfterDuration = (key, durationInDays) => {
 };
 
 /**
+ * Stores the Strava OAuth payload and token fields used by refresh logic.
  *
- * @param { json array} payload  an async function
- * @returns {function} store payload to local storage
+ * @param {Object} payload - Token response returned by Strava.
  */
 const storePayloadToLocalStorage = (payload) => {
   removeDataAfterDuration('payload', 6);
@@ -140,9 +186,11 @@ const storePayloadToLocalStorage = (payload) => {
 };
 
 /**
- * Higher-order function for async/await error handling
- * @param {function} fn an async function
- * @returns {function}
+ * Wraps an async function so rejected promises are re-thrown as standard Error
+ * instances.
+ *
+ * @param {Function} fn - Async function to wrap.
+ * @returns {Function} Wrapped function preserving the original arguments.
  */
 export const catchErrors = (fn) => {
   return function (...args) {
