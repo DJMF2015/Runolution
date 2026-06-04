@@ -1,53 +1,18 @@
 import { useEffect, useState } from 'react';
 
-// custom hook for getting the window width
-export const useGetWindowWidth = () => {
-  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
-
-  useEffect(() => {
-    const handleResize = () => {
-      setWindowWidth(window.innerWidth);
-    };
-
-    window.addEventListener('resize', handleResize);
-
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  return { windowWidth };
-};
-
-export const useScroll = () => {
-  const [isVisible, setIsVisible] = useState(false);
-
-  const toggleVisibility = () => {
-    if (window.scrollY > 300) {
-      setIsVisible(true);
-    } else {
-      setIsVisible(false);
-    }
-  };
-
-  const scrollToTop = () => {
-    window.scrollTo({
-      top: 0,
-      behavior: 'smooth',
-    });
-  };
-
-  useEffect(() => {
-    window.addEventListener('scroll', toggleVisibility);
-    return () => {
-      window.removeEventListener('scroll', toggleVisibility);
-    };
-  }, []);
-
-  return { isVisible, scrollToTop };
-};
-
+/**
+ * Keeps a single field in a component state object synchronized with
+ * localStorage.
+ *
+ * The hook reads once on mount, reports when hydration is complete, and writes
+ * future non-empty values back to localStorage.
+ */
 export const useLocalStorageState = ({ key, state, setState, stateKey }) => {
   const [hasLoadedFromStorage, setHasLoadedFromStorage] = useState(false);
   const valueToStore = state[stateKey];
+
+  // Hydrate the requested state field before the caller decides whether it
+  // needs to fetch fresh data.
   useEffect(() => {
     try {
       const item = localStorage.getItem(key);
@@ -65,6 +30,8 @@ export const useLocalStorageState = ({ key, state, setState, stateKey }) => {
     }
   }, [key, setState, stateKey]);
 
+  // Avoid overwriting a populated cache with an initial empty array before
+  // hydration has completed.
   useEffect(() => {
     if (!hasLoadedFromStorage) {
       return;

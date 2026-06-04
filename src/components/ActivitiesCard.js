@@ -1,84 +1,44 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { ArrowUpCircleFill } from '@styled-icons/bootstrap/ArrowUpCircleFill';
-import { FiBox, FiChevronDown, FiChevronLeft, FiLayers, FiMenu } from 'react-icons/fi';
+import {
+  FiBox,
+  FiChevronDown,
+  FiChevronLeft,
+  FiLayers,
+  FiMenu,
+  FiMinus,
+  FiPlay,
+  FiSquare,
+  FiPlus,
+} from 'react-icons/fi';
 import styled from 'styled-components';
-import { useScroll } from '../utils/hooks';
-import MapCoordinatesHelper from '../utils/mapCoordinates';
+import { useScroll } from '../hooks/useScroll';
 import { getSufferScore, getMilesToKms, getMetresToFeet } from '../utils/conversion';
-import { addActivityMapLayers } from './MapActivityLayers';
-import mapboxgl from 'mapbox-gl';
-import * as turf from '@turf/turf';
+import { addActivityMapLayers } from '../utils/MapActivityLayers';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import {
   getCommentsByActivityId,
   getDetailedAthleteData,
   getKudoersByActivityId,
+  getAthleteStreams,
 } from '../utils/functions';
-import polyline from '@mapbox/polyline';
-
-const MAP_STYLES = {
-  street: 'mapbox://styles/mapbox/streets-v12',
-  satellite: 'mapbox://styles/mapbox/satellite-v9',
-};
-
-const getActivityLineFeature = (summaryPolyline) => {
-  if (!summaryPolyline) {
-    return null;
-  }
-
-  const activityGeoJson = polyline.toGeoJSON(summaryPolyline);
-  return MapCoordinatesHelper(activityGeoJson);
-};
-
-const getRouteBounds = (coordinates) => {
-  if (!coordinates?.length) {
-    return null;
-  }
-
-  return coordinates.reduce(
-    (bounds, coordinate) => bounds.extend(coordinate),
-    new mapboxgl.LngLatBounds(coordinates[0], coordinates[0]),
-  );
-};
-
-const getRouteMapPadding = (isNavigationCollapsed) => {
-  if (typeof window !== 'undefined' && window.innerWidth <= 800) {
-    if (isNavigationCollapsed) {
-      return { top: 96, bottom: 110, left: 36, right: 36 };
-    }
-
-    return { top: 96, bottom: 260, left: 36, right: 36 };
-  }
-
-  if (isNavigationCollapsed) {
-    return { top: 86, bottom: 80, left: 80, right: 80 };
-  }
-
-  return { top: 86, bottom: 80, left: 360, right: 80 };
-};
-
-const fitRouteToMap = (
-  map,
-  coordinates,
-  isThreeDimensional,
-  isNavigationCollapsed,
-  duration = 1200,
-) => {
-  const bounds = getRouteBounds(coordinates);
-
-  if (!map || !bounds) {
-    return;
-  }
-
-  map.fitBounds(bounds, {
-    padding: getRouteMapPadding(isNavigationCollapsed),
-    duration,
-    pitch: isThreeDimensional ? 55 : 0,
-    bearing: isThreeDimensional ? -18 : 0,
-    maxZoom: isThreeDimensional ? 15 : 16,
-  });
-};
+import { fetchTokenInfo } from '../utils/athleteActivitiesFunctions';
+import { ACTIVITY_DETAIL_MAP_STYLES } from '../utils/mapStyles';
+import {
+  addActivityDetailMapControls,
+  createActivityDetailMap,
+  fitRouteToMap,
+  getActivityLineFeature,
+  getActivityRouteCenter,
+} from '../utils/activityRouteMap';
+import {
+  formatFlyoverDistance,
+  getFlyoverRouteCoordinates,
+  getFlyoverRouteFeatureFromStreams,
+  setFlyoverRouteGradient,
+} from '../utils/flyOverHelper';
+import { useFlyoverAnimation } from '../hooks/useFlyoverAnimation';
 
 export default function ActivitiesCard() {
   const { isVisible, scrollToTop } = useScroll();
@@ -101,18 +61,48 @@ export default function ActivitiesCard() {
   const location = useLocation();
   const from = location.state?.from;
   const coordinates = from?.map?.summary_polyline;
-  const accessToken = localStorage.getItem('access_token');
-  const token = JSON.parse(accessToken);
   const mapContainer = useRef(null);
   const mapRef = useRef(null);
   const currentMapStyleRef = useRef('street');
   const isActivityNavCollapsedRef = useRef(false);
   const data = useMemo(() => getActivityLineFeature(coordinates), [coordinates]);
   const routeCoordinates = useMemo(() => data?.geometry?.coordinates || [], [data]);
-
   const routeCenter = useMemo(() => {
-    return data ? turf.center(data).geometry.coordinates : [-3.21698, 55.89107];
+    return getActivityRouteCenter(data);
   }, [data]);
+  const flyoverRouteLine = useMemo(() => {
+    return getFlyoverRouteFeatureFromStreams(athleteData?.athleteStreams);
+  }, [athleteData?.athleteStreams]);
+  const flyoverRouteCoordinates = useMemo(() => {
+    return getFlyoverRouteCoordinates(flyoverRouteLine, routeCoordinates);
+  }, [flyoverRouteLine, routeCoordinates]);
+
+  const {
+    consumeRouteFitSkip,
+    decreaseFlyoverSpeed,
+    dismissFlyoverSummary,
+    flyoverAveragePace,
+    flyoverDistanceKm,
+    flyoverSpeed,
+    flyoverTotalDistance,
+    flyoverTotalElevation,
+    increaseFlyoverSpeed,
+    isFlyoverPlaying,
+    isFlyoverSpeedMax,
+    isFlyoverSpeedMin,
+    showFlyoverSummary,
+    startFlyover,
+    stopFlyover,
+  } = useFlyoverAnimation({
+    activity: from,
+    currentMapStyleRef,
+    data,
+    fitRouteToMap,
+    flyoverRouteLine,
+    isActivityNavCollapsedRef,
+    mapRef,
+    routeCoordinates,
+  });
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
@@ -137,24 +127,43 @@ export default function ActivitiesCard() {
 
   useEffect(() => {
     async function fetchData() {
-      if (!from?.id || !token || !isOnline) {
+      if (!from?.id || !isOnline) {
         return;
       }
 
       try {
-        const [kudoersResponse, commentsResponse, detailedActivityResponse] =
-          await Promise.all([
-            getKudoersByActivityId(from.id, token),
-            getCommentsByActivityId(from.id, token),
-            getDetailedAthleteData(from.id, token),
-          ]);
+        const token = await fetchTokenInfo();
+
+        if (!token) {
+          return;
+        }
+
+        const [
+          kudoersResponse,
+          commentsResponse,
+          detailedActivityResponse,
+          athleteStreamsResponse,
+        ] = await Promise.all([
+          getKudoersByActivityId(from.id, token),
+          getCommentsByActivityId(from.id, token),
+          getDetailedAthleteData(from.id, token),
+          getAthleteStreams(from.id, token).catch(() => null),
+        ]);
 
         setAthleteData((prevState) => ({
           ...prevState,
           kudosoers: kudoersResponse.data,
           comments: commentsResponse.data,
           detailedActivity: detailedActivityResponse.data,
+          athleteStreams: athleteStreamsResponse?.data || null,
         }));
+
+        if (detailedActivityResponse.data?.id) {
+          localStorage.setItem(
+            `activity-detail-${detailedActivityResponse.data.id}`,
+            JSON.stringify(detailedActivityResponse.data),
+          );
+        }
       } catch (error) {
         console.error(error.message);
         setDetailError(
@@ -163,37 +172,29 @@ export default function ActivitiesCard() {
       }
     }
     fetchData();
-  }, [from?.id, isOnline, token]);
+  }, [from?.id, isOnline]);
 
   useEffect(() => {
     if (!data || !mapContainer.current || !isOnline) {
       return;
     }
 
-    mapboxgl.accessToken = process.env.REACT_APP_MAPBOX_KEY;
-    const map = new mapboxgl.Map({
-      style: MAP_STYLES.street,
-      antialias: true,
+    const map = createActivityDetailMap({
+      accessToken: process.env.REACT_APP_MAPBOX_KEY,
+      container: mapContainer?.current,
       center: routeCenter,
-      zoom: 12,
-      pitch: 0,
-      bearing: 0,
-      interactive: true,
-      hash: false,
-      container: mapContainer.current,
+      style: ACTIVITY_DETAIL_MAP_STYLES.street,
     });
 
     mapRef.current = map;
 
     map.on('style.load', () => {
       addActivityMapLayers(map, data);
+      setFlyoverRouteGradient(map, from);
     });
 
     map.on('load', () => {
-      map.addControl(new mapboxgl.NavigationControl());
-      map.addControl(new mapboxgl.FullscreenControl());
-      map.addControl(new mapboxgl.ScaleControl());
-
+      addActivityDetailMapControls(map);
       fitRouteToMap(map, routeCoordinates, false, false, 1800);
     });
     return () => {
@@ -201,11 +202,19 @@ export default function ActivitiesCard() {
       mapRef.current = null;
       currentMapStyleRef.current = 'street';
     };
-  }, [data, from?.end_latlng, isOnline, routeCenter, routeCoordinates]);
+  }, [data, from, from?.end_latlng, isOnline, routeCenter, routeCoordinates]);
 
   useEffect(() => {
-    const map = mapRef.current;
+    const map = mapRef?.current;
     if (!map) {
+      return;
+    }
+
+    if (isFlyoverPlaying) {
+      return;
+    }
+
+    if (consumeRouteFitSkip()) {
       return;
     }
 
@@ -216,11 +225,11 @@ export default function ActivitiesCard() {
       isActivityNavCollapsedRef.current,
       900,
     );
-  }, [isThreeDimensional, routeCoordinates]);
+  }, [consumeRouteFitSkip, isFlyoverPlaying, isThreeDimensional, routeCoordinates]);
 
   useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !MAP_STYLES[mapStyle]) {
+    const map = mapRef?.current;
+    if (!map || !ACTIVITY_DETAIL_MAP_STYLES[mapStyle]) {
       return;
     }
 
@@ -229,8 +238,9 @@ export default function ActivitiesCard() {
     }
 
     currentMapStyleRef.current = mapStyle;
-    map.setStyle(MAP_STYLES[mapStyle]);
-  }, [mapStyle]);
+    stopFlyover();
+    map.setStyle(ACTIVITY_DETAIL_MAP_STYLES[mapStyle]);
+  }, [mapStyle, stopFlyover]);
 
   if (!from) {
     return (
@@ -316,7 +326,10 @@ export default function ActivitiesCard() {
                 )}
               </ActivitySummaryHeader>
               <NavActions>
-                <ActionLink to="/splits" state={{ from: from }}>
+                <ActionLink
+                  to="/splits"
+                  state={{ from, detailedActivity: athleteData?.detailedActivity }}
+                >
                   View Splits
                 </ActionLink>
                 <ActionLink to="/">Go Back</ActionLink>
@@ -388,6 +401,81 @@ export default function ActivitiesCard() {
         </SideNavigation>
 
         <MapShell>
+          <FlyoverControl>
+            <FlyoverButton
+              type="button"
+              aria-label="Play route flyover"
+              disabled={isFlyoverPlaying || flyoverRouteCoordinates.length < 2}
+              onClick={startFlyover}
+            >
+              <FiPlay aria-hidden="true" />
+              <FlyoverLabel>Play</FlyoverLabel>
+            </FlyoverButton>
+            <FlyoverButton
+              type="button"
+              aria-label="Stop route flyover"
+              disabled={!isFlyoverPlaying}
+              onClick={stopFlyover}
+            >
+              <FiSquare aria-hidden="true" />
+              <FlyoverLabel>Stop</FlyoverLabel>
+            </FlyoverButton>
+            <FlyoverSpeedGroup aria-label="Flyover speed controls">
+              <FlyoverButton
+                type="button"
+                aria-label="Decrease flyover speed"
+                disabled={isFlyoverSpeedMin}
+                onClick={decreaseFlyoverSpeed}
+              >
+                <FiMinus aria-hidden="true" />
+              </FlyoverButton>
+              <FlyoverSpeedValue aria-live="polite">{flyoverSpeed}x</FlyoverSpeedValue>
+              <FlyoverButton
+                type="button"
+                aria-label="Increase flyover speed"
+                disabled={isFlyoverSpeedMax}
+                onClick={increaseFlyoverSpeed}
+              >
+                <FiPlus aria-hidden="true" />
+              </FlyoverButton>
+            </FlyoverSpeedGroup>
+          </FlyoverControl>
+          {isFlyoverPlaying && (
+            <FlyoverLiveStats $navCollapsed={isActivityNavCollapsed}>
+              <FlyoverLiveStat $featured>
+                <span>Distance</span>
+                <strong>{formatFlyoverDistance(flyoverDistanceKm)}</strong>
+              </FlyoverLiveStat>
+              <FlyoverLiveStat>
+                <span>Pace</span>
+                <strong>{flyoverAveragePace}</strong>
+              </FlyoverLiveStat>
+            </FlyoverLiveStats>
+          )}
+          {showFlyoverSummary && (
+            <FlyoverSummary aria-live="polite">
+              <FlyoverSummaryCloseButton
+                type="button"
+                aria-label="Close flyover summary"
+                onClick={dismissFlyoverSummary}
+              >
+                &times;
+              </FlyoverSummaryCloseButton>
+
+              <FlyoverSummaryStat>
+                <span>Distance</span>
+                <strong>{flyoverTotalDistance}</strong>
+              </FlyoverSummaryStat>
+              <FlyoverSummaryStat>
+                <span>Avg Pace</span>
+                <strong>{flyoverAveragePace}</strong>
+              </FlyoverSummaryStat>
+              <FlyoverSummaryStat>
+                <span>Elevation</span>
+                <strong>{flyoverTotalElevation}</strong>
+              </FlyoverSummaryStat>
+            </FlyoverSummary>
+          )}
           <MapStyleControl $navCollapsed={isActivityNavCollapsed}>
             <MapViewModeButton
               type="button"
@@ -410,7 +498,7 @@ export default function ActivitiesCard() {
                     setIsMapStyleOpen(false);
                   }}
                 >
-                  Streets
+                  Outdoors
                 </MapStyleButton>
                 <MapStyleButton
                   type="button"
@@ -436,7 +524,10 @@ export default function ActivitiesCard() {
               </MapStyleButtonLabel>
             </MapStyleIconButton>
           </MapStyleControl>
-          <Map id="map" ref={(el) => (mapContainer.current = el)}></Map>
+          <Map
+            id="map"
+            ref={(el) => (mapContainer ? (mapContainer.current = el) : null)}
+          ></Map>
         </MapShell>
       </PageShell>
     </>
@@ -633,6 +724,283 @@ const MapStylePopup = styled.div`
     linear-gradient(135deg, rgba(252, 82, 0, 0.24), rgba(59, 130, 246, 0.16));
   box-shadow: 0 18px 38px rgba(0, 0, 0, 0.38);
   backdrop-filter: blur(16px);
+`;
+
+const FlyoverControl = styled.div`
+  position: absolute;
+  top: 5.35rem;
+  right: 4.75rem;
+  z-index: 1030;
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.9);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.34);
+  backdrop-filter: blur(14px);
+
+  @media screen and (max-width: 800px) {
+    top: 4.85rem;
+    right: 4.25rem;
+  }
+
+  @media screen and (max-width: 520px) {
+    right: 3.95rem;
+    transform: scale(0.94);
+    transform-origin: top right;
+  }
+
+  @media screen and (max-width: 420px) {
+    border-radius: 14px;
+    right: 3.75rem;
+    transform: scale(0.9);
+  }
+`;
+
+const FlyoverButton = styled.button`
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0 0.75rem;
+  border: 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.18);
+  background: transparent;
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 800;
+  transition:
+    background 160ms ease,
+    color 160ms ease;
+
+  &:last-child {
+    border-right: 0;
+  }
+
+  &:hover:not(:disabled),
+  &:focus-visible:not(:disabled) {
+    background: rgba(252, 82, 0, 0.92);
+    outline: none;
+  }
+
+  &:disabled {
+    color: rgba(255, 255, 255, 0.46);
+    cursor: not-allowed;
+  }
+
+  svg {
+    width: 1rem;
+    height: 1rem;
+    flex: 0 0 auto;
+  }
+
+  @media screen and (max-width: 420px) {
+    width: 2.45rem;
+    min-height: 2.55rem;
+    padding: 0;
+  }
+`;
+
+const FlyoverSpeedGroup = styled.div`
+  display: inline-flex;
+  align-items: center;
+  border-left: 1px solid rgba(255, 255, 255, 0.18);
+`;
+
+const FlyoverSpeedValue = styled.span`
+  min-width: 2.25rem;
+  color: #ffffff;
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-align: center;
+
+  @media screen and (max-width: 420px) {
+    min-width: 1.85rem;
+    font-size: 0.72rem;
+  }
+`;
+
+const FlyoverLabel = styled.span`
+  @media screen and (max-width: 420px) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+`;
+
+const FlyoverLiveStats = styled.div`
+  position: absolute;
+  left: ${(props) =>
+    props.$navCollapsed ? '5.35rem' : 'calc(clamp(280px, 24vw, 340px) + 1.2rem)'};
+  bottom: 1rem;
+  z-index: 1025;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  gap: 0.7rem;
+  align-items: center;
+  padding: 0.62rem 0.82rem;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 8px;
+  background: rgba(2, 6, 23, 0.38);
+  color: #ffffff;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.76);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(10px);
+  pointer-events: none;
+
+  @media screen and (max-width: 980px) {
+    left: ${(props) => (props.$navCollapsed ? '5.1rem' : 'calc(260px + 1rem)')};
+  }
+
+  @media screen and (max-width: 800px) {
+    left: 1rem;
+    bottom: ${(props) =>
+      props.$navCollapsed
+        ? 'calc(max(0.85rem, env(safe-area-inset-bottom)) + 4.35rem)'
+        : 'calc(max(0.85rem, env(safe-area-inset-bottom)) + min(34vh, 17rem) + 0.75rem)'};
+  }
+
+  @media screen and (max-width: 420px) {
+    left: 0.75rem;
+    gap: 0.5rem;
+    padding: 0.52rem 0.62rem;
+    bottom: ${(props) =>
+      props.$navCollapsed
+        ? 'calc(max(0.75rem, env(safe-area-inset-bottom)) + 4.15rem)'
+        : 'calc(max(0.75rem, env(safe-area-inset-bottom)) + min(30vh, 14.5rem) + 0.65rem)'};
+  }
+`;
+
+const FlyoverLiveStat = styled.div`
+  display: grid;
+  gap: 0.12rem;
+  justify-items: ${(props) => (props.$featured ? 'center' : 'start')};
+  text-align: ${(props) => (props.$featured ? 'center' : 'left')};
+
+  span {
+    color: rgba(255, 255, 255, 0.72);
+    font-size: 0.64rem;
+    font-weight: 800;
+    letter-spacing: 0;
+    line-height: 1;
+    text-transform: uppercase;
+  }
+
+  strong {
+    color: #ffffff;
+    font-size: ${(props) => (props.$featured ? '36px' : '0.98rem')};
+    font-weight: 900;
+    line-height: 1;
+    white-space: nowrap;
+    text-shadow: ${(props) =>
+      props.$featured
+        ? `-1px -1px 0 rgba(0, 0, 0, 0.86),
+      1px -1px 0 rgba(0, 0, 0, 0.86),
+      -1px 1px 0 rgba(0, 0, 0, 0.86),
+      1px 1px 0 rgba(0, 0, 0, 0.86),
+      0 4px 14px rgba(0, 0, 0, 0.55)`
+        : 'inherit'};
+    -webkit-text-stroke: ${(props) =>
+      props.$featured ? '0.45px rgba(0, 0, 0, 0.88)' : '0'};
+  }
+
+  @media screen and (max-width: 800px) {
+    strong {
+      font-size: ${(props) => (props.$featured ? '27px' : '0.98rem')};
+    }
+  }
+
+  @media screen and (max-width: 420px) {
+    strong {
+      font-size: ${(props) => (props.$featured ? '27px' : '0.86rem')};
+    }
+  }
+`;
+
+const FlyoverSummary = styled.div`
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 1026;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  width: min(34rem, calc(100vw - 2rem));
+  padding: 1.05rem 1.2rem;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 8px;
+  background: rgba(2, 6, 23, 0.5);
+  color: #ffffff;
+  text-align: center;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.78);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.36);
+  transform: translate(-50%, -50%);
+  backdrop-filter: blur(12px);
+  pointer-events: auto;
+
+  @media screen and (max-width: 620px) {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+    width: min(18rem, calc(100vw - 1.5rem));
+    padding: 0.9rem 1rem;
+  }
+`;
+
+const FlyoverSummaryStat = styled.div`
+  display: grid;
+  gap: 0.28rem;
+
+  span {
+    color: rgba(255, 255, 255, 0.76);
+    font-size: 0.72rem;
+    font-weight: 900;
+    letter-spacing: 0;
+    line-height: 1;
+    text-transform: uppercase;
+  }
+
+  strong {
+    color: #ffffff;
+    font-size: clamp(1.45rem, 3vw, 2.35rem);
+    font-weight: 900;
+    line-height: 1;
+    white-space: nowrap;
+  }
+`;
+
+const FlyoverSummaryCloseButton = styled.button`
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(252, 82, 0, 0.92);
+  color: #ffffff;
+  font-size: 1.25rem;
+  font-weight: bold;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0.9;
+  transition:
+    background 160ms ease,
+    opacity 160ms ease;
+  &:hover,
+  &:focus-visible {
+    background: rgba(252, 82, 0, 0.96);
+    opacity: 1;
+    outline: none;
+  }
 `;
 
 const MapStyleIconButton = styled.button`
@@ -955,7 +1323,7 @@ const ActionLink = styled(Link)`
   justify-content: center;
   border: 1px solid rgba(252, 82, 0, 0.48);
   border-radius: 8px;
-  background: rgba(252, 82, 0, 0.16);
+  background: rgba(252, 84, 0, 0.63);
   color: #ffffff;
   font-family: Arial, Helvetica, sans-serif;
   font-size: 0.92rem;
@@ -969,8 +1337,8 @@ const ActionLink = styled(Link)`
 
   &:hover,
   &:focus-visible {
-    background: rgba(252, 82, 0, 0.28);
-    border-color: rgba(252, 82, 0, 0.86);
+    background: rgba(222, 220, 219, 0.94);
+    color: black;
     outline: none;
     transform: translateY(-1px);
   }

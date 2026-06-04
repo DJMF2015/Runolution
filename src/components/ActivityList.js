@@ -2,19 +2,135 @@ import styled from 'styled-components';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { getSecondstoMinutes, getKmsToMiles, getMstoKmHr } from '../utils/conversion';
 import { getDetailedAthleteData } from '../utils/functions';
-import { useScroll } from '../utils/hooks';
+import { fetchTokenInfo } from '../utils/athleteActivitiesFunctions';
+import { getNewAccessToken, isUnauthorizedError } from '../utils/helpers';
+import { useScroll } from '../hooks/useScroll';
 import PaceZoneBarChart from './BestEffortsChart';
 import ElevationChart from './ElevationBarChart';
 import { useEffect, useState } from 'react';
 import { ArrowUpCircleFill } from '@styled-icons/bootstrap/ArrowUpCircleFill';
 
+const getSplitRows = (activity) => {
+  if (activity?.laps?.length) {
+    return activity.laps;
+  }
+
+  if (activity?.splits_standard?.length) {
+    return activity.splits_standard;
+  }
+
+  return activity?.splits_metric || [];
+};
+
+const getSplitElevation = (split) => {
+  return split.total_elevation_gain ?? split.elevation_difference ?? '—';
+};
+
+const getSplitLabel = (split, index) => {
+  return split.name || split.split || index + 1;
+};
+
+const getSegmentDistance = (segment) => {
+  return segment.segment?.distance ?? segment.distance ?? '—';
+};
+
+const getSegmentMaxGrade = (segment) => {
+  return segment.segment?.maximum_grade ?? segment.maximum_grade ?? '—';
+};
+
+const getSegmentAverageGrade = (segment) => {
+  return segment.segment?.average_grade ?? segment.average_grade ?? '—';
+};
+
+const getSegmentElevationHigh = (segment) => {
+  return segment.segment?.elevation_high ?? segment.elevation_high ?? '—';
+};
+
+const hasDetailedActivityData = (activity) => {
+  return Boolean(
+    activity &&
+    !Array.isArray(activity) &&
+    (activity.laps?.length ||
+      activity.splits_standard?.length ||
+      activity.splits_metric?.length ||
+      activity.best_efforts?.length ||
+      activity.segment_efforts?.length),
+  );
+};
+
+const getDetailedActivityCacheKey = (activityId) => `activity-detail-${activityId}`;
+
+const getCachedDetailedActivity = (activityId) => {
+  if (!activityId) {
+    return null;
+  }
+
+  try {
+    const cachedActivity = JSON.parse(
+      localStorage.getItem(getDetailedActivityCacheKey(activityId)),
+    );
+    return hasDetailedActivityData(cachedActivity) ? cachedActivity : null;
+  } catch (error) {
+    return null;
+  }
+};
+
+const storeDetailedActivity = (activity) => {
+  if (!activity?.id || !hasDetailedActivityData(activity)) {
+    return;
+  }
+
+  localStorage.setItem(
+    getDetailedActivityCacheKey(activity.id),
+    JSON.stringify(activity),
+  );
+};
+
+const getInitialDetailedActivity = (locationState) => {
+  if (hasDetailedActivityData(locationState?.detailedActivity)) {
+    return locationState.detailedActivity;
+  }
+
+  if (hasDetailedActivityData(locationState?.from)) {
+    return locationState.from;
+  }
+
+  return getCachedDetailedActivity(
+    locationState?.from?.id || locationState?.detailedActivity?.id,
+  );
+};
+
+const fetchDetailedActivityWithRetry = async (activityId, token) => {
+  try {
+    return await getDetailedAthleteData(activityId, token);
+  } catch (error) {
+    if (!isUnauthorizedError(error)) {
+      throw error;
+    }
+
+    const refreshedPayload = await getNewAccessToken();
+    const refreshedToken = refreshedPayload?.access_token;
+
+    if (!refreshedToken) {
+      throw error;
+    }
+
+    return getDetailedAthleteData(activityId, refreshedToken);
+  }
+};
+
 export default function ActivityList() {
   const location = useLocation();
-  const [detailedActivity, setDetailedActivity] = useState([]);
+  const [detailedActivity, setDetailedActivity] = useState(() =>
+    getInitialDetailedActivity(location.state),
+  );
+  const [isDetailLoading, setIsDetailLoading] = useState(!detailedActivity);
+  const [detailError, setDetailError] = useState(null);
   const { isVisible, scrollToTop } = useScroll();
   const navigate = useNavigate();
 
-  const { from } = location.state;
+  const { from, detailedActivity: routedDetailedActivity } = location.state || {};
+  const activityId = from?.id || routedDetailedActivity?.id;
 
   if (!location.state) {
     navigate('/activities');
@@ -24,13 +140,45 @@ export default function ActivityList() {
     navigate('/');
   };
 
+  const splitRows = getSplitRows(detailedActivity);
+  const segmentEfforts = detailedActivity?.segment_efforts || [];
+
   useEffect(() => {
-    const accessToken = localStorage.getItem('access_token');
-    const token = JSON.parse(accessToken);
-    getDetailedAthleteData(from?.id, token).then((response) => {
+    async function fetchData() {
+      const detailedActivityFromState = getInitialDetailedActivity(location.state);
+
+      if (detailedActivityFromState) {
+        setDetailedActivity(detailedActivityFromState);
+        storeDetailedActivity(detailedActivityFromState);
+        setIsDetailLoading(false);
+        setDetailError(null);
+        return;
+      }
+
+      setIsDetailLoading(true);
+      setDetailError(null);
+
+      const token = await fetchTokenInfo();
+
+      if (!activityId || !token) {
+        setIsDetailLoading(false);
+        setDetailError('Activity detail data could not be loaded.');
+        return;
+      }
+
+      const response = await fetchDetailedActivityWithRetry(activityId, token);
       setDetailedActivity(response.data);
+      storeDetailedActivity(response.data);
+      setDetailError(null);
+      setIsDetailLoading(false);
+    }
+
+    fetchData().catch((error) => {
+      console.error(error.message);
+      setDetailError('Activity detail data could not be loaded.');
+      setIsDetailLoading(false);
     });
-  }, [from]);
+  }, [activityId, location.state]);
 
   return (
     <PageContainer>
@@ -46,12 +194,24 @@ export default function ActivityList() {
       <ChartsGrid>
         <ChartCard>
           <ChartHeading>Best Efforts</ChartHeading>
-          <PaceZoneBarChart props={detailedActivity} />
+          {isDetailLoading ? (
+            <DetailLoading>Loading best efforts...</DetailLoading>
+          ) : detailedActivity ? (
+            <PaceZoneBarChart props={detailedActivity} />
+          ) : (
+            <DetailLoading>{detailError}</DetailLoading>
+          )}
         </ChartCard>
 
         <ChartCard>
           <ChartHeading>Elevation & Effort</ChartHeading>
-          <ElevationChart props={detailedActivity} />
+          {isDetailLoading ? (
+            <DetailLoading>Loading elevation data...</DetailLoading>
+          ) : detailedActivity ? (
+            <ElevationChart props={detailedActivity} />
+          ) : (
+            <DetailLoading>{detailError}</DetailLoading>
+          )}
         </ChartCard>
       </ChartsGrid>
 
@@ -74,11 +234,11 @@ export default function ActivityList() {
           </thead>
 
           <tbody>
-            {detailedActivity?.laps?.map((lap) => (
-              <tr key={`${lap.id || lap.split}-${lap.elapsed_time}`}>
-                <td data-label="Split">{from.name}</td>
+            {splitRows.map((lap, index) => (
+              <tr key={`${lap.id || lap.split || index}-${lap.elapsed_time}`}>
+                <td data-label="Split">{getSplitLabel(lap, index)}</td>
                 <td data-label="Distance">{getKmsToMiles(lap.distance)}</td>
-                <td data-label="Elevation">{lap.total_elevation_gain}</td>
+                <td data-label="Elevation">{getSplitElevation(lap)}</td>
                 <td data-label="Elapsed">{getSecondstoMinutes(lap.elapsed_time)}</td>
                 <td data-label="Speed">{getMstoKmHr(lap?.average_speed)}</td>
                 <td data-label="Cadence">{lap.average_cadence || '—'}</td>
@@ -108,15 +268,15 @@ export default function ActivityList() {
           </thead>
 
           <tbody>
-            {detailedActivity?.segment_efforts?.map((segment) => (
+            {segmentEfforts.map((segment) => (
               <tr key={`${segment.id}-${segment.elapsed_time}`}>
                 <td data-label="Name">{segment.name}</td>
-                <td data-label="Distance">{segment.segment.distance}</td>
-                <td data-label="Max Grade">{segment.segment.maximum_grade}</td>
-                <td data-label="Average Grade">{segment.segment.average_grade}</td>
+                <td data-label="Distance">{getSegmentDistance(segment)}</td>
+                <td data-label="Max Grade">{getSegmentMaxGrade(segment)}</td>
+                <td data-label="Average Grade">{getSegmentAverageGrade(segment)}</td>
                 <td data-label="Elapsed">{getSecondstoMinutes(segment.elapsed_time)}</td>
                 <td data-label="Avg HR">{segment.average_heartrate || '—'}</td>
-                <td data-label="Elevation High">{segment.segment.elevation_high}</td>
+                <td data-label="Elevation High">{getSegmentElevationHigh(segment)}</td>
               </tr>
             ))}
           </tbody>
@@ -231,6 +391,17 @@ const ChartHeading = styled.h2`
   margin: 0 0 1rem;
   color: #111;
   font-size: 1rem;
+`;
+
+const DetailLoading = styled.div`
+  min-height: 300px;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  box-sizing: border-box;
+  color: #111827;
+  text-align: center;
+  font-weight: 700;
 `;
 
 const ResponsiveSection = styled.section`

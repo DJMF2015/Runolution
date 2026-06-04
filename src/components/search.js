@@ -1,99 +1,61 @@
-import React from 'react';
-import { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import styled from 'styled-components';
-const Search = ({ placeholder, updateSearchTxt }) => {
-  const accessToken = localStorage.getItem('access_token');
-  const [searchInput, setSearchTerm] = useState('');
+const Search = ({
+  className,
+  placeholder,
+  searchTxt,
+  updateSearchTxt,
+  'aria-label': ariaLabel,
+}) => {
+  const [searchInput, setSearchTerm] = useState(searchTxt || '');
+  const inputValue = searchTxt !== undefined ? searchTxt : searchInput;
 
-  const ref = useRef();
-  const handleChange = (e) => {
-    if (ref.current !== searchInput) {
-      setSearchTerm(ref.current.value);
-    }
-    updateSearchTxt(searchInput);
+  const handleChange = (event) => {
+    const nextValue = event.target.value;
+
+    setSearchTerm(nextValue);
+    updateSearchTxt(nextValue);
   };
   return (
-    <>
-      {accessToken && (
-        <div>
-          <StyledInput>
-            <SearchInput
-              type="text"
-              ref={ref}
-              placeholder={placeholder}
-              value={searchInput}
-              onChange={handleChange}
-            />
-          </StyledInput>
-        </div>
-      )}
-    </>
+    <StyledInput>
+      <SearchInput
+        className={className}
+        type="text"
+        placeholder={placeholder}
+        value={inputValue}
+        aria-label={ariaLabel}
+        onChange={handleChange}
+      />
+    </StyledInput>
   );
 };
 const SearchInput = styled.input`
-  height: 3rem;
-  font-size: 18px;
-  background-color: ghostwhite;
-  width: 50%;
-  border: 1px solid #aaa;
-  border-radius: 4px;
-  margin: 0 auto;
-  margin-top: 3rem;
-  outline: none;
-  padding: 8px;
+  width: 100%;
+  min-width: 0;
+  min-height: 2.75rem;
+  padding: 0 0.85rem;
   box-sizing: border-box;
-  transition: 0.5s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  margin-bottom: 1.5rem;
-  &:hover {
-    box-shadow: 5px 2px 7px 2px grey;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #111827;
+  font-size: 0.92rem;
+  font-weight: 700;
+  outline: none;
+  box-shadow: 0 10px 22px rgba(2, 6, 23, 0.22);
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+
+  &::placeholder {
+    color: #64748b;
   }
-  @media screen and (max-width: 990px) {
-    display: flex;
-    height: 2.5rem;
-    border: 1px solid #aaa;
-    background-color: ghostwhite;
-    cursor: pointer;
-    border-radius: 4px;
-    font-size: 18px;
-    width: 50%;
-    padding: 10px;
-    margin-right: 6rem;
-    margin: 0 auto;
-    margin-bottom: 1.5rem;
-  }
-  @media screen and (max-width: 800px) {
-    display: flex;
-    height: 2.5rem;
-    border: 1px solid #aaa;
-    margin-left: 8rem;
-    background-color: ghostwhite;
-    cursor: pointer;
-    border-radius: 4px;
-    font-size: 18px;
-    width: 50%;
-    padding: 10px;
-    margin-right: 6rem;
-    margin-bottom: 1rem;
-    margin: 0 auto;
-  }
-  @media screen and (max-width: 600px) {
-    display: flex;
-    height: 3rem;
-    margin: 0 auto;
-    border: 1px solid #aaa;
-    background-color: ghostwhite;
-    cursor: pointer;
-    border-radius: 4px;
-    font-size: 18px;
-    width: 65%;
-    padding: 8px;
-    margin-bottom: 0rem;
-    margin: 0 auto;
-    margin-bottom: 2rem;
+
+  &:focus {
+    border-color: #fc5200;
+    box-shadow:
+      0 0 0 3px rgba(252, 82, 0, 0.24),
+      0 10px 22px rgba(2, 6, 23, 0.22);
   }
 `;
 

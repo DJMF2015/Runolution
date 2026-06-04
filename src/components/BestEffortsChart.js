@@ -182,6 +182,26 @@ const getMileSplits = (activity) => {
     }));
   }
 
+  const metricSplits = activity?.splits_metric || [];
+
+  if (metricSplits.length) {
+    return metricSplits.map((split, index) => ({
+      label: `Km ${split.split || index + 1}`,
+      elapsedTime: secondsToMinutes(split.elapsed_time),
+      heartRate: split.average_heartrate ? Math.round(split.average_heartrate) : null,
+    }));
+  }
+
+  const laps = activity?.laps || [];
+
+  if (laps.length) {
+    return laps.map((lap, index) => ({
+      label: `Lap ${lap.split || index + 1}`,
+      elapsedTime: secondsToMinutes(lap.elapsed_time),
+      heartRate: lap.average_heartrate ? Math.round(lap.average_heartrate) : null,
+    }));
+  }
+
   const bestEfforts = activity?.best_efforts || [];
 
   return bestEfforts.map((effort, index) => ({
@@ -213,7 +233,7 @@ export default function BestEffortsChart({ props }) {
         data: elapsedTimes,
         yAxisID: 'elapsed',
         borderColor: '#141414',
-        backgroundColor: 'rgba(252, 82, 0, 0.68)',
+        backgroundColor: 'rgba(44, 216, 28, 0.68)',
         borderWidth: 1,
         borderRadius: 7,
         barPercentage: 0.72,
@@ -224,10 +244,10 @@ export default function BestEffortsChart({ props }) {
         type: 'line',
         data: heartRates,
         yAxisID: 'heartRate',
-        borderColor: '#60a5fa',
-        backgroundColor: '#60a5fa',
-        pointBackgroundColor: '#dbeafe',
-        pointBorderColor: '#1d4ed8',
+        borderColor: '#f20707',
+        backgroundColor: '#120202',
+        pointBackgroundColor: '#f20707',
+        pointBorderColor: '#174c11',
         pointHoverRadius: 6,
         pointRadius: 4,
         tension: 0.32,

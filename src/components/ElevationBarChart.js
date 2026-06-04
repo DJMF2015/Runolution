@@ -336,10 +336,6 @@ const ChartPanel = styled.div`
   box-sizing: border-box;
   border: 1px solid rgba(148, 163, 184, 0.2);
   border-radius: 14px;
-  /* background-color:; */
-  /* background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.94)),
-    radial-gradient(circle at top right, rgba(34, 197, 94, 0.18), transparent 36%); */
   box-shadow: 0 16px 38px rgba(0, 0, 0, 0.24);
 
   @media screen and (max-width: 700px) {

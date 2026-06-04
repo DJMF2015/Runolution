@@ -1,5 +1,5 @@
 import { getAthleteActivities, getUsersDetails } from './functions';
-import { checkIfTokenExpired, removeDataAfterDuration } from './helpers';
+import { checkIfTokenExpired, getNewAccessToken, removeDataAfterDuration } from './helpers';
 
 /**
  * Fetches all Strava activities for the athlete, handling pagination
@@ -70,9 +70,15 @@ export const fetchData = async (accessToken, setLoading, setActivityLoadingState
 export const fetchTokenInfo = async () => {
   const expires_at = localStorage.getItem('expires_at');
   const expires_in = localStorage.getItem('expires_in');
+  const refreshToken = JSON.parse(localStorage.getItem('refresh_token'));
 
   if (expires_at && expires_in) {
     return checkIfTokenExpired(expires_in, expires_at);
+  }
+
+  if (refreshToken) {
+    const refreshedPayload = await getNewAccessToken();
+    return refreshedPayload?.access_token || null;
   }
 
   return JSON.parse(localStorage.getItem('access_token'));

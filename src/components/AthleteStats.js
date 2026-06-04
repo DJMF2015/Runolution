@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { getAthleteStats } from '../utils/functions';
+import { fetchTokenInfo } from '../utils/athleteActivitiesFunctions';
 import { isUnauthorizedError } from '../utils/helpers';
 import styled from 'styled-components';
 import { Run } from '@styled-icons/boxicons-regular/Run';
@@ -38,17 +39,49 @@ const metresToEverests = (metres) => {
   return toNumber(metres) / EVEREST_HEIGHT_METRES;
 };
 
-const AthleteStats = ({ athlete, onAuthError }) => {
-  const token = JSON.parse(localStorage.getItem('access_token'));
+const getActivityType = (activity) => {
+  return String(activity?.sport_type || activity?.type || '').toLowerCase();
+};
+
+const getLoadedTotals = (activities, matches) => {
+  return activities.reduce(
+    (totals, activity) => {
+      if (!matches.includes(getActivityType(activity))) {
+        return totals;
+      }
+
+      return {
+        count: totals.count + 1,
+        distance: totals.distance + toNumber(activity.distance),
+        elevation_gain:
+          totals.elevation_gain + toNumber(activity.total_elevation_gain),
+      };
+    },
+    {
+      count: 0,
+      distance: 0,
+      elevation_gain: 0,
+    },
+  );
+};
+
+const AthleteStats = ({ activities = [], athlete, onAuthError }) => {
   const [user, setUser] = useState(null);
+  const loadedActivities = Array.isArray(activities) ? activities : [];
 
   useEffect(() => {
     async function fetchData() {
-      if (!athlete?.id || !token) {
+      if (!athlete?.id) {
         return;
       }
 
       try {
+        const token = await fetchTokenInfo();
+
+        if (!token) {
+          return;
+        }
+
         const athleteStats = await getAthleteStats(athlete.id, token);
 
         if (athleteStats) {
@@ -65,14 +98,25 @@ const AthleteStats = ({ athlete, onAuthError }) => {
     }
 
     fetchData();
-  }, [athlete?.id, onAuthError, token]);
+  }, [athlete?.id, onAuthError]);
 
-  if (!athlete?.id || !user?.data) {
+  const loadedRunTotals = getLoadedTotals(loadedActivities, [
+    'run',
+    'virtualrun',
+    'trailrun',
+  ]);
+  const loadedRideTotals = getLoadedTotals(loadedActivities, [
+    'ride',
+    'virtualride',
+    'ebikeride',
+    'mountainbikeride',
+  ]);
+  const allRunTotals = user?.data?.all_run_totals || loadedRunTotals;
+  const allRideTotals = user?.data?.all_ride_totals || loadedRideTotals;
+
+  if (!athlete?.id || (!user?.data && !loadedActivities.length)) {
     return null;
   }
-
-  const allRunTotals = user.data.all_run_totals || {};
-  const allRideTotals = user.data.all_ride_totals || {};
 
   const runDistanceMetres = toNumber(allRunTotals.distance);
   const rideDistanceMetres = toNumber(allRideTotals.distance);

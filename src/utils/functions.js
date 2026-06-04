@@ -1,10 +1,13 @@
 import axios from 'axios';
-import { baseURL } from './config';
+import { auth_revoke_link, baseURL } from './config';
 import { removeDataAfterDuration } from './helpers';
 import { RateLimiter } from './rateLimiter';
 
 const stravaRateLimiter = new RateLimiter(100, 15 * 60 * 1000);
 
+/**
+ * Preserves Axios response metadata while standardizing Strava API errors.
+ */
 const createStravaError = (message, error) => {
   const status = error?.response?.status;
   const stravaError = new Error(message);
@@ -14,6 +17,13 @@ const createStravaError = (message, error) => {
   return stravaError;
 };
 
+/**
+ * Fetches all-time athlete stats from Strava for charts and profile metrics.
+ *
+ * @param {number|string} userId - Strava athlete id.
+ * @param {string} accessToken - Valid Strava bearer token.
+ * @returns {Promise<import('axios').AxiosResponse>} Axios response from Strava.
+ */
 export const getAthleteStats = async (userId, accessToken) => {
   if (await stravaRateLimiter.request()) {
     const apiUrl = `${baseURL}/athletes/${userId}/stats`;
@@ -38,6 +48,9 @@ export const getAthleteStats = async (userId, accessToken) => {
   }
 };
 
+/**
+ * Fetches one paginated page of the authenticated athlete's activities.
+ */
 export const getAthleteActivities = async (accessToken, per_page, index) => {
   if (await stravaRateLimiter.request()) {
     const apiUrl = `${baseURL}/athlete/activities?per_page=${per_page}&page=${index}`;
@@ -61,6 +74,9 @@ export const getAthleteActivities = async (accessToken, per_page, index) => {
   }
 };
 
+/**
+ * Fetches the authenticated athlete profile and caches it for later rendering.
+ */
 export const getUsersDetails = async (accessToken) => {
   if (await stravaRateLimiter.request()) {
     const apiUrl = `${baseURL}/athlete`;
@@ -85,6 +101,9 @@ export const getUsersDetails = async (accessToken) => {
   }
 };
 
+/**
+ * Fetches the authenticated athlete's Strava clubs.
+ */
 export const getUsersClubs = async (accessToken) => {
   if (await stravaRateLimiter.request()) {
     try {
@@ -103,6 +122,9 @@ export const getUsersClubs = async (accessToken) => {
   }
 };
 
+/**
+ * Fetches users who gave kudos on a specific activity.
+ */
 export const getKudoersByActivityId = async (activityId, accessToken) => {
   const apiUrl = `${baseURL}/activities/${activityId}/kudos`;
   try {
@@ -119,6 +141,9 @@ export const getKudoersByActivityId = async (activityId, accessToken) => {
   }
 };
 
+/**
+ * Fetches comments for a specific Strava activity.
+ */
 export const getCommentsByActivityId = async (activityId, accessToken) => {
   const apiUrl = `${baseURL}/activities/${activityId}/comments`;
   try {
@@ -135,6 +160,9 @@ export const getCommentsByActivityId = async (activityId, accessToken) => {
   }
 };
 
+/**
+ * Fetches lap-level details for a Strava activity.
+ */
 export const getUserActivityLaps = async (activityId, accessToken) => {
   const apiUrl = `${baseURL}/activities/${activityId}/laps`;
   if (await stravaRateLimiter.request()) {
@@ -155,10 +183,40 @@ export const getUserActivityLaps = async (activityId, accessToken) => {
   }
 };
 
-/*  get detailed activity data */
+/**
+ * Fetches full activity details for the activity detail page.
+ */
 export const getDetailedAthleteData = async (id, accessToken) => {
   if (await stravaRateLimiter.request()) {
-    const apiUrl = `${baseURL}/activities/${id}`;
+    const apiUrl = `${baseURL}/activities/${id}?include_all_efforts=true`;
+    try {
+      const response = await axios.get(apiUrl, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (response.status === 200) {
+        console.log({ response });
+        return response;
+      } else {
+        throw new Error(`Failed to fetch athlete stats. Status: ${response.status}`);
+      }
+    } catch (error) {
+      throw createStravaError(
+        `Error while fetching athlete stats: ${error.message}`,
+        error,
+      );
+    }
+  } else {
+    throw new Error('Exceeded the Strava rate limit. Please try again later.');
+  }
+};
+
+/**
+ * @returns steam set
+ *
+ */
+export const getAthleteStreams = async (id, accessToken) => {
+  if (await stravaRateLimiter.request()) {
+    const apiUrl = `${baseURL}/activities/${id}/streams?keys=latlng,distance,altitude,time,velocity_smooth,moving,grade_smooth&key_by_type=true`;
     try {
       const response = await axios.get(apiUrl, {
         headers: { Authorization: `Bearer ${accessToken}` },
@@ -169,32 +227,42 @@ export const getDetailedAthleteData = async (id, accessToken) => {
         throw new Error(`Failed to fetch athlete stats. Status: ${response.status}`);
       }
     } catch (error) {
-      throw new Error(`Error while fetching athlete stats: ${error.message}`);
+      throw createStravaError(
+        `Error while fetching athlete stats: ${error.message}`,
+        error,
+      );
     }
   } else {
     throw new Error('Exceeded the Strava rate limit. Please try again later.');
   }
 };
-
-// deauthorize a user from the strava app
-export const deauthorizeUser = async () => {
-  const accessToken = localStorage.getItem('access_token');
-  // remove %22 prefix and "' from access token string before sending to strava
-  const removePrefix = accessToken
-    .replace(/%22/g, '')
-    .replace(/"/g, '')
-    .replace(/'/g, '');
-
-  const apiurl = `https://www.strava.com/oauth/deauthorize?access_token=${removePrefix}`;
+const getStoredAccessToken = () => {
   try {
-    const response = await axios.post(apiurl);
+    return JSON.parse(localStorage.getItem('access_token'));
+  } catch (error) {
+    return localStorage.getItem('access_token');
+  }
+};
+
+/**
+ * Revokes the stored Strava token using the OAuth revoke endpoint.
+ */
+export const deauthorizeUser = async () => {
+  const accessToken = getStoredAccessToken();
+
+  try {
+    const response = await axios.post(auth_revoke_link, null, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
     if (response.status === 200) {
-      console.log(response);
       return response;
     } else {
-      throw new Error(`Failed to deauthorize user. Status: ${response.status}`);
+      throw new Error(`Failed to revoke user authorization. Status: ${response.status}`);
     }
   } catch (error) {
-    throw new Error(`Error while deauthorizing user: ${error.message}`);
+    throw createStravaError(
+      `Error while revoking user authorization: ${error.message}`,
+      error,
+    );
   }
 };

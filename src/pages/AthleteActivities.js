@@ -1,7 +1,9 @@
 import React, { useCallback, useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { useGetWindowWidth, useScroll, useLocalStorageState } from '../utils/hooks';
-import { clearStravaAuth, isUnauthorizedError } from '../utils/helpers';
+import { useGetWindowWidth } from '../hooks/useWindowWidth';
+import { useLocalStorageState } from '../hooks/useLocalStorageState';
+import { useScroll } from '../hooks/useScroll';
+import { clearStravaAuth, hasStoredData, isUnauthorizedError } from '../utils/helpers';
 import {
   fetchData,
   fetchTokenInfo,
@@ -49,6 +51,9 @@ const AthleteActivities = () => {
 
   const access_token = JSON.parse(localStorage.getItem('access_token'));
   const activitiesLoaded = state.activities.length > 0;
+  const hasStoredActivities = hasStoredData('activities');
+  const canRenderCachedActivities =
+    activitiesLoaded || (!access_token && hasStoredActivities);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -202,7 +207,7 @@ const AthleteActivities = () => {
 
   return (
     <PageContainer>
-      {!access_token ? (
+      {!access_token && !canRenderCachedActivities ? (
         <>
           {authError && <AuthMessage>{authError}</AuthMessage>}
           <Login />
@@ -244,7 +249,11 @@ const AthleteActivities = () => {
               )}
 
               {isOnline && athlete?.id && (
-                <AthleteStats athlete={athlete} onAuthError={handleAuthError} />
+                <AthleteStats
+                  activities={state.activities}
+                  athlete={athlete}
+                  onAuthError={handleAuthError}
+                />
               )}
               {isOnline && (
                 <BreakdownChart props={state.activities} onAuthError={handleAuthError} />
@@ -269,7 +278,9 @@ const AthleteActivities = () => {
                     <TableHeader>
                       <TableTitleGroup>
                         <TableTitle>Recent Activities</TableTitle>
-                        <TableSubtitle>Select an activity name to open its map view.</TableSubtitle>
+                        <TableSubtitle>
+                          Select an activity name to open its map view.
+                        </TableSubtitle>
                       </TableTitleGroup>
                     </TableHeader>
 
@@ -305,7 +316,9 @@ const AthleteActivities = () => {
                                       <OpenHint>Open</OpenHint>
                                     </ActivityLink>
                                   ) : (
-                                    <UnavailableActivityName>{activity.name}</UnavailableActivityName>
+                                    <UnavailableActivityName>
+                                      {activity.name}
+                                    </UnavailableActivityName>
                                   )}
                                 </ActivityTitle>
 
@@ -355,7 +368,9 @@ const AthleteActivities = () => {
                                 <MobileOpenHint>Open map</MobileOpenHint>
                               </MobileActivityLink>
                             ) : (
-                              <UnavailableActivityName>{activity.name}</UnavailableActivityName>
+                              <UnavailableActivityName>
+                                {activity.name}
+                              </UnavailableActivityName>
                             )}
                           </MobileActivityTitle>
 
