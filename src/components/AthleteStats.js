@@ -53,8 +53,7 @@ const getLoadedTotals = (activities, matches) => {
       return {
         count: totals.count + 1,
         distance: totals.distance + toNumber(activity.distance),
-        elevation_gain:
-          totals.elevation_gain + toNumber(activity.total_elevation_gain),
+        elevation_gain: totals.elevation_gain + toNumber(activity.total_elevation_gain),
       };
     },
     {
@@ -295,11 +294,13 @@ const StatsGrid = styled.div`
   }
 
   @media screen and (max-width: 560px) {
+    margin-top: 1.5rem;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.55rem;
   }
 
   @media screen and (max-width: 360px) {
+    margin-top: 1.25rem;
     grid-template-columns: 1fr;
   }
 `;

@@ -218,7 +218,6 @@ const AthleteActivities = () => {
 
           <DashboardLayout>
             <DashboardSidebar>
-              <SidebarTitle>Dashboard</SidebarTitle>
               <SidebarText>Filter your Strava activities</SidebarText>
 
               <SidebarControl>
@@ -588,17 +587,6 @@ const DashboardSidebar = styled.aside`
 
   @media screen and (max-width: 650px) {
     grid-template-columns: 1fr;
-  }
-`;
-
-const SidebarTitle = styled.h2`
-  margin: 0;
-  color: #ffffff;
-  font-size: 1.15rem;
-  font-weight: 800;
-
-  @media screen and (max-width: 980px) {
-    grid-column: 1 / -1;
   }
 `;
 
