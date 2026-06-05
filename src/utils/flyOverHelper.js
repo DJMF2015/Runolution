@@ -6,6 +6,7 @@ export const FLYOVER_OUTRO_DURATION_MS = 3600;
 export const FLYOVER_ZOOM = 13.7; //
 export const FLYOVER_PITCH = 58;
 export const FLYOVER_OUTRO_PITCH = 38;
+export const FLYOVER_TILE_WAIT_MS = 1800;
 export const ACTIVITY_ROUTE_SOURCE_ID = 'linepath';
 export const DEFAULT_FLYOVER_ROUTE_GRADIENT = '#fb0707';
 export const FLYOVER_ROUTE_GRADIENT = '#e1ff00';
@@ -26,6 +27,12 @@ const DRAMATIC_TURN_DAMPING = 0.4; //Softer dramatic turns feel more natural, bu
 const NORMAL_TURN_RATE = 0.015; //Increase for faster turns, decrease for slower turns. This is applied to all turns, but sharper turns are further damped by the DRAMATIC_TURN_DAMPING factor.
 const DRAMATIC_TURN_RATE = 0.095;
 const CAMERA_CENTER_SMOOTHING = 0.075; //Smoother camera panning: increase for smoother movement, decrease for more responsive movement
+export const FLYOVER_HIGH_SPEED_CAMERA_CENTER_SMOOTHING = 0.18;
+const CAMERA_MARKER_LEAD_RATIO = 0.16;
+const CAMERA_DRAMATIC_TURN_LEAD_RATIO = 0.05;
+const CAMERA_HIGH_SPEED_LEAD_RATIO = 0.08;
+const CAMERA_HIGH_SPEED_THRESHOLD = 3;
+const CAMERA_MAX_TURN_LEAD_DEGREES = 90;
 
 const STREAM_KEYS = [
   'distance',
@@ -69,10 +76,17 @@ const isSameCoordinate = (firstCoordinate, secondCoordinate) => {
   );
 };
 
+const interpolateLngLat = (fromLngLat, toLngLat, ratio) => {
+  return [
+    fromLngLat[0] + (toLngLat[0] - fromLngLat[0]) * ratio,
+    fromLngLat[1] + (toLngLat[1] - fromLngLat[1]) * ratio,
+  ];
+};
+
 /**
  * Converts Strava keyed stream data into a flyover LineString.
  * Stream coordinates are denser than summary polylines, and the other stream
- * arrays are preserved as route properties for future camera or telemetry tuning.
+ * arrays are preserved as route properties.
  */
 export const getFlyoverRouteFeatureFromStreams = (streams) => {
   const latLngStream = getStreamData(streams, 'latlng');
@@ -189,10 +203,6 @@ const clampRouteDistance = (distanceKm, routeDistanceKm) => {
 
 const getLookaheadDistance = (routeDistanceKm) => {
   return Math.min(Math.max(routeDistanceKm * 0.12, 0.45), 2.4);
-};
-
-const getChaseDistance = (routeDistanceKm) => {
-  return Math.min(Math.max(routeDistanceKm * 0.035, 0.18), 0.85);
 };
 
 const getCameraTargetSmoothingDistance = (routeDistanceKm) => {
@@ -325,25 +335,47 @@ export const getRouteBearing = (routeLine, distanceKm, routeDistanceKm) => {
   return getWeightedBearingMean(bearingSamples);
 };
 
+const getCameraLeadRatio = (turnDelta, flyoverSpeed = 1) => {
+  const turnRatio = clamp(Math.abs(turnDelta) / CAMERA_MAX_TURN_LEAD_DEGREES, 0, 1);
+  const normalLeadRatio =
+    flyoverSpeed >= CAMERA_HIGH_SPEED_THRESHOLD
+      ? CAMERA_HIGH_SPEED_LEAD_RATIO
+      : CAMERA_MARKER_LEAD_RATIO;
+
+  return (
+    normalLeadRatio - (normalLeadRatio - CAMERA_DRAMATIC_TURN_LEAD_RATIO) * turnRatio
+  );
+};
+
 /**
- * Computes the camera center and bearing for a chase-style route flyover.
- * The center trails the current point while the bearing looks ahead, producing
- * forward movement without abrupt camera swings on tight turns.
+ * Computes a marker-safe camera center and bearing for the route flyover.
+ * The center stays near the marker with a small forward lead, then reduces that
+ * lead during sharp turns or fast playback so the marker remains in view.
  */
-export const getFlyoverCameraTarget = (routeLine, distanceKm, routeDistanceKm) => {
+export const getFlyoverCameraTarget = (
+  routeLine,
+  distanceKm,
+  routeDistanceKm,
+  flyoverSpeed,
+) => {
   const lookAheadDistance = Math.min(
     distanceKm + getLookaheadDistance(routeDistanceKm),
     routeDistanceKm,
   );
-  const chaseDistance = Math.max(distanceKm - getChaseDistance(routeDistanceKm), 0);
-  const cameraCenter = getSmoothedPointOnRoute(routeLine, chaseDistance, routeDistanceKm);
+  const currentPoint = getSmoothedPointOnRoute(routeLine, distanceKm, routeDistanceKm);
   const focusPoint = getSmoothedPointOnRoute(
     routeLine,
     lookAheadDistance,
     routeDistanceKm,
   );
-  const targetBearing = turf.bearing(turf.point(cameraCenter), turf.point(focusPoint));
+  const targetBearing = turf.bearing(turf.point(currentPoint), turf.point(focusPoint));
   const routeBearing = getRouteBearing(routeLine, distanceKm, routeDistanceKm);
+  const turnDelta = normalizeBearing(targetBearing - routeBearing);
+  const cameraCenter = interpolateLngLat(
+    currentPoint,
+    focusPoint,
+    getCameraLeadRatio(turnDelta, flyoverSpeed),
+  );
   const bearing = getWeightedBearingMean([
     { bearing: targetBearing, weight: 0.7 },
     { bearing: routeBearing, weight: 0.3 },
@@ -520,14 +552,18 @@ export const smoothBearing = (currentBearing, targetBearing) => {
 /**
  * Smooths camera center movement between two longitude/latitude pairs.
  */
-export const smoothLngLat = (currentLngLat, targetLngLat) => {
+export const smoothLngLat = (
+  currentLngLat,
+  targetLngLat,
+  smoothingRatio = CAMERA_CENTER_SMOOTHING,
+) => {
   if (!currentLngLat) {
     return targetLngLat;
   }
 
   return [
-    currentLngLat[0] + (targetLngLat[0] - currentLngLat[0]) * CAMERA_CENTER_SMOOTHING,
-    currentLngLat[1] + (targetLngLat[1] - currentLngLat[1]) * CAMERA_CENTER_SMOOTHING,
+    currentLngLat[0] + (targetLngLat[0] - currentLngLat[0]) * smoothingRatio,
+    currentLngLat[1] + (targetLngLat[1] - currentLngLat[1]) * smoothingRatio,
   ];
 };
 

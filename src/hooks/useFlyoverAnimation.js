@@ -5,8 +5,10 @@ import {
   FLYOVER_INTRO_DURATION_MS,
   FLYOVER_OUTRO_DURATION_MS,
   FLYOVER_OUTRO_PITCH,
+  FLYOVER_HIGH_SPEED_CAMERA_CENTER_SMOOTHING,
   FLYOVER_PITCH,
   FLYOVER_SPEEDS,
+  FLYOVER_TILE_WAIT_MS,
   FLYOVER_ZOOM,
   createFlyoverMarkerElement,
   formatFlyoverElevation,
@@ -23,6 +25,37 @@ import {
   smoothFlyoverProgress,
   smoothLngLat,
 } from '../utils/flyOverHelper';
+
+const FLYOVER_HIGH_SPEED_THRESHOLD = 3;
+
+const setFlyoverTilePrefetch = (map) => {
+  if (typeof map?.setPrefetchZoomDelta === 'function') {
+    map.setPrefetchZoomDelta(4);
+  }
+};
+
+const waitForFlyoverTiles = (map) => {
+  return new Promise((resolve) => {
+    if (!map || map.loaded()) {
+      resolve();
+      return;
+    }
+
+    let hasResolved = false;
+
+    const finish = () => {
+      if (hasResolved) {
+        return;
+      }
+
+      hasResolved = true;
+      resolve();
+    };
+
+    map.once('idle', finish);
+    window.setTimeout(finish, FLYOVER_TILE_WAIT_MS);
+  });
+};
 
 /**
  * Coordinates the route flyover UI state, Mapbox camera movement, route
@@ -131,6 +164,7 @@ export const useFlyoverAnimation = ({
     stopFlyover();
     setFlyoverDistanceKm(0);
     setShowFlyoverSummary(false);
+    setFlyoverTilePrefetch(map);
     setFlyoverRouteGradient(map, currentMapStyleRef?.current);
     setFlyoverRouteProgress(map, routeLine, 0, routeDistanceKm);
 
@@ -145,7 +179,12 @@ export const useFlyoverAnimation = ({
     setIsFlyoverPlaying(true);
 
     const duration = getFlyoverDuration(routeDistanceKm, routeLine.properties?.streams);
-    const initialCameraTarget = getFlyoverCameraTarget(routeLine, 0, routeDistanceKm);
+    const initialCameraTarget = getFlyoverCameraTarget(
+      routeLine,
+      0,
+      routeDistanceKm,
+      flyoverSpeedRef.current,
+    );
     let cameraCenter = initialCameraTarget.center;
     let cameraBearing = initialCameraTarget.bearing;
     let flyoverProgress = 0;
@@ -169,12 +208,23 @@ export const useFlyoverAnimation = ({
       const distanceKm = routeDistanceKm * easedProgress;
       const point = turf.along(routeLine, distanceKm, { units: 'kilometers' });
       const lngLat = point.geometry.coordinates;
-      const cameraTarget = getFlyoverCameraTarget(routeLine, distanceKm, routeDistanceKm);
+      const cameraTarget = getFlyoverCameraTarget(
+        routeLine,
+        distanceKm,
+        routeDistanceKm,
+        flyoverSpeedRef.current,
+      );
 
       setFlyoverRouteProgress(map, routeLine, distanceKm, routeDistanceKm);
       setFlyoverDistanceKm(distanceKm);
       marker.setLngLat(lngLat);
-      cameraCenter = smoothLngLat(cameraCenter, cameraTarget.center);
+      cameraCenter = smoothLngLat(
+        cameraCenter,
+        cameraTarget.center,
+        flyoverSpeedRef.current >= FLYOVER_HIGH_SPEED_THRESHOLD
+          ? FLYOVER_HIGH_SPEED_CAMERA_CENTER_SMOOTHING
+          : undefined,
+      );
       cameraBearing = smoothBearing(cameraBearing, cameraTarget.bearing);
 
       map.jumpTo({
@@ -221,7 +271,13 @@ export const useFlyoverAnimation = ({
 
     flyoverIntroTimeoutRef.current = window.setTimeout(() => {
       flyoverIntroTimeoutRef.current = null;
-      flyoverAnimationRef.current = window.requestAnimationFrame(animateFlyover);
+      waitForFlyoverTiles(map).then(() => {
+        if (!flyoverMarkerRef.current || flyoverAnimationRef.current) {
+          return;
+        }
+
+        flyoverAnimationRef.current = window.requestAnimationFrame(animateFlyover);
+      });
     }, FLYOVER_INTRO_DURATION_MS);
   }, [
     currentMapStyleRef,
