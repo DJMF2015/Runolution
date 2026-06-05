@@ -38,7 +38,11 @@ export const getActivityRouteCenter = (data) => {
 export const createActivityDetailMap = ({ accessToken, center, container, style }) => {
   mapboxgl.accessToken = accessToken;
 
-  return new mapboxgl.Map({
+  if (typeof mapboxgl.prewarm === 'function') {
+    mapboxgl.prewarm();
+  }
+
+  const map = new mapboxgl.Map({
     style,
     antialias: true,
     center,
@@ -49,6 +53,12 @@ export const createActivityDetailMap = ({ accessToken, center, container, style 
     hash: false,
     container,
   });
+
+  if (typeof map.setPrefetchZoomDelta === 'function') {
+    map.setPrefetchZoomDelta(4);
+  }
+
+  return map;
 };
 
 /**
