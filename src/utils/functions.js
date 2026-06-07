@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { auth_revoke_link, baseURL } from './config';
-import { removeDataAfterDuration } from './helpers';
+import { removeDataAfterDuration } from './storageHelpers';
 import { RateLimiter } from './rateLimiter';
 
 const stravaRateLimiter = new RateLimiter(100, 15 * 60 * 1000);

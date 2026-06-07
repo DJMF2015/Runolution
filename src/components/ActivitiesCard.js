@@ -23,7 +23,7 @@ import {
   getKudoersByActivityId,
   getAthleteStreams,
 } from '../utils/functions';
-import { fetchTokenInfo } from '../utils/athleteActivitiesFunctions';
+import { fetchTokenInfo } from '../utils/helpers';
 import { ACTIVITY_DETAIL_MAP_STYLES } from '../utils/mapStyles';
 import {
   addActivityDetailMapControls,
@@ -31,7 +31,7 @@ import {
   fitRouteToMap,
   getActivityLineFeature,
   getActivityRouteCenter,
-} from '../utils/activityRouteMap';
+} from '../utils/activityDetailMap';
 import {
   formatFlyoverDistance,
   getFlyoverRouteCoordinates,
@@ -97,7 +97,6 @@ export default function ActivitiesCard() {
     activity: from,
     currentMapStyleRef,
     data,
-    fitRouteToMap,
     flyoverRouteLine,
     isActivityNavCollapsedRef,
     mapRef,

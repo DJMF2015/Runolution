@@ -2,22 +2,28 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import * as turf from '@turf/turf';
 import {
+  FLYOVER_INTRO_START_ALTITUDE,
   FLYOVER_INTRO_DURATION_MS,
   FLYOVER_OUTRO_DURATION_MS,
   FLYOVER_OUTRO_PITCH,
   FLYOVER_HIGH_SPEED_CAMERA_CENTER_SMOOTHING,
+  FLYOVER_HIGH_SPEED_THRESHOLD,
   FLYOVER_PITCH,
   FLYOVER_SPEEDS,
   FLYOVER_TILE_WAIT_MS,
-  FLYOVER_ZOOM,
+  computeCameraPosition,
   createFlyoverMarkerElement,
+  easeCubicOut,
   formatFlyoverElevation,
   formatFlyoverPace,
   formatFlyoverTotalDistance,
+  getFlyoverAltitude,
   getFlyoverCameraTarget,
   getFlyoverDuration,
   getFlyoverRouteCoordinates,
   getFlyoverRouteDistanceKm,
+  getFlyoverZoom,
+  lerp,
   setActivityRouteData,
   setFlyoverRouteGradient,
   setFlyoverRouteProgress,
@@ -26,7 +32,44 @@ import {
   smoothLngLat,
 } from '../utils/flyOverHelper';
 
-const FLYOVER_HIGH_SPEED_THRESHOLD = 3;
+const setFlyoverFreeCamera = ({
+  altitude,
+  bearing,
+  map,
+  pitch,
+  targetLngLat,
+  zoom,
+}) => {
+  if (
+    !map ||
+    typeof map.getFreeCameraOptions !== 'function' ||
+    typeof map.setFreeCameraOptions !== 'function' ||
+    !mapboxgl.MercatorCoordinate
+  ) {
+    map?.jumpTo({
+      center: [targetLngLat.lng, targetLngLat.lat],
+      bearing,
+      pitch,
+      zoom,
+    });
+    return;
+  }
+
+  const camera = map.getFreeCameraOptions();
+  const cameraPosition = computeCameraPosition(
+    pitch,
+    bearing,
+    targetLngLat,
+    altitude,
+  );
+
+  camera.setPitchBearing(pitch, bearing);
+  camera.position = mapboxgl.MercatorCoordinate.fromLngLat(
+    cameraPosition,
+    altitude,
+  );
+  map.setFreeCameraOptions(camera);
+};
 
 const setFlyoverTilePrefetch = (map) => {
   if (typeof map?.setPrefetchZoomDelta === 'function') {
@@ -67,7 +110,6 @@ const waitForFlyoverTiles = (map) => {
 export const useFlyoverAnimation = ({
   activity,
   data,
-  fitRouteToMap,
   isActivityNavCollapsedRef,
   mapRef,
   currentMapStyleRef,
@@ -75,13 +117,12 @@ export const useFlyoverAnimation = ({
   routeCoordinates,
 }) => {
   const [isFlyoverPlaying, setIsFlyoverPlaying] = useState(false);
-  const [flyoverSpeed, setFlyoverSpeed] = useState(2.0);
+  const [flyoverSpeed, setFlyoverSpeed] = useState(1);
   const [flyoverDistanceKm, setFlyoverDistanceKm] = useState(0);
   const [showFlyoverSummary, setShowFlyoverSummary] = useState(false);
 
   const flyoverAnimationRef = useRef(null);
   const flyoverMarkerRef = useRef(null);
-  const flyoverIntroTimeoutRef = useRef(null);
   const flyoverSpeedRef = useRef(1);
   const skipNextRouteFitRef = useRef(false);
 
@@ -131,11 +172,6 @@ export const useFlyoverAnimation = ({
         flyoverAnimationRef.current = null;
       }
 
-      if (flyoverIntroTimeoutRef.current) {
-        window.clearTimeout(flyoverIntroTimeoutRef.current);
-        flyoverIntroTimeoutRef.current = null;
-      }
-
       flyoverMarkerRef.current?.remove();
       flyoverMarkerRef.current = null;
       setActivityRouteData(mapRef.current, data);
@@ -179,6 +215,16 @@ export const useFlyoverAnimation = ({
     setIsFlyoverPlaying(true);
 
     const duration = getFlyoverDuration(routeDistanceKm, routeLine.properties?.streams);
+    const flyoverZoom = getFlyoverZoom({
+      routeDistanceKm,
+      streams: routeLine.properties?.streams,
+      totalElevationGain: activity?.total_elevation_gain,
+    });
+    const flyoverAltitude = getFlyoverAltitude({
+      routeDistanceKm,
+      streams: routeLine.properties?.streams,
+      totalElevationGain: activity?.total_elevation_gain,
+    });
     const initialCameraTarget = getFlyoverCameraTarget(
       routeLine,
       0,
@@ -227,11 +273,16 @@ export const useFlyoverAnimation = ({
       );
       cameraBearing = smoothBearing(cameraBearing, cameraTarget.bearing);
 
-      map.jumpTo({
-        center: cameraCenter,
+      setFlyoverFreeCamera({
+        altitude: flyoverAltitude,
         bearing: cameraBearing,
+        map,
         pitch: FLYOVER_PITCH,
-        zoom: FLYOVER_ZOOM,
+        targetLngLat: {
+          lng: cameraCenter[0],
+          lat: cameraCenter[1],
+        },
+        zoom: flyoverZoom,
       });
 
       if (flyoverProgress < 1) {
@@ -247,30 +298,51 @@ export const useFlyoverAnimation = ({
       setFlyoverDistanceKm(routeDistanceKm);
       setShowFlyoverSummary(true);
       setIsFlyoverPlaying(false);
-      fitRouteToMap(
-        map,
-        flyoverRouteCoordinates,
-        false,
-        isActivityNavCollapsedRef.current,
-        FLYOVER_OUTRO_DURATION_MS,
-        {
-          bearing: cameraBearing,
-          pitch: FLYOVER_OUTRO_PITCH,
-        },
-      );
+      map.fitBounds(turf.bbox(routeLine), {
+        duration: FLYOVER_OUTRO_DURATION_MS,
+        pitch: FLYOVER_OUTRO_PITCH,
+        bearing: cameraBearing,
+        padding: isActivityNavCollapsedRef.current ? 120 : 180,
+      });
     };
 
-    map.easeTo({
-      center: cameraCenter,
-      bearing: cameraBearing,
-      pitch: FLYOVER_PITCH,
-      zoom: FLYOVER_ZOOM,
-      duration: FLYOVER_INTRO_DURATION_MS,
-      essential: true,
-    });
+    const animateIntro = (timestamp) => {
+      if (!previousTimestamp) {
+        previousTimestamp = timestamp;
+      }
 
-    flyoverIntroTimeoutRef.current = window.setTimeout(() => {
-      flyoverIntroTimeoutRef.current = null;
+      const introProgress = Math.min(
+        (timestamp - previousTimestamp) / FLYOVER_INTRO_DURATION_MS,
+        1,
+      );
+      const easedProgress = easeCubicOut(introProgress);
+      const introAltitude = lerp(
+        FLYOVER_INTRO_START_ALTITUDE,
+        flyoverAltitude,
+        easedProgress,
+      );
+      const introPitch = lerp(35, FLYOVER_PITCH, easedProgress);
+      const introBearing = lerp(cameraBearing - 24, cameraBearing, easedProgress);
+
+      setFlyoverFreeCamera({
+        altitude: introAltitude,
+        bearing: introBearing,
+        map,
+        pitch: introPitch,
+        targetLngLat: {
+          lng: cameraCenter[0],
+          lat: cameraCenter[1],
+        },
+        zoom: flyoverZoom,
+      });
+
+      if (introProgress < 1) {
+        flyoverAnimationRef.current = window.requestAnimationFrame(animateIntro);
+        return;
+      }
+
+      previousTimestamp = null;
+      flyoverAnimationRef.current = null;
       waitForFlyoverTiles(map).then(() => {
         if (!flyoverMarkerRef.current || flyoverAnimationRef.current) {
           return;
@@ -278,11 +350,13 @@ export const useFlyoverAnimation = ({
 
         flyoverAnimationRef.current = window.requestAnimationFrame(animateFlyover);
       });
-    }, FLYOVER_INTRO_DURATION_MS);
+    };
+
+    flyoverAnimationRef.current = window.requestAnimationFrame(animateIntro);
   }, [
     currentMapStyleRef,
+    activity?.total_elevation_gain,
     data,
-    fitRouteToMap,
     flyoverRouteCoordinates,
     isActivityNavCollapsedRef,
     mapRef,

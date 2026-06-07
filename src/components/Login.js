@@ -9,7 +9,7 @@ const Login = () => {
   const redirectUrl = 'http://runolution.vercel.app/redirect';
   const handleLogin = () => {
     setLoggedOut(!logout);
-    window.location = `http://www.strava.com/oauth/authorize?client_id=${client_id}&response_type=code&redirect_uri=${redirectUrl}&approval_prompt=auto&scope=read_all,activity:read_all,profile:read_all`;
+    window.location = `https://www.strava.com/oauth/authorize?client_id=${client_id}&response_type=code&redirect_uri=${redirectUrl}&approval_prompt=auto&scope=read_all,activity:read_all,profile:read_all`;
   };
 
   return (

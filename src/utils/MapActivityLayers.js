@@ -2,8 +2,12 @@ import {
   ACTIVITIES_LINE_LAYER_ID,
   ACTIVITIES_SOURCE_ID,
   EMPTY_FEATURE_COLLECTION,
-} from './activityMap';
-import { DEFAULT_FLYOVER_ROUTE_GRADIENT } from './flyOverHelper';
+} from './activitiesMap';
+import {
+  ACTIVITY_ROUTE_LAYER_ID,
+  ACTIVITY_ROUTE_SOURCE_ID,
+  DEFAULT_FLYOVER_ROUTE_GRADIENT,
+} from './flyOverHelper';
 
 const getActivityColourExpression = [
   'match',
@@ -135,23 +139,23 @@ export const addActivityMapLayers = (map, data) => {
 
   setMapAtmosphere(map);
 
-  if (!map.getSource('linepath')) {
-    map.addSource('linepath', {
+  if (!map.getSource(ACTIVITY_ROUTE_SOURCE_ID)) {
+    map.addSource(ACTIVITY_ROUTE_SOURCE_ID, {
       type: 'geojson',
       lineMetrics: true,
       data,
     });
   } else {
-    map.getSource('linepath').setData(data);
+    map.getSource(ACTIVITY_ROUTE_SOURCE_ID).setData(data);
   }
 
-  if (!map.getLayer('line-dashed')) {
+  if (!map.getLayer(ACTIVITY_ROUTE_LAYER_ID)) {
     map.addLayer({
       type: 'line',
-      source: 'linepath',
-      id: 'line-dashed',
+      source: ACTIVITY_ROUTE_SOURCE_ID,
+      id: ACTIVITY_ROUTE_LAYER_ID,
       paint: {
-        'line-width': 6,
+        'line-width': 5,
         'line-color': DEFAULT_FLYOVER_ROUTE_GRADIENT,
       },
     });

@@ -1,14 +1,17 @@
 import React, { useState, useEffect, useMemo, useRef, useDeferredValue } from 'react';
 import { ArrowUpCircleFill } from '@styled-icons/bootstrap/ArrowUpCircleFill';
 import { FiBox, FiLayers } from 'react-icons/fi';
-import { getAthleteActivities } from '../utils/functions';
-import { fetchTokenInfo } from '../utils/athleteActivitiesFunctions';
 import ActivityDropDown from '../components/ActivityDropDown';
 import Search from '../components/search';
 import addActivitiesLayers from '../utils/MapActivityLayers';
 import Login from '../components/Login';
 import styled from 'styled-components';
-import { hasStoredData, removeDataAfterDuration } from '../utils/helpers';
+import {
+  fetchStravaActivities,
+  fetchTokenInfo,
+  hasStoredData,
+  removeDataAfterDuration,
+} from '../utils/helpers';
 import { useGetWindowWidth } from '../hooks/useWindowWidth';
 import { useScroll } from '../hooks/useScroll';
 import LoadingWheel from '../styles/Loading.module.css';
@@ -26,7 +29,7 @@ import {
   getRouteFeatureCollection,
   setActivitiesSourceData,
   updateActivitiesMapData,
-} from '../utils/activityMap';
+} from '../utils/activitiesMap';
 import { ACTIVITY_DETAIL_MAP_STYLES } from '../utils/mapStyles';
 
 const initialState = {
@@ -88,7 +91,15 @@ const ActivitiesMap = () => {
           return;
         }
 
-        const stravaActivityResponse = await fetchStravaActivities(currentAccessToken);
+        const stravaActivityResponse = await fetchStravaActivities(
+          currentAccessToken,
+          (loadedActivityCount) => {
+            setState((prevState) => ({
+              ...prevState,
+              activityLoadingState: loadedActivityCount,
+            }));
+          },
+        );
         polylines = getDataPolylines(stravaActivityResponse);
         localStorage.setItem('activities', JSON.stringify(stravaActivityResponse));
         setState((prevState) => ({
@@ -111,50 +122,6 @@ const ActivitiesMap = () => {
     });
     // eslint-disable-next-line
   }, []);
-
-  const setMapLoading = (loading) => {
-    setState((prevState) => ({
-      ...prevState,
-      loading,
-    }));
-  };
-
-  const setLoadedActivityCount = (activityLoadingState) => {
-    setState((prevState) => ({
-      ...prevState,
-      activityLoadingState,
-    }));
-  };
-
-  const fetchStravaActivities = async (accessToken) => {
-    let stravaActivityResponse = [];
-    let looper_num = 1;
-
-    while (looper_num || stravaActivityResponse.length === 0) {
-      const stravaActivityResponseSingle = await getAthleteActivities(
-        accessToken,
-        200,
-        looper_num,
-      );
-
-      if (
-        !stravaActivityResponseSingle.data ||
-        stravaActivityResponseSingle.data.length === 0 ||
-        stravaActivityResponseSingle.data.errors
-      ) {
-        setMapLoading(false);
-        break;
-      } else {
-        const loadedActivityCount = stravaActivityResponse.length;
-        setLoadedActivityCount(loadedActivityCount);
-        stravaActivityResponse = stravaActivityResponse.concat(
-          stravaActivityResponseSingle.data,
-        );
-      }
-      looper_num++;
-    }
-    return stravaActivityResponse;
-  };
 
   const filteredName = useMemo(() => {
     return filterMapActivities(state.nodes, deferredSearchTxt, filteredSportType);
