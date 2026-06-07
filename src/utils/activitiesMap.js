@@ -56,21 +56,6 @@ export const getDataPolylines = (activities) => {
     .filter((activity) => activity.activityCoordinates.length > 1);
 };
 
-export const getAthleteStreamsData = ({ streams, activity }) => {
-  if (streams?.latlng?.data?.length > 1) {
-    return streams.latlng.data.map(([lat, lng]) => [lng, lat]);
-  }
-
-  if (activity?.map?.polyline) {
-    return polyline.decode(activity.map.polyline).map(([lat, lng]) => [lng, lat]);
-  }
-
-  if (activity?.map?.summary_polyline) {
-    return polyline.decode(activity.map.summary_polyline).map(([lat, lng]) => [lng, lat]);
-  }
-
-  return [];
-};
 /**
  * Filters decoded activity route records by text and sport type.
  */
@@ -111,14 +96,6 @@ export const getRouteFeatureCollection = (activities) => ({
  */
 export const getRouteCoordinates = (featureCollection) => {
   return featureCollection.features.flatMap((feature) => feature.geometry.coordinates);
-};
-
-/**
- * Creates a stable key for deciding whether a camera fit has already been done
- * for the current filter/result/viewport combination.
- */
-export const getCameraFitKey = ({ filteredSportType, activityCount, isMobile }) => {
-  return `${filteredSportType || 'all'}:${activityCount}:${isMobile ? 'mobile' : 'desktop'}`;
 };
 
 /**

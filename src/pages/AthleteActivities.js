@@ -3,12 +3,14 @@ import styled from 'styled-components';
 import { useGetWindowWidth } from '../hooks/useWindowWidth';
 import { useLocalStorageState } from '../hooks/useLocalStorageState';
 import { useScroll } from '../hooks/useScroll';
-import { clearStravaAuth, hasStoredData, isUnauthorizedError } from '../utils/helpers';
 import {
+  clearStravaAuth,
   fetchData,
   fetchTokenInfo,
+  hasStoredData,
   initializeUserDetails,
-} from '../utils/athleteActivitiesFunctions';
+  isUnauthorizedError,
+} from '../utils/helpers';
 import LoadingWheel from '../styles/Loading.module.css';
 import { ArrowUpCircleFill } from '@styled-icons/bootstrap/ArrowUpCircleFill';
 import { Activity } from '@styled-icons/evaicons-solid/Activity';

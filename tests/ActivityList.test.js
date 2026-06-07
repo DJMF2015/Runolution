@@ -2,15 +2,10 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import ActivityList from '../src/components/ActivityList';
 import { getDetailedAthleteData } from '../src/utils/functions';
-import { fetchTokenInfo } from '../src/utils/athleteActivitiesFunctions';
-import { getNewAccessToken } from '../src/utils/helpers';
+import { fetchTokenInfo, getNewAccessToken } from '../src/utils/helpers';
 
 jest.mock('../src/utils/functions', () => ({
   getDetailedAthleteData: jest.fn(),
-}));
-
-jest.mock('../src/utils/athleteActivitiesFunctions', () => ({
-  fetchTokenInfo: jest.fn(),
 }));
 
 jest.mock('../src/utils/helpers', () => {
@@ -18,6 +13,7 @@ jest.mock('../src/utils/helpers', () => {
 
   return {
     ...actual,
+    fetchTokenInfo: jest.fn(),
     getNewAccessToken: jest.fn(),
   };
 });

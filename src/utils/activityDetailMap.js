@@ -1,13 +1,7 @@
 import polyline from '@mapbox/polyline';
 import mapboxgl from 'mapbox-gl';
 import * as turf from '@turf/turf';
-import { getBoundsForCoordinates } from './activityMap';
-import MapCoordinatesHelper from './mapCoordinates';
-
-export const ACTIVITY_DETAIL_MAP_STYLES = {
-  street: 'mapbox://styles/mapbox/outdoors-v12',
-  satellite: 'mapbox://styles/mapbox/satellite-v9',
-};
+import { getBoundsForCoordinates } from './activitiesMap';
 
 export const DEFAULT_ACTIVITY_ROUTE_CENTER = [-3.21698, 55.89107];
 
@@ -20,8 +14,11 @@ export const getActivityLineFeature = (summaryPolyline) => {
     return null;
   }
 
-  const activityGeoJson = polyline.toGeoJSON(summaryPolyline);
-  return MapCoordinatesHelper(activityGeoJson);
+  return {
+    type: 'Feature',
+    properties: { name: 'activity' },
+    geometry: polyline.toGeoJSON(summaryPolyline),
+  };
 };
 
 /**
@@ -51,6 +48,7 @@ export const createActivityDetailMap = ({ accessToken, center, container, style 
     bearing: 0,
     interactive: true,
     hash: false,
+    projection: 'globe',
     container,
   });
 

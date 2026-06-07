@@ -1,5 +1,9 @@
 import axios from 'axios';
 import { auth_link, client_secret, client_id } from './config';
+import { getAthleteActivities, getUsersDetails } from './functions';
+import { removeDataAfterDuration } from './storageHelpers';
+
+export { removeDataAfterDuration } from './storageHelpers';
 
 const STRAVA_AUTH_KEYS = [
   'payload',
@@ -139,34 +143,6 @@ export const checkIfTokenExpired = async (expires_in, expires_at) => {
 };
 
 /**
- * Removes stale cached data once it is older than the provided retention window.
- * Stored values without a `timestamp` field are currently left to existing
- * parsing/date behavior.
- *
- * @param {string} key - localStorage key to check.
- * @param {number} durationInDays - Maximum cache age in days.
- */
-export const removeDataAfterDuration = (key, durationInDays) => {
-  const storedData = localStorage.getItem(key);
-
-  if (storedData) {
-    const storedTimestamp = new Date(JSON.parse(storedData).timestamp);
-    const currentTimestamp = new Date();
-
-    // Calculate the time difference in milliseconds
-    const timeDifference = currentTimestamp - storedTimestamp;
-
-    // Convert the time difference from milliseconds to days
-    const timeDifferenceInDays = timeDifference / (1000 * 60 * 60 * 24);
-
-    // Check if the stored data is older than the specified duration
-    if (timeDifferenceInDays >= durationInDays) {
-      localStorage.removeItem(key);
-    }
-  }
-};
-
-/**
  * Stores the Strava OAuth payload and token fields used by refresh logic.
  *
  * @param {Object} payload - Token response returned by Strava.
@@ -198,4 +174,107 @@ export const catchErrors = (fn) => {
       throw new Error(err);
     });
   };
+};
+
+/**
+ * Fetches all Strava activities for the athlete, handling Strava pagination.
+ *
+ * @param {string} accessToken - The Strava API access token.
+ * @param {Function} onLoadingStateChange - Optional callback with loaded count.
+ * @returns {Promise<Array>} Array of activity objects.
+ */
+export const fetchStravaActivities = async (accessToken, onLoadingStateChange) => {
+  let stravaActivityResponse = [];
+  let looper_num = 1;
+
+  while (looper_num || stravaActivityResponse.length === 0) {
+    const stravaActivityResponseSingle = await getAthleteActivities(
+      accessToken,
+      200,
+      looper_num,
+    );
+
+    if (
+      !stravaActivityResponseSingle.data ||
+      stravaActivityResponseSingle.data.length === 0 ||
+      stravaActivityResponseSingle.data.errors
+    ) {
+      break;
+    }
+
+    if (onLoadingStateChange) {
+      onLoadingStateChange(stravaActivityResponse.length);
+    }
+
+    stravaActivityResponse = stravaActivityResponse.concat(
+      stravaActivityResponseSingle.data,
+    );
+    looper_num++;
+  }
+
+  return stravaActivityResponse;
+};
+
+/**
+ * Fetches athlete activities with localStorage caching.
+ *
+ * @param {string} accessToken - The Strava API access token.
+ * @param {Function} setLoading - State setter for loading state.
+ * @param {Function} setActivityLoadingState - State setter for progress count.
+ * @returns {Promise<Array>} Array of activities.
+ */
+export const fetchData = async (accessToken, setLoading, setActivityLoadingState) => {
+  removeDataAfterDuration('activities', 6);
+  const data = JSON.parse(localStorage.getItem('activities'));
+
+  if (data !== null && data !== undefined) {
+    setLoading(false);
+    return data;
+  }
+
+  setLoading(true);
+  const stravaActivityResponse = await fetchStravaActivities(accessToken, (count) => {
+    setActivityLoadingState(count);
+  });
+
+  setLoading(false);
+  localStorage.setItem('activities', JSON.stringify(stravaActivityResponse));
+  return stravaActivityResponse;
+};
+
+/**
+ * Returns a valid Strava access token from storage or refresh flow.
+ *
+ * @returns {Promise<string|null>} Valid access token when available.
+ */
+export const fetchTokenInfo = async () => {
+  const expires_at = localStorage.getItem('expires_at');
+  const expires_in = localStorage.getItem('expires_in');
+  const refreshToken = JSON.parse(localStorage.getItem('refresh_token'));
+
+  if (expires_at && expires_in) {
+    return checkIfTokenExpired(expires_in, expires_at);
+  }
+
+  if (refreshToken) {
+    const refreshedPayload = await getNewAccessToken();
+    return refreshedPayload?.access_token || null;
+  }
+
+  return JSON.parse(localStorage.getItem('access_token'));
+};
+
+/**
+ * Fetches the authenticated athlete profile details.
+ *
+ * @param {string} accessToken - The Strava API access token.
+ * @returns {Promise<Object|null>} Athlete profile data.
+ */
+export const initializeUserDetails = async (accessToken) => {
+  if (accessToken) {
+    const response = await getUsersDetails(accessToken);
+    return response?.data;
+  }
+
+  return null;
 };
