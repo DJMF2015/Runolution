@@ -2,8 +2,11 @@ import styled from 'styled-components';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { getSecondstoMinutes, getKmsToMiles, getMstoKmHr } from '../utils/conversion';
 import { getDetailedAthleteData } from '../utils/functions';
-import { fetchTokenInfo } from '../utils/athleteActivitiesFunctions';
-import { getNewAccessToken, isUnauthorizedError } from '../utils/helpers';
+import {
+  fetchTokenInfo,
+  getNewAccessToken,
+  isUnauthorizedError,
+} from '../utils/helpers';
 import { useScroll } from '../hooks/useScroll';
 import PaceZoneBarChart from './BestEffortsChart';
 import ElevationChart from './ElevationBarChart';

@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { getAthleteStats } from '../utils/functions';
-import { fetchTokenInfo } from '../utils/athleteActivitiesFunctions';
-import { isUnauthorizedError } from '../utils/helpers';
+import { fetchTokenInfo, isUnauthorizedError } from '../utils/helpers';
 import styled from 'styled-components';
 import { Run } from '@styled-icons/boxicons-regular/Run';
 import { Bicycle } from '@styled-icons/bootstrap/Bicycle';

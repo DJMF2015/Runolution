@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { getAthleteStats } from '../utils/functions';
-import { fetchTokenInfo } from '../utils/athleteActivitiesFunctions';
-import { isUnauthorizedError } from '../utils/helpers';
+import { fetchTokenInfo, isUnauthorizedError } from '../utils/helpers';
 import styled from 'styled-components';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 import { Doughnut } from 'react-chartjs-2';
