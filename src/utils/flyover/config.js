@@ -44,6 +44,11 @@ export const FLYOVER_ALTITUDE_LIMITS = {
   min: 650,
   max: 5200,
 };
+export const FLYOVER_HIGH_ROUTE_ALTITUDE_METRES = 2000;
+export const FLYOVER_HIGH_ROUTE_ALTITUDE_RAMP_METRES = 1500;
+export const FLYOVER_HIGH_ROUTE_CLEARANCE_METRES = 1800;
+export const FLYOVER_HIGH_ROUTE_MAX_CAMERA_ALTITUDE = 7600;
+export const FLYOVER_HIGH_ROUTE_MAX_ZOOM_OUT = 0.75;
 export const ROUTE_DISTANCE_ZOOM_STOPS = [
   { thresholdKm: 1, value: 16.6 },
   { thresholdKm: 3, value: 16.1 },

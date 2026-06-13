@@ -3,8 +3,6 @@ import { useLocation, Link } from 'react-router-dom';
 import { ArrowUpCircleFill } from '@styled-icons/bootstrap/ArrowUpCircleFill';
 import {
   FiBox,
-  FiChevronDown,
-  FiChevronLeft,
   FiLayers,
   FiMenu,
   FiMinus,
@@ -83,6 +81,7 @@ export default function ActivitiesCard() {
     dismissFlyoverSummary,
     flyoverAveragePace,
     flyoverDistanceKm,
+    flyoverLivePace,
     flyoverSpeed,
     flyoverTotalDistance,
     flyoverTotalElevation,
@@ -305,14 +304,6 @@ export default function ActivitiesCard() {
             onClick={() => setIsActivityNavCollapsed((isCollapsed) => !isCollapsed)}
           >
             <FiMenu aria-hidden="true" />
-            <ToggleText $collapsed={isActivityNavCollapsed}>
-              {isActivityNavCollapsed ? 'Map view' : 'Details'}
-            </ToggleText>
-            {isActivityNavCollapsed ? (
-              <FiChevronLeft aria-hidden="true" />
-            ) : (
-              <FiChevronDown aria-hidden="true" />
-            )}
           </ActivityNavToggle>
           {!isActivityNavCollapsed && (
             <CardHeaders>
@@ -446,8 +437,8 @@ export default function ActivitiesCard() {
                 <strong>{formatFlyoverDistance(flyoverDistanceKm)}</strong>
               </FlyoverLiveStat>
               <FlyoverLiveStat>
-                <span>Pace</span>
-                <strong>{flyoverAveragePace}</strong>
+                <span>Avg pace</span>
+                <strong>{flyoverLivePace}</strong>
               </FlyoverLiveStat>
             </FlyoverLiveStats>
           )}
@@ -519,7 +510,7 @@ export default function ActivitiesCard() {
             >
               <MapStyleIcon aria-hidden="true" />
               <MapStyleButtonLabel>
-                {mapStyle === 'satellite' ? 'Satellite' : 'Streets'}
+                {mapStyle === 'satellite' ? 'satellite' : 'streets'}
               </MapStyleButtonLabel>
             </MapStyleIconButton>
           </MapStyleControl>
@@ -727,8 +718,8 @@ const MapStylePopup = styled.div`
 
 const FlyoverControl = styled.div`
   position: absolute;
-  top: 5.35rem;
-  right: 4.75rem;
+  top: 1rem;
+  right: 5rem;
   z-index: 1030;
   display: inline-flex;
   overflow: hidden;
@@ -739,8 +730,8 @@ const FlyoverControl = styled.div`
   backdrop-filter: blur(14px);
 
   @media screen and (max-width: 800px) {
-    top: 4.85rem;
-    right: 4.25rem;
+    top: 1rem;
+    right: 4.75rem;
   }
 
   @media screen and (max-width: 520px) {
@@ -796,9 +787,10 @@ const FlyoverButton = styled.button`
   }
 
   @media screen and (max-width: 420px) {
-    width: 2.45rem;
-    min-height: 2.55rem;
-    padding: 0;
+    margin-bottom: 1rem;
+    width: 3.45rem;
+    min-height: 2rem;
+    padding: 1px;
   }
 `;
 
@@ -816,7 +808,7 @@ const FlyoverSpeedValue = styled.span`
   text-align: center;
 
   @media screen and (max-width: 420px) {
-    min-width: 1.85rem;
+    min-width: 2.85rem;
     font-size: 0.72rem;
   }
 `;
@@ -824,8 +816,8 @@ const FlyoverSpeedValue = styled.span`
 const FlyoverLabel = styled.span`
   @media screen and (max-width: 420px) {
     position: absolute;
-    width: 1px;
-    height: 1px;
+    width: 1em;
+    height: 2em;
     overflow: hidden;
     clip: rect(0 0 0 0);
     white-space: nowrap;
@@ -1141,13 +1133,13 @@ const ScrollToTop = styled(ArrowUpCircleFill)`
 `;
 
 const SideNavigation = styled.aside`
-  height: calc(100dvh - 4.75rem);
+  height: 100dvh;
   width: ${(props) => (props.$collapsed ? '4.35rem' : 'clamp(280px, 24vw, 340px)')};
   display: block;
   position: fixed;
   border-right: 1px solid rgba(252, 82, 0, 0.5);
   z-index: 1000;
-  top: 4.75rem;
+  top: 0;
   left: 0;
   scroll-behavior: smooth;
   padding: ${(props) => (props.$collapsed ? '0.62rem' : '1.05rem')};
@@ -1267,21 +1259,6 @@ const ActivityNavToggle = styled.button`
     min-height: 2.8rem;
     min-width: 2.8rem;
     padding: 0 0.65rem;
-  }
-`;
-
-const ToggleText = styled.span`
-  font-size: 0.82rem;
-  letter-spacing: 0;
-  white-space: nowrap;
-  display: ${(props) => (props.$collapsed ? 'none' : 'inline')};
-
-  @media screen and (max-width: 800px) {
-    display: inline;
-  }
-
-  @media screen and (max-width: 420px) {
-    font-size: 0.78rem;
   }
 `;
 

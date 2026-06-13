@@ -14,6 +14,11 @@ import {
   DRAMATIC_TURN_DAMPING,
   ELEVATION_CAMERA_ADJUSTMENTS,
   FLYOVER_ALTITUDE_LIMITS,
+  FLYOVER_HIGH_ROUTE_ALTITUDE_METRES,
+  FLYOVER_HIGH_ROUTE_ALTITUDE_RAMP_METRES,
+  FLYOVER_HIGH_ROUTE_CLEARANCE_METRES,
+  FLYOVER_HIGH_ROUTE_MAX_CAMERA_ALTITUDE,
+  FLYOVER_HIGH_ROUTE_MAX_ZOOM_OUT,
   FLYOVER_HIGH_SPEED_THRESHOLD,
   FLYOVER_ROUTE_GRADIENT,
   FLYOVER_ZOOM,
@@ -39,6 +44,7 @@ export {
   formatFlyoverDistance,
   formatFlyoverElevation,
   formatFlyoverPace,
+  formatFlyoverStreamAveragePace,
   formatFlyoverTotalDistance,
 } from './formatters';
 export { createFlyoverMarkerElement } from './marker';
@@ -65,6 +71,7 @@ export {
   FLYOVER_ZOOM,
 } from './config';
 
+// simple linear interpolation between two values
 export const lerp = (start, end, ratio) => {
   return start + (end - start) * ratio;
 };
@@ -90,6 +97,14 @@ const interpolateLngLat = (fromLngLat, toLngLat, ratio) => {
   ];
 };
 
+/**
+ * Computes the camera position based on pitch, bearing, target position, and altitude.
+ * @param {*} pitch
+ * @param {*} bearing
+ * @param {*} targetPosition
+ * @param {*} altitude
+ * @returns
+ */
 export const computeCameraPosition = (pitch, bearing, targetPosition, altitude) => {
   const bearingInRadian = bearing / 57.29;
   const pitchInRadian = (90 - pitch) / 57.29;
@@ -201,6 +216,33 @@ const getElevationCameraAdjustment = (routeDistanceKm, totalElevationGain, strea
   );
 };
 
+const getMaxRouteAltitudeMetres = (streams) => {
+  const altitudeStream = streams?.altitude;
+
+  if (!Array.isArray(altitudeStream) || altitudeStream.length < 2) {
+    return 0;
+  }
+
+  return altitudeStream.reduce((maxAltitude, altitude) => {
+    const altitudeMetres = Number(altitude);
+
+    return Number.isFinite(altitudeMetres)
+      ? Math.max(maxAltitude, altitudeMetres)
+      : maxAltitude;
+  }, 0);
+};
+
+const getHighRouteAltitudeRisk = (streams) => {
+  const altitudeAboveThreshold =
+    getMaxRouteAltitudeMetres(streams) - FLYOVER_HIGH_ROUTE_ALTITUDE_METRES;
+
+  return clamp(
+    altitudeAboveThreshold / FLYOVER_HIGH_ROUTE_ALTITUDE_RAMP_METRES,
+    0,
+    1,
+  );
+};
+
 /**
  * Applies the same camera adjustment pipeline to zoom and altitude: route
  * distance gives the base value, viewport size opens the framing on smaller
@@ -220,9 +262,22 @@ const getAdjustedCameraValue = ({
     totalElevationGain,
     streams,
   )[property];
+  const highRouteAltitudeRisk = getHighRouteAltitudeRisk(streams);
+  const adjustedValue = baseValue + responsiveAdjustment + elevationAdjustment;
+
+  if (property === 'altitude' && highRouteAltitudeRisk > 0) {
+    const safeAltitude =
+      getMaxRouteAltitudeMetres(streams) + FLYOVER_HIGH_ROUTE_CLEARANCE_METRES;
+
+    return clamp(
+      Math.max(adjustedValue, safeAltitude),
+      limits.min,
+      FLYOVER_HIGH_ROUTE_MAX_CAMERA_ALTITUDE,
+    );
+  }
 
   return clamp(
-    baseValue + responsiveAdjustment + elevationAdjustment,
+    adjustedValue - highRouteAltitudeRisk * FLYOVER_HIGH_ROUTE_MAX_ZOOM_OUT,
     limits.min,
     limits.max,
   );
@@ -332,6 +387,8 @@ const getSmoothedPointOnRoute = (routeLine, distanceKm, routeDistanceKm) => {
   return [weightedLng / totalWeight, weightedLat / totalWeight];
 };
 
+// returns the smallest difference between two bearings, normalized to a value between -180 and 180 degrees.
+// This is used to determine how much the camera should lead the marker during turnns.
 const normalizeBearing = (bearing) => {
   return ((((bearing + 180) % 360) + 360) % 360) - 180;
 };
@@ -402,6 +459,15 @@ export const getRouteBearing = (routeLine, distanceKm, routeDistanceKm) => {
   return getWeightedBearingMean(bearingSamples);
 };
 
+/**
+ * getMacroRoutebearing looks at a longer route segment to determine the broader route direction.
+ * This helps stabilize the camera bearing on looping routes where the local direction can spin wildly.
+ * When the local and macro bearings diverge sharply, getLoopStableBearing blends them to keep the camera steady.
+ * @param {*} routeLine
+ * @param {*} distanceKm
+ * @param {*} routeDistanceKm
+ * @returns
+ */
 const getMacroRouteBearing = (routeLine, distanceKm, routeDistanceKm) => {
   const lookaheadDistance = getLoopingRouteLookaheadDistance(routeDistanceKm);
   const fromDistance = clampRouteDistance(

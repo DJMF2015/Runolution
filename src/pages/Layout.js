@@ -13,7 +13,7 @@ const Layout = () => {
   const isActivityCardPage = location.pathname === '/activity';
   const isActivityListPage = location.pathname === '/splits';
   const isActivitiesMapPage = location.pathname === '/map';
-  const showTopBar = !isActivitiesMapPage;
+  const showTopBar = !isActivitiesMapPage && !isActivityCardPage;
   const showPoweredByStrava = isActivitiesPage;
   const showTitle = !isActivityListPage;
   const navigationLayerClasses = [

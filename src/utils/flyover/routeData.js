@@ -5,6 +5,8 @@ const STREAM_KEYS = [
   'distance',
   'altitude',
   'time',
+  'heartrate',
+  'cadence',
   'velocity_smooth',
   'moving',
   'grade_smooth',
