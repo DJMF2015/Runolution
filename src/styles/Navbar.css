@@ -26,12 +26,30 @@
 }
 
 .navigation-layer--activities .navigation,
-.navigation-layer--activity-card .navigation,
 .navigation-layer--activity-list .navigation {
     padding: 0.55rem 0.85rem;
     background: linear-gradient(90deg, rgba(7, 16, 24, 0.9), rgba(7, 16, 24, 0.34));
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     backdrop-filter: blur(12px);
+}
+
+.navigation-layer--activity-card {
+    width: 100%;
+}
+
+.navigation-layer--activity-card .navigation {
+    width: 100%;
+    min-height: 0;
+    padding: 0;
+    background: transparent;
+    border-bottom: 0;
+    backdrop-filter: none;
+}
+
+.navigation-layer--activity-card .navigation .name,
+.navigation-layer--activity-card .navigation [class*="Athlete"],
+.navigation-layer--activity-card .navigation [class*="Title"] {
+    display: none;
 }
 
 .navigation-layer--map-menu-only .navigation {
@@ -89,6 +107,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    z-index: 1050;
     backdrop-filter: blur(14px);
     box-shadow: 0 14px 32px rgba(0, 0, 0, 0.28);
 }
@@ -104,6 +123,24 @@
 .navigation-layer--map-menu-only .hamburger {
     background: rgba(252, 82, 0, 0.96);
     border-color: rgba(255, 255, 255, 0.32);
+}
+
+.navigation-layer--activity-card .hamburger {
+    top: 1rem;
+    right: 1rem;
+    left: auto;
+    color: #ffffff;
+    z-index: 1060;
+    outline-offset: 4px;
+    box-shadow:
+        0 16px 36px rgba(0, 0, 0, 0.34),
+        0 0 0 5px rgba(15, 23, 42, 0.22);
+}
+
+.navigation-layer--activity-card .navigation-menu {
+    top: 4.35rem;
+    left: auto;
+    right: 1rem;
 }
 
 .navigation-layer--activities .hamburger {
@@ -204,6 +241,13 @@
         backdrop-filter: none;
     }
 
+    .navigation-layer--activity-card .navigation {
+        min-height: 0;
+        background: transparent;
+        border-bottom: 0;
+        backdrop-filter: none;
+    }
+
     .powered_by_strava {
         width: 108px;
         margin-left: 0;
@@ -221,6 +265,18 @@
         top: 4rem;
         right: 0.7rem;
         width: min(280px, calc(100vw - 1.4rem));
+    }
+
+    .navigation-layer--activity-card .hamburger {
+        top: 0.75rem;
+        right: 0.75rem;
+        left: auto;
+    }
+
+    .navigation-layer--activity-card .navigation-menu {
+        top: 4rem;
+        left: auto;
+        right: 0.75rem;
     }
 }
 
