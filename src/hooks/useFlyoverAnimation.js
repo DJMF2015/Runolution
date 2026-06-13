@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import * as turf from '@turf/turf';
+// import markerProfile from '../assets/profileMarker.jpg';
 import {
   FLYOVER_INTRO_START_ALTITUDE,
   FLYOVER_INTRO_DURATION_MS,
@@ -16,6 +17,7 @@ import {
   easeCubicOut,
   formatFlyoverElevation,
   formatFlyoverPace,
+  formatFlyoverStreamAveragePace,
   formatFlyoverTotalDistance,
   getFlyoverAltitude,
   getFlyoverCameraTarget,
@@ -32,14 +34,7 @@ import {
   smoothLngLat,
 } from '../utils/flyOverHelper';
 
-const setFlyoverFreeCamera = ({
-  altitude,
-  bearing,
-  map,
-  pitch,
-  targetLngLat,
-  zoom,
-}) => {
+const setFlyoverFreeCamera = ({ altitude, bearing, map, pitch, targetLngLat, zoom }) => {
   if (
     !map ||
     typeof map.getFreeCameraOptions !== 'function' ||
@@ -56,18 +51,10 @@ const setFlyoverFreeCamera = ({
   }
 
   const camera = map.getFreeCameraOptions();
-  const cameraPosition = computeCameraPosition(
-    pitch,
-    bearing,
-    targetLngLat,
-    altitude,
-  );
+  const cameraPosition = computeCameraPosition(pitch, bearing, targetLngLat, altitude);
 
   camera.setPitchBearing(pitch, bearing);
-  camera.position = mapboxgl.MercatorCoordinate.fromLngLat(
-    cameraPosition,
-    altitude,
-  );
+  camera.position = mapboxgl.MercatorCoordinate.fromLngLat(cameraPosition, altitude);
   map.setFreeCameraOptions(camera);
 };
 
@@ -147,6 +134,20 @@ export const useFlyoverAnimation = ({
   const flyoverAveragePace = useMemo(() => {
     return formatFlyoverPace(activity?.distance, activity?.moving_time);
   }, [activity?.distance, activity?.moving_time]);
+
+  const flyoverLivePace = useMemo(() => {
+    return formatFlyoverStreamAveragePace({
+      distanceKm: flyoverDistanceKm,
+      fallbackDistanceMetres: activity?.distance,
+      fallbackMovingTimeSeconds: activity?.moving_time,
+      streams: routeLine?.properties?.streams,
+    });
+  }, [
+    activity?.distance,
+    activity?.moving_time,
+    flyoverDistanceKm,
+    routeLine?.properties?.streams,
+  ]);
 
   const flyoverTotalDistance = useMemo(() => {
     return formatFlyoverTotalDistance(activity?.distance);
@@ -416,6 +417,7 @@ export const useFlyoverAnimation = ({
     dismissFlyoverSummary,
     flyoverAveragePace,
     flyoverDistanceKm,
+    flyoverLivePace,
     flyoverSpeed,
     flyoverTotalDistance,
     flyoverTotalElevation,

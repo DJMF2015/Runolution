@@ -215,7 +215,7 @@ export const getDetailedAthleteData = async (id, accessToken) => {
  */
 export const getAthleteStreams = async (id, accessToken) => {
   if (await stravaRateLimiter.request()) {
-    const apiUrl = `${baseURL}/activities/${id}/streams?keys=latlng,distance,altitude,time,velocity_smooth,moving,grade_smooth&key_by_type=true`;
+    const apiUrl = `${baseURL}/activities/${id}/streams?keys=latlng,distance,altitude,cadence,heartrate,time,velocity_smooth,moving,grade_smooth&key_by_type=true`;
     try {
       const response = await axios.get(apiUrl, {
         headers: { Authorization: `Bearer ${accessToken}` },
