@@ -19,17 +19,18 @@ import {
   formatFlyoverPace,
   formatFlyoverStreamAveragePace,
   formatFlyoverTotalDistance,
+  detectSmallLoopSection,
   getFlyoverAltitude,
   getFlyoverCameraTarget,
   getFlyoverDuration,
   getFlyoverRouteCoordinates,
   getFlyoverRouteDistanceKm,
   getFlyoverZoom,
+  getStableBearing,
   lerp,
   setActivityRouteData,
   setFlyoverRouteGradient,
   setFlyoverRouteProgress,
-  smoothBearing,
   smoothFlyoverProgress,
   smoothLngLat,
 } from '../utils/flyOverHelper';
@@ -104,7 +105,7 @@ export const useFlyoverAnimation = ({
   routeCoordinates,
 }) => {
   const [isFlyoverPlaying, setIsFlyoverPlaying] = useState(false);
-  const [flyoverSpeed, setFlyoverSpeed] = useState(1);
+  const [flyoverSpeed, setFlyoverSpeed] = useState(1.5);
   const [flyoverDistanceKm, setFlyoverDistanceKm] = useState(0);
   const [showFlyoverSummary, setShowFlyoverSummary] = useState(false);
 
@@ -272,7 +273,15 @@ export const useFlyoverAnimation = ({
           ? FLYOVER_HIGH_SPEED_CAMERA_CENTER_SMOOTHING
           : undefined,
       );
-      cameraBearing = smoothBearing(cameraBearing, cameraTarget.bearing);
+      cameraBearing = getStableBearing({
+        previousBearing: cameraBearing,
+        targetBearing: cameraTarget.bearing,
+        isLooping: detectSmallLoopSection({
+          routeLine,
+          distanceKm,
+          routeDistanceKm,
+        }),
+      });
 
       setFlyoverFreeCamera({
         altitude: flyoverAltitude,

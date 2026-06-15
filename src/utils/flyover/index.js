@@ -36,6 +36,10 @@ import {
   ROUTE_DISTANCE_ALTITUDE_STOPS,
   ROUTE_DISTANCE_ZOOM_STOPS,
   SAME_DIRECTION_BEARING_THRESHOLD,
+  SMALL_LOOP_DETECTION_DISTANCE_KM,
+  SMALL_LOOP_MAX_DIAMETER_KM,
+  SMALL_LOOP_MIN_BEARING_SPREAD_DEGREES,
+  SMALL_LOOP_MIN_PATH_TO_DIAMETER_RATIO,
   SMOOTHING_SAMPLE_COUNT,
   DRAMATIC_TURN_RATE,
 } from './config';
@@ -236,11 +240,7 @@ const getHighRouteAltitudeRisk = (streams) => {
   const altitudeAboveThreshold =
     getMaxRouteAltitudeMetres(streams) - FLYOVER_HIGH_ROUTE_ALTITUDE_METRES;
 
-  return clamp(
-    altitudeAboveThreshold / FLYOVER_HIGH_ROUTE_ALTITUDE_RAMP_METRES,
-    0,
-    1,
-  );
+  return clamp(altitudeAboveThreshold / FLYOVER_HIGH_ROUTE_ALTITUDE_RAMP_METRES, 0, 1);
 };
 
 /**
@@ -393,6 +393,10 @@ const normalizeBearing = (bearing) => {
   return ((((bearing + 180) % 360) + 360) % 360) - 180;
 };
 
+export const normalizeBearingDifference = (fromBearing, toBearing) => {
+  return normalizeBearing(toBearing - fromBearing);
+};
+
 const getWeightedBearingMean = (bearingSamples) => {
   let sumX = 0;
   let sumY = 0;
@@ -505,6 +509,129 @@ const getLoopStableBearing = (localBearing, macroBearing) => {
     { bearing: localBearing, weight: 1 - LOOPING_ROUTE_MACRO_BEARING_WEIGHT },
     { bearing: macroBearing, weight: LOOPING_ROUTE_MACRO_BEARING_WEIGHT },
   ]);
+};
+
+const getRouteSectionCoordinates = (routeLine, startDistanceKm, endDistanceKm) => {
+  const startDistance = clamp(startDistanceKm, 0, endDistanceKm);
+  const endDistance = Math.max(endDistanceKm, 0);
+  const startCoordinate = getPointOnRoute(routeLine, startDistance);
+  const endCoordinate = getPointOnRoute(routeLine, endDistance);
+
+  if (startDistance === endDistance) {
+    return [startCoordinate];
+  }
+
+  const section = turf.lineSliceAlong(routeLine, startDistance, endDistance, {
+    units: 'kilometers',
+  });
+  const coordinates = section.geometry.coordinates.filter(Boolean);
+  const firstCoordinate = coordinates[0];
+  const lastCoordinate = coordinates[coordinates.length - 1];
+
+  if (
+    firstCoordinate?.[0] !== startCoordinate[0] ||
+    firstCoordinate?.[1] !== startCoordinate[1]
+  ) {
+    coordinates.unshift(startCoordinate);
+  }
+
+  if (
+    lastCoordinate?.[0] !== endCoordinate[0] ||
+    lastCoordinate?.[1] !== endCoordinate[1]
+  ) {
+    coordinates.push(endCoordinate);
+  }
+
+  return coordinates;
+};
+
+const getSectionBearingSpread = (coordinates) => {
+  if (coordinates.length < 3) {
+    return 0;
+  }
+
+  const bearings = coordinates.slice(1).reduce((sectionBearings, coordinate, index) => {
+    const previousCoordinate = coordinates[index];
+
+    if (
+      previousCoordinate?.[0] === coordinate?.[0] &&
+      previousCoordinate?.[1] === coordinate?.[1]
+    ) {
+      return sectionBearings;
+    }
+
+    const bearing = turf.bearing(turf.point(previousCoordinate), turf.point(coordinate));
+
+    return Number.isFinite(bearing) ? [...sectionBearings, bearing] : sectionBearings;
+  }, []);
+
+  if (bearings.length < 2) {
+    return 0;
+  }
+
+  const sortedBearings = bearings
+    .map((bearing) => (normalizeBearing(bearing) + 360) % 360)
+    .sort((a, b) => a - b);
+  const largestGap = sortedBearings.reduce((gap, bearing, index) => {
+    const nextBearing = sortedBearings[(index + 1) % sortedBearings.length];
+    const bearingGap =
+      index === sortedBearings.length - 1
+        ? nextBearing + 360 - bearing
+        : nextBearing - bearing;
+
+    return Math.max(gap, bearingGap);
+  }, 0);
+
+  return 360 - largestGap;
+};
+
+/**
+ * Detects compact loop sections where the route keeps turning inside a small
+ * area. During these sections the camera bearing can spin faster than the
+ * marker movement feels, so the animation temporarily locks rotation.
+ */
+export const detectSmallLoopSection = ({
+  routeLine,
+  distanceKm,
+  routeDistanceKm,
+  sectionDistanceKm = SMALL_LOOP_DETECTION_DISTANCE_KM,
+  maxDiameterKm = SMALL_LOOP_MAX_DIAMETER_KM,
+  minPathToDiameterRatio = SMALL_LOOP_MIN_PATH_TO_DIAMETER_RATIO,
+  minBearingSpread = SMALL_LOOP_MIN_BEARING_SPREAD_DEGREES,
+}) => {
+  if (!routeLine || !routeDistanceKm || routeDistanceKm < sectionDistanceKm) {
+    return false;
+  }
+
+  const endDistance = clampRouteDistance(distanceKm, routeDistanceKm);
+  const startDistance = clampRouteDistance(
+    endDistance - sectionDistanceKm,
+    routeDistanceKm,
+  );
+  const sectionLength = endDistance - startDistance;
+
+  if (sectionLength < sectionDistanceKm * 0.75) {
+    return false;
+  }
+
+  const coordinates = getRouteSectionCoordinates(routeLine, startDistance, endDistance);
+
+  if (coordinates.length < 4) {
+    return false;
+  }
+
+  const bbox = turf.bbox(turf.lineString(coordinates));
+  const diagonalKm = turf.distance([bbox[0], bbox[1]], [bbox[2], bbox[3]], {
+    units: 'kilometers',
+  });
+  const pathToDiameterRatio = sectionLength / Math.max(diagonalKm, Number.EPSILON);
+  const bearingSpread = getSectionBearingSpread(coordinates);
+
+  return (
+    diagonalKm <= maxDiameterKm &&
+    pathToDiameterRatio >= minPathToDiameterRatio &&
+    bearingSpread >= minBearingSpread
+  );
 };
 
 const getCameraLeadRatio = (turnDelta, flyoverSpeed = 1) => {
@@ -661,7 +788,35 @@ export const smoothFlyoverProgress = (progress) => {
 };
 
 const getBearingDelta = (currentBearing, targetBearing) => {
-  return normalizeBearing(targetBearing - currentBearing);
+  return normalizeBearingDifference(currentBearing, targetBearing);
+};
+
+/**
+ * Adds route-context bearing control on top of ordinary smoothing. Small loops
+ * lock the current bearing, minor changes are ignored, and open route sections
+ * keep the existing gradual camera rotation.
+ */
+export const getStableBearing = ({
+  previousBearing,
+  targetBearing,
+  isLooping,
+  minChange = SAME_DIRECTION_BEARING_THRESHOLD,
+}) => {
+  if (previousBearing === null || previousBearing === undefined) {
+    return normalizeBearing(targetBearing);
+  }
+
+  if (isLooping) {
+    return previousBearing;
+  }
+
+  const delta = Math.abs(normalizeBearingDifference(previousBearing, targetBearing));
+
+  if (delta < minChange) {
+    return previousBearing;
+  }
+
+  return smoothBearing(previousBearing, targetBearing);
 };
 
 /**
