@@ -12,7 +12,12 @@ import {
 } from 'react-icons/fi';
 import styled from 'styled-components';
 import { useScroll } from '../hooks/useScroll';
-import { getSufferScore, getMilesToKms, getMetresToFeet } from '../utils/conversion';
+import {
+  getSufferScore,
+  getMilesToKms,
+  getMetresToFeet,
+  formattedDate,
+} from '../utils/conversion';
 import { addActivityMapLayers } from '../utils/MapActivityLayers';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import {
@@ -274,6 +279,12 @@ export default function ActivitiesCard() {
     );
   }
 
+  const activityDate =
+    athleteData?.detailedActivity?.start_date_local ||
+    athleteData?.detailedActivity?.start_date ||
+    from?.start_date_local ||
+    from?.start_date;
+  const activityDateLabel = formattedDate(activityDate) || 'Date unavailable';
   const primaryPhotoUrl = athleteData?.detailedActivity?.photos?.primary?.urls?.['100'];
 
   return (
@@ -309,6 +320,9 @@ export default function ActivitiesCard() {
             <CardHeaders>
               <ActivitySummaryHeader>
                 <ActivityTitle>{from?.name}</ActivityTitle>
+                <ActivityDate dateTime={activityDate || undefined}>
+                  {activityDateLabel}
+                </ActivityDate>
                 {from?.average_heartrate && (
                   <ActivityCard props={from?.average_heartrate}>
                     {getSufferScore(from?.average_heartrate)}
@@ -1263,26 +1277,47 @@ const ActivityNavToggle = styled.button`
 `;
 
 const ActivitySummaryHeader = styled.div`
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0.85rem;
+  display: grid;
+  grid-template-columns: 1fr;
+  align-items: start;
+  gap: 0.45rem;
+  width: 100%;
+  min-width: 0;
 
   @media screen and (max-width: 600px) {
-    align-items: center;
+    gap: 0.38rem;
   }
 `;
 
 const ActivityTitle = styled.h3`
+  width: 100%;
+  min-width: 0;
   margin: 0;
   color: #ffffff;
   font-size: 1.05rem;
   line-height: 1.25;
   text-align: left;
   overflow-wrap: anywhere;
+  word-break: break-word;
 
   @media screen and (max-width: 600px) {
     font-size: 0.98rem;
+  }
+`;
+
+const ActivityDate = styled.time`
+  display: block;
+  width: 100%;
+  min-width: 0;
+  color: #cbd5e1;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+
+  @media screen and (max-width: 600px) {
+    font-size: 0.78rem;
   }
 `;
 
