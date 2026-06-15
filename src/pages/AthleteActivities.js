@@ -887,7 +887,7 @@ const MobileOpenHint = styled.span`
 `;
 
 const SportBadge = styled.span`
-  background-color: #ff6b35;
+  background-color: ${(props) => props.theme.strava};
   color: #000;
   padding: 4px 10px;
   border-radius: 12px;

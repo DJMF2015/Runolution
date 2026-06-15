@@ -7,7 +7,7 @@ import {
   ACTIVITY_ROUTE_LAYER_ID,
   ACTIVITY_ROUTE_SOURCE_ID,
   DEFAULT_FLYOVER_ROUTE_GRADIENT,
-} from './flyOverHelper';
+} from './flyover';
 
 const getActivityColourExpression = [
   'match',
@@ -31,18 +31,18 @@ const getActivityColourExpression = [
 
 const TERRAIN_SOURCE_ID = 'mapbox-dem';
 const ACTIVITY_MAP_FOG = {
-  range: [0.5, 10],
+  range: [0.1, 9],
   color: 'rgb(186, 210, 235)',
   'high-color': 'rgb(73, 152, 186)',
   'space-color': 'rgb(73, 152, 186)',
-  'horizon-blend': 0.9,
+  'horizon-blend': 0.1,
   'star-intensity': 0,
 };
 const ACTIVITY_MAP_SKY_PAINT = {
   'sky-type': 'atmosphere',
   'sky-atmosphere-color': 'rgb(255, 255, 255)',
   'sky-atmosphere-halo-color': 'rgb(255, 255, 255)',
-  'sky-atmosphere-sun': [0, 0.5],
+  'sky-atmosphere-sun': ['literal', [0.0, 0.0]],
   'sky-atmosphere-sun-intensity': 5,
 };
 

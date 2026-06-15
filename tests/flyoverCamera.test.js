@@ -1,8 +1,11 @@
+import * as turf from '@turf/turf';
 import {
   FLYOVER_PITCH,
+  detectSmallLoopSection,
   getFlyoverAltitude,
   getFlyoverZoom,
   formatFlyoverStreamAveragePace,
+  getStableBearing,
   smoothBearing,
 } from '../src/utils/flyover';
 
@@ -102,5 +105,60 @@ describe('flyover camera framing', () => {
 
     expect(smallTurn).toBe(0);
     expect(sharpTurn).toBeCloseTo(6.08);
+  });
+
+  test('locks bearing while the route is repeatedly looping in a compact area', () => {
+    const lockedBearing = getStableBearing({
+      previousBearing: 30,
+      targetBearing: 160,
+      isLooping: true,
+    });
+    const resumedBearing = getStableBearing({
+      previousBearing: 30,
+      targetBearing: 90,
+      isLooping: false,
+    });
+
+    expect(lockedBearing).toBe(30);
+    expect(resumedBearing).toBeGreaterThan(30);
+    expect(resumedBearing).toBeLessThan(90);
+  });
+
+  test('detects repeated compact route loops without flagging open routes', () => {
+    const loopCoordinates = turf
+      .circle([-0.1276, 51.5072], 0.08, { steps: 24, units: 'kilometers' })
+      .geometry.coordinates[0];
+    const repeatedLoopLine = turf.lineString([
+      ...loopCoordinates,
+      ...loopCoordinates.slice(1),
+      ...loopCoordinates.slice(1),
+      ...loopCoordinates.slice(1),
+    ]);
+    const repeatedLoopDistanceKm = turf.length(repeatedLoopLine, {
+      units: 'kilometers',
+    });
+    const openRouteLine = turf.lineString([
+      [-0.14, 51.5],
+      [-0.13, 51.505],
+      [-0.12, 51.51],
+      [-0.11, 51.515],
+      [-0.1, 51.52],
+    ]);
+    const openRouteDistanceKm = turf.length(openRouteLine, { units: 'kilometers' });
+
+    expect(
+      detectSmallLoopSection({
+        routeLine: repeatedLoopLine,
+        distanceKm: repeatedLoopDistanceKm,
+        routeDistanceKm: repeatedLoopDistanceKm,
+      }),
+    ).toBe(true);
+    expect(
+      detectSmallLoopSection({
+        routeLine: openRouteLine,
+        distanceKm: openRouteDistanceKm,
+        routeDistanceKm: openRouteDistanceKm,
+      }),
+    ).toBe(false);
   });
 });
