@@ -1,10 +1,11 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import ActivityList from '../src/components/ActivityList';
-import { getDetailedAthleteData } from '../src/utils/functions';
+import { getAthleteStreams, getDetailedAthleteData } from '../src/utils/functions';
 import { fetchTokenInfo, getNewAccessToken } from '../src/utils/helpers';
 
 jest.mock('../src/utils/functions', () => ({
+  getAthleteStreams: jest.fn(),
   getDetailedAthleteData: jest.fn(),
 }));
 
@@ -19,7 +20,15 @@ jest.mock('../src/utils/helpers', () => {
 });
 
 jest.mock('react-chartjs-2', () => ({
-  Chart: () => <div data-testid="best-efforts-chart" />,
+  Chart: ({ data }) => (
+    <div
+      data-testid={
+        data?.datasets?.some((dataset) => dataset.label === 'Grade adjusted effort')
+          ? 'elevation-chart'
+          : 'best-efforts-chart'
+      }
+    />
+  ),
   Line: () => <div data-testid="elevation-chart" />,
 }));
 
@@ -61,6 +70,57 @@ const detailedActivity = {
   ],
 };
 
+const cyclingActivity = {
+  id: 456,
+  name: 'Morning Ride',
+  weighted_average_watts: 260,
+  normalized_power: 270,
+  laps: [
+    {
+      id: 2,
+      name: 'Ride Lap 1',
+      distance: 5000,
+      total_elevation_gain: 80,
+      elapsed_time: 600,
+      average_speed: 8.2,
+      average_heartrate: 138,
+      max_heartrate: 172,
+      average_watts: 225,
+    },
+  ],
+  segment_efforts: [
+    {
+      id: 77,
+      name: 'Climb Segment',
+      distance: 1200,
+      elevation_difference: 96,
+      elapsed_time: 260,
+      average_heartrate: 151,
+      max_heartrate: 178,
+      average_watts: 265,
+      segment: {
+        distance: 1200,
+        elevation_high: 180,
+      },
+    },
+  ],
+};
+
+const activityStreams = {
+  distance: {
+    data: [0, 400, 800, 1200, 1609],
+  },
+  altitude: {
+    data: [42, 55, 76, 68, 90],
+  },
+  heartrate: {
+    data: [130, 142, 154, 148, 160],
+  },
+  velocity_smooth: {
+    data: [3.7, 3.4, 3.1, 3.3, 2.9],
+  },
+};
+
 const renderActivityList = (state) => {
   return render(
     <MemoryRouter initialEntries={[{ pathname: '/splits', state }]}>
@@ -78,30 +138,65 @@ beforeEach(() => {
 });
 
 test('renders charts and tables from detailed activity passed in route state', async () => {
-  renderActivityList({ from: summaryActivity, detailedActivity });
+  renderActivityList({
+    from: summaryActivity,
+    detailedActivity,
+    athleteStreams: activityStreams,
+  });
 
   expect(await screen.findByText('Mile Splits')).toBeInTheDocument();
-  expect(screen.getByText('Elevation & Grade Adjusted Pace')).toBeInTheDocument();
+  expect(screen.getByText('Elevation & Effort')).toBeInTheDocument();
+  expect(screen.getByText('Elevation & Grade Adjusted Effort')).toBeInTheDocument();
   expect(screen.getByTestId('best-efforts-chart')).toBeInTheDocument();
   expect(screen.getByTestId('elevation-chart')).toBeInTheDocument();
   expect(screen.getByText('Lap 1')).toBeInTheDocument();
   expect(screen.getByText('Hill Segment')).toBeInTheDocument();
+  expect(screen.getByText('Cadence')).toBeInTheDocument();
+  expect(screen.queryByText('Avg Watts')).not.toBeInTheDocument();
   expect(getDetailedAthleteData).not.toHaveBeenCalled();
+  expect(getAthleteStreams).not.toHaveBeenCalled();
+});
+
+test('shows cycling power metrics for ride splits and segment efforts', async () => {
+  renderActivityList({
+    from: {
+      id: 456,
+      name: 'Morning Ride',
+    },
+    detailedActivity: cyclingActivity,
+    athleteStreams: activityStreams,
+  });
+
+  expect(await screen.findByText('Mile Splits')).toBeInTheDocument();
+  expect(screen.getByText('Ride Lap 1')).toBeInTheDocument();
+  expect(screen.getByText('Climb Segment')).toBeInTheDocument();
+  expect(screen.getAllByText('Avg Watts').length).toBeGreaterThan(0);
+  expect(screen.getAllByText('Weighted Power').length).toBeGreaterThan(0);
+  expect(screen.getAllByText('Normalized Power').length).toBeGreaterThan(0);
+  expect(screen.getByText('225w')).toBeInTheDocument();
+  expect(screen.getByText('265w')).toBeInTheDocument();
+  expect(screen.getAllByText('260w').length).toBeGreaterThan(0);
+  expect(screen.getAllByText('270w').length).toBeGreaterThan(0);
+  expect(screen.queryByText('Cadence')).not.toBeInTheDocument();
+  expect(screen.queryByText('Pace Zone')).not.toBeInTheDocument();
 });
 
 test('fetches full activity details when only summary activity is routed', async () => {
   fetchTokenInfo.mockResolvedValue('valid-token');
   getDetailedAthleteData.mockResolvedValue({ data: detailedActivity });
+  getAthleteStreams.mockResolvedValue({ data: activityStreams });
 
   renderActivityList({ from: summaryActivity });
 
   expect(await screen.findByText('Mile Splits')).toBeInTheDocument();
-  expect(screen.getByText('Elevation & Grade Adjusted Pace')).toBeInTheDocument();
+  expect(screen.getByText('Elevation & Effort')).toBeInTheDocument();
+  expect(screen.getByText('Elevation & Grade Adjusted Effort')).toBeInTheDocument();
   expect(screen.getByTestId('best-efforts-chart')).toBeInTheDocument();
-  expect(screen.getByTestId('elevation-chart')).toBeInTheDocument();
+  expect(await screen.findByTestId('elevation-chart')).toBeInTheDocument();
   expect(screen.getByText('Lap 1')).toBeInTheDocument();
   expect(screen.getByText('Hill Segment')).toBeInTheDocument();
   expect(getDetailedAthleteData).toHaveBeenCalledWith(123, 'valid-token');
+  expect(getAthleteStreams).toHaveBeenCalledWith(123, 'valid-token');
 });
 
 test('refreshes and retries when the detailed activity request is unauthorized', async () => {
@@ -112,11 +207,13 @@ test('refreshes and retries when the detailed activity request is unauthorized',
   getDetailedAthleteData
     .mockRejectedValueOnce(unauthorizedError)
     .mockResolvedValueOnce({ data: detailedActivity });
+  getAthleteStreams.mockResolvedValue({ data: activityStreams });
 
   renderActivityList({ from: summaryActivity });
 
   expect(await screen.findByText('Mile Splits')).toBeInTheDocument();
-  expect(screen.getByText('Elevation & Grade Adjusted Pace')).toBeInTheDocument();
+  expect(screen.getByText('Elevation & Effort')).toBeInTheDocument();
+  expect(screen.getByText('Elevation & Grade Adjusted Effort')).toBeInTheDocument();
   expect(screen.getByText('Lap 1')).toBeInTheDocument();
   expect(screen.getByText('Hill Segment')).toBeInTheDocument();
   expect(getDetailedAthleteData).toHaveBeenNthCalledWith(1, 123, 'stale-token');
@@ -125,12 +222,14 @@ test('refreshes and retries when the detailed activity request is unauthorized',
 
 test('renders cached full activity details when no token is available', async () => {
   localStorage.setItem('activity-detail-123', JSON.stringify(detailedActivity));
+  localStorage.setItem('activity-streams-123', JSON.stringify(activityStreams));
   fetchTokenInfo.mockResolvedValue(null);
 
   renderActivityList({ from: summaryActivity });
 
   expect(await screen.findByText('Mile Splits')).toBeInTheDocument();
-  expect(screen.getByText('Elevation & Grade Adjusted Pace')).toBeInTheDocument();
+  expect(screen.getByText('Elevation & Effort')).toBeInTheDocument();
+  expect(screen.getByText('Elevation & Grade Adjusted Effort')).toBeInTheDocument();
   expect(screen.getByTestId('best-efforts-chart')).toBeInTheDocument();
   expect(screen.getByTestId('elevation-chart')).toBeInTheDocument();
   expect(screen.getByText('Lap 1')).toBeInTheDocument();

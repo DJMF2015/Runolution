@@ -7,6 +7,7 @@ const STREAM_KEYS = [
   'time',
   'heartrate',
   'cadence',
+  'watts',
   'velocity_smooth',
   'moving',
   'grade_smooth',

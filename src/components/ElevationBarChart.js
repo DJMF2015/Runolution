@@ -4,42 +4,65 @@ import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
+  BarElement,
   PointElement,
   LineElement,
-  Filler,
   Tooltip,
   Legend,
 } from 'chart.js';
-import { Line } from 'react-chartjs-2';
+import { Chart } from 'react-chartjs-2';
 
 ChartJS.register(
   CategoryScale,
   LinearScale,
+  BarElement,
   PointElement,
   LineElement,
   Tooltip,
   Legend,
-  Filler,
 );
 
 const METRES_PER_KM = 1000;
-const METRES_PER_MILE = 1609.344;
+const MAX_PROFILE_POINTS = 260;
+const EFFORT_BASELINE = 100;
+const EFFORT_WEIGHTS = {
+  elevation: 0.4,
+  heartRate: 0.35,
+  velocity: 0.25,
+};
 
-const toNumber = (value, fallback = 0) => {
+const toNumber = (value, fallback = null) => {
   const number = Number(value);
   return Number.isFinite(number) ? number : fallback;
 };
 
-const secondsToPace = (seconds) => {
-  const totalSeconds = Math.round(toNumber(seconds));
-  const minutes = Math.floor(totalSeconds / 60);
-  const remainder = totalSeconds % 60;
-  return `${minutes}:${String(remainder).padStart(2, '0')}`;
+const clamp = (value, min, max) => {
+  return Math.min(Math.max(value, min), max);
 };
 
-const formatPace = (paceMinutes) => secondsToPace(paceMinutes * 60);
+const getStreamData = (streams, key) => {
+  if (Array.isArray(streams)) {
+    return streams.find((stream) => stream?.type === key)?.data || [];
+  }
 
-const getAxisRange = (values, fallbackMax, paddingRatio = 0.16) => {
+  if (Array.isArray(streams?.[key])) {
+    return streams[key];
+  }
+
+  return streams?.[key]?.data || streams?.streams?.[key]?.data || [];
+};
+
+const getAverage = (values) => {
+  const numericValues = values.filter((value) => Number.isFinite(value));
+
+  if (!numericValues.length) {
+    return null;
+  }
+
+  return numericValues.reduce((sum, value) => sum + value, 0) / numericValues.length;
+};
+
+const getAxisRange = (values, fallbackMax = 100) => {
   const numericValues = values.filter((value) => Number.isFinite(value));
 
   if (!numericValues.length) {
@@ -51,99 +74,110 @@ const getAxisRange = (values, fallbackMax, paddingRatio = 0.16) => {
 
   const minValue = Math.min(...numericValues);
   const maxValue = Math.max(...numericValues);
-  const spread = Math.max(maxValue - minValue, Math.abs(maxValue) * 0.1, 1);
-  const padding = spread * paddingRatio;
+  const spread = Math.max(maxValue - minValue, 10);
+  const padding = spread * 0.12;
 
   return {
-    min: Math.floor(Math.min(0, minValue - padding)),
+    min: Math.floor(minValue - padding),
     max: Math.ceil(maxValue + padding),
   };
 };
 
-const getSplitSource = (activity) => {
-  if (activity?.splits_standard?.length) {
-    return {
-      unitLabel: 'Mile',
-      unitDistance: METRES_PER_MILE,
-      rows: activity.splits_standard,
-    };
-  }
+/**
+ * Effort is calculated from a weighted formula: - elevation/climb load: 40%, - heart-rate load: 35%, - velocity strain: 25%
+ * @param {number} grade point
+ * @returns number
+ */
+const getGradeAdjustedEffort = ({
+  averageHeartRate,
+  averageVelocity,
+  distanceDeltaMetres,
+  elevationDifference,
+  heartRate,
+  velocity,
+}) => {
+  const positiveGradePercent =
+    (Math.max(elevationDifference, 0) / Math.max(distanceDeltaMetres, 1)) * 100;
+  const elevationLoad = clamp(1 + positiveGradePercent / 10, 0.75, 2);
+  const heartRateLoad =
+    heartRate && averageHeartRate ? clamp(heartRate / averageHeartRate, 0.75, 1.5) : 1;
+  const velocityLoad =
+    velocity && averageVelocity ? clamp(averageVelocity / velocity, 0.75, 1.5) : 1;
+  const weightedLoad =
+    elevationLoad * EFFORT_WEIGHTS.elevation +
+    heartRateLoad * EFFORT_WEIGHTS.heartRate +
+    velocityLoad * EFFORT_WEIGHTS.velocity;
 
-  if (activity?.splits_metric?.length) {
-    return {
-      unitLabel: 'Km',
-      unitDistance: METRES_PER_KM,
-      rows: activity.splits_metric,
-    };
-  }
-
-  return {
-    unitLabel: 'Lap',
-    unitDistance: null,
-    rows: activity?.laps || [],
-  };
+  return Number((EFFORT_BASELINE * weightedLoad).toFixed(1));
 };
 
-const getPaceMinutesPerKm = (row) => {
-  const distanceKm = toNumber(row.distance) / METRES_PER_KM;
+const getProfilePoints = (streams) => {
+  const altitudeStream = getStreamData(streams, 'altitude');
+  const distanceStream = getStreamData(streams, 'distance');
+  const heartRateStream = getStreamData(streams, 'heartrate');
+  const velocityStream = getStreamData(streams, 'velocity_smooth');
+  const sampleStep = Math.max(1, Math.ceil(altitudeStream.length / MAX_PROFILE_POINTS));
+  const averageHeartRate = getAverage(heartRateStream.map((value) => toNumber(value)));
+  const averageVelocity = getAverage(velocityStream.map((value) => toNumber(value)));
+  const points = [];
 
-  if (!distanceKm) {
-    return null;
-  }
+  altitudeStream.forEach((altitude, index) => {
+    if (index % sampleStep !== 0 && index !== altitudeStream.length - 1) {
+      return;
+    }
 
-  return toNumber(row.elapsed_time) / 60 / distanceKm;
-};
+    const altitudeMetres = toNumber(altitude);
 
-const getAverage = (values, fallback = null) => {
-  const numericValues = values.filter((value) => Number.isFinite(value));
+    if (altitudeMetres === null) {
+      return;
+    }
 
-  if (!numericValues.length) {
-    return fallback;
-  }
+    const previousPoint = points[points.length - 1];
+    const distanceMetres = toNumber(distanceStream[index]);
+    const distanceKm =
+      distanceMetres !== null ? distanceMetres / METRES_PER_KM : index / sampleStep;
+    const elevationDifference = previousPoint
+      ? altitudeMetres - previousPoint.altitude
+      : 0;
+    const distanceDeltaMetres = previousPoint
+      ? Math.max((distanceKm - previousPoint.distanceKm) * METRES_PER_KM, 1)
+      : 1;
+    const heartRate = toNumber(heartRateStream[index]);
+    const velocity = toNumber(velocityStream[index]);
 
-  return numericValues.reduce((sum, value) => sum + value, 0) / numericValues.length;
-};
-
-const getGradeAdjustedSplits = (activity) => {
-  const { unitLabel, unitDistance, rows } = getSplitSource(activity);
-  const splitRows = rows.filter((row) => toNumber(row.distance) > 0 && row.elapsed_time);
-  const paces = splitRows.map(getPaceMinutesPerKm);
-  const heartRates = splitRows.map((row) => toNumber(row.average_heartrate, null));
-  const avgPace = getAverage(paces);
-  const avgHeartRate = getAverage(heartRates);
-
-  if (!splitRows.length || !avgPace) {
-    return [];
-  }
-
-  return splitRows.map((row, index) => {
-    const distance = toNumber(row.distance, unitDistance || METRES_PER_KM);
-    const distanceKm = distance / METRES_PER_KM;
-    const pace = getPaceMinutesPerKm(row);
-    const heartRate = toNumber(row.average_heartrate, null);
-    const elevation = toNumber(row.elevation_difference || row.total_elevation_gain);
-    const climbingPerKm = distanceKm ? Math.max(elevation, 0) / distanceKm : 0;
-    const paceScore = pace ? avgPace / pace : 1;
-    const heartRateScore = heartRate && avgHeartRate ? heartRate / avgHeartRate : 1;
-    const elevationScore = 1 + climbingPerKm / 100;
-    const gradeAdjustedScore = Number(
-      (paceScore * heartRateScore * elevationScore * 100).toFixed(1),
-    );
-
-    return {
-      label: `${unitLabel} ${row.split || index + 1}`,
-      elevation,
-      climbingPerKm,
-      pace,
-      gradeAdjustedScore,
+    points.push({
+      altitude: altitudeMetres,
+      distanceKm,
+      elevationDifference,
+      gradeAdjustedEffort: getGradeAdjustedEffort({
+        averageHeartRate,
+        averageVelocity,
+        distanceDeltaMetres,
+        elevationDifference,
+        heartRate,
+        velocity,
+      }),
       heartRate,
-    };
+      velocity,
+    });
   });
+
+  return points;
 };
 
-const getChartOptions = (elevationValues, gradeAdjustedScores) => {
-  const elevationRange = getAxisRange(elevationValues, 50, 0.2);
-  const effortRange = getAxisRange(gradeAdjustedScores, 120, 0.18);
+const formatDistance = (distanceKm) => {
+  return `${Number(distanceKm || 0).toFixed(2)} km`;
+};
+
+const getChartOptions = (profilePoints) => {
+  const elevationRange = getAxisRange(
+    profilePoints.map((point) => point.elevationDifference),
+    50,
+  );
+  const effortRange = getAxisRange(
+    profilePoints.map((point) => point.gradeAdjustedEffort),
+    120,
+  );
 
   return {
     responsive: true,
@@ -175,25 +209,29 @@ const getChartOptions = (elevationValues, gradeAdjustedScores) => {
         padding: 12,
         displayColors: true,
         callbacks: {
+          title: (items) => {
+            const point = profilePoints[items[0]?.dataIndex];
+            return point ? formatDistance(point.distanceKm) : '';
+          },
           afterBody: (items) => {
-            const index = items[0]?.dataIndex;
-            const raw = items[0]?.chart?.data?.datasets?.[0]?.meta?.[index];
+            const point = profilePoints[items[0]?.dataIndex];
 
-            if (!raw) {
+            if (!point) {
               return [];
             }
 
             return [
-              `Pace: ${formatPace(raw.pace)} /km`,
-              `Climb: ${raw.climbingPerKm.toFixed(1)} m/km`,
-              raw.heartRate ? `Avg HR: ${Math.round(raw.heartRate)} bpm` : '',
+              `Altitude: ${Math.round(point.altitude)} m`,
+              point.heartRate ? `Heart rate: ${Math.round(point.heartRate)} bpm` : '',
+              point.velocity ? `Velocity: ${point.velocity.toFixed(2)} m/s` : '',
             ].filter(Boolean);
           },
           label: (context) => {
             if (context.dataset.yAxisID === 'effort') {
               return `Grade adjusted effort: ${context.parsed.y}`;
             }
-            return `Elevation: ${context.parsed.y} m`;
+
+            return `Elevation difference: ${context.parsed.y.toFixed(1)} m`;
           },
         },
       },
@@ -214,6 +252,15 @@ const getChartOptions = (elevationValues, gradeAdjustedScores) => {
         grid: {
           display: false,
         },
+        title: {
+          display: true,
+          text: 'Distance',
+          color: '#000000',
+          font: {
+            size: 12,
+            weight: '800',
+          },
+        },
       },
       elevation: {
         type: 'linear',
@@ -226,11 +273,11 @@ const getChartOptions = (elevationValues, gradeAdjustedScores) => {
           callback: (value) => `${value}m`,
         },
         grid: {
-          color: 'rgba(0, 0, 0, 0.18)',
+          color: 'rgba(0, 0, 0, 0.16)',
         },
         title: {
           display: true,
-          text: 'Elevation change',
+          text: 'Elevation difference',
           color: '#000000',
           font: {
             size: 12,
@@ -265,64 +312,67 @@ const getChartOptions = (elevationValues, gradeAdjustedScores) => {
   };
 };
 
-export default function ElevationBarChart({ props }) {
-  const splitData = getGradeAdjustedSplits(props || {});
-
-  if (!splitData.length) {
-    return <EmptyChart>No split elevation data available for this activity.</EmptyChart>;
-  }
-
-  const labels = splitData.map((split) => split.label);
-  const elevationValues = splitData.map((split) => split.elevation);
-  const gradeAdjustedScores = splitData.map((split) => split.gradeAdjustedScore);
-  const options = getChartOptions(elevationValues, gradeAdjustedScores);
-
-  const data = {
-    labels,
-    datasets: [
-      {
-        label: 'Elevation change',
-        data: elevationValues,
-        meta: splitData,
-        fill: 'origin',
-        borderColor: '#22c55e',
-        backgroundColor: 'rgba(17, 17, 17, 0.18)',
-        pointBackgroundColor: '#dcfce7',
-        pointBorderColor: '#15803d',
-        pointRadius: 4,
-        pointHoverRadius: 6,
-        tension: 0.35,
-        borderWidth: 3,
-        yAxisID: 'elevation',
-      },
-      {
-        label: 'Grade adjusted effort',
-        data: gradeAdjustedScores,
-        fill: false,
-        borderColor: '#fb923c',
-        backgroundColor: '#fb923c',
-        pointBackgroundColor: '#ffedd5',
-        pointBorderColor: '#c2410c',
-        pointRadius: 4,
-        pointHoverRadius: 6,
-        tension: 0.32,
-        borderWidth: 3,
-        yAxisID: 'effort',
-      },
-    ],
-  };
+export default function ElevationBarChart({ streams, isLoading, error }) {
+  const profilePoints = getProfilePoints(streams);
+  const hasProfile = profilePoints.length > 0;
+  const labels = hasProfile
+    ? profilePoints.map((point) => formatDistance(point.distanceKm))
+    : [];
+  const options = hasProfile ? getChartOptions(profilePoints) : null;
+  const data = hasProfile
+    ? {
+        labels,
+        datasets: [
+          {
+            type: 'bar',
+            label: 'Elevation difference',
+            data: profilePoints.map((point) => point.elevationDifference),
+            backgroundColor: (context) =>
+              context.raw >= 0 ? 'rgba(38, 251, 0, 0.94)' : 'rgb(255, 0, 195)',
+            borderColor: '#16a34a',
+            borderWidth: 0,
+            borderRadius: 3,
+            maxBarThickness: 10,
+            yAxisID: 'elevation',
+          },
+          {
+            type: 'line',
+            label: 'Grade adjusted effort',
+            data: profilePoints.map((point) => point.gradeAdjustedEffort),
+            fill: false,
+            borderColor: ' #ff6b35',
+            backgroundColor: '#ff6b35',
+            pointBackgroundColor: '#ffedd5',
+            pointBorderColor: '#c2410c',
+            pointRadius: profilePoints.length > 80 ? 0 : 2,
+            pointHoverRadius: 5,
+            tension: 0.3,
+            borderWidth: 3,
+            yAxisID: 'effort',
+          },
+        ],
+      }
+    : null;
 
   return (
     <ChartPanel>
       <ChartHeader>
-        <ChartTitle>Elevation & Grade Adjusted Pace</ChartTitle>
+        <ChartTitle>Elevation & Grade Adjusted Effort</ChartTitle>
         <ChartSubtitle>
-          Elevation is shaded; effort adjusts pace by heart rate and climbing per
-          kilometre.
+          Elevation difference bars with effort weighted by climb, heart rate and
+          velocity.
         </ChartSubtitle>
       </ChartHeader>
       <ChartWrapper>
-        <Line data={data} options={options} />
+        {hasProfile ? (
+          <Chart type="bar" data={data} options={options} />
+        ) : (
+          <EmptyChart>
+            {isLoading
+              ? 'Loading elevation profile...'
+              : error || 'No detailed altitude stream data available for this activity.'}
+          </EmptyChart>
+        )}
       </ChartWrapper>
     </ChartPanel>
   );
@@ -386,18 +436,19 @@ const ChartWrapper = styled.div`
 const EmptyChart = styled.div`
   width: 100%;
   max-width: 100%;
-  height: 300px;
+  height: 100%;
+  min-height: 240px;
   display: grid;
   place-items: center;
   padding: 1rem;
   box-sizing: border-box;
   text-align: center;
   color: #000000;
-  background: rgba(15, 23, 42, 0.94);
+  background: rgba(255, 255, 255, 0.96);
   border: 1px solid rgba(148, 163, 184, 0.2);
   border-radius: 14px;
 
   @media screen and (max-width: 700px) {
-    height: 250px;
+    min-height: 220px;
   }
 `;

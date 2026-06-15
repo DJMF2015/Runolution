@@ -1,8 +1,9 @@
 import styled from 'styled-components';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { getSecondstoMinutes, getKmsToMiles, getMstoKmHr } from '../utils/conversion';
-import { getDetailedAthleteData } from '../utils/functions';
+import { getAthleteStreams, getDetailedAthleteData } from '../utils/functions';
 import { fetchTokenInfo, getNewAccessToken, isUnauthorizedError } from '../utils/helpers';
+import { hasCyclingPowerData, isCyclingActivity } from '../utils/activityTypes';
 import { useScroll } from '../hooks/useScroll';
 import PaceZoneBarChart from './BestEffortsChart';
 import ElevationChart from './ElevationBarChart';
@@ -25,6 +26,65 @@ const getSplitElevation = (split) => {
   return split.total_elevation_gain ?? split.elevation_difference ?? '—';
 };
 
+const getPowerValue = (row, keys, fallbackRow) => {
+  const rows = [row, fallbackRow].filter(Boolean);
+
+  return keys.reduce((powerValue, key) => {
+    if (powerValue !== null && powerValue !== undefined) {
+      return powerValue;
+    }
+
+    return rows.reduce((rowPowerValue, currentRow) => {
+      if (rowPowerValue !== null && rowPowerValue !== undefined) {
+        return rowPowerValue;
+      }
+
+      return currentRow?.[key] ?? currentRow?.segment?.[key] ?? null;
+    }, null);
+  }, null);
+};
+
+const formatPower = (watts) => {
+  const power = Number(watts);
+
+  if (!Number.isFinite(power)) {
+    return '—';
+  }
+
+  return `${Math.round(power)}w`;
+};
+
+const getAverageWatts = (row, fallbackRow) => {
+  return formatPower(getPowerValue(row, ['average_watts', 'watts'], fallbackRow));
+};
+
+const getWeightedAveragePower = (row, fallbackRow) => {
+  return formatPower(
+    getPowerValue(
+      row,
+      ['weighted_average_watts', 'weighted_average_power', 'weighted_average_watts_calc'],
+      fallbackRow,
+    ),
+  );
+};
+
+const getNormalizedPower = (row, fallbackRow) => {
+  return formatPower(
+    getPowerValue(
+      row,
+      [
+        'normalized_power',
+        'normalized_power_watts',
+        'normalized_watts',
+        'np',
+        'weighted_average_watts',
+        'weighted_average_power',
+      ],
+      fallbackRow,
+    ),
+  );
+};
+
 const getSplitLabel = (split, index) => {
   return split.name || split.split || index + 1;
 };
@@ -45,6 +105,16 @@ const getSegmentElevationHigh = (segment) => {
   return segment.segment?.elevation_high ?? segment.elevation_high ?? '—';
 };
 
+const getSegmentElevation = (segment) => {
+  return (
+    segment.elevation_difference ??
+    segment.total_elevation_gain ??
+    segment.segment?.elevation_difference ??
+    segment.segment?.total_elevation_gain ??
+    getSegmentElevationHigh(segment)
+  );
+};
+
 const hasDetailedActivityData = (activity) => {
   return Boolean(
     activity &&
@@ -58,6 +128,27 @@ const hasDetailedActivityData = (activity) => {
 };
 
 const getDetailedActivityCacheKey = (activityId) => `activity-detail-${activityId}`;
+const getActivityStreamsCacheKey = (activityId) => `activity-streams-${activityId}`;
+
+const getStreamData = (streams, key) => {
+  if (Array.isArray(streams)) {
+    return streams.find((stream) => stream?.type === key)?.data || [];
+  }
+
+  if (Array.isArray(streams?.[key])) {
+    return streams[key];
+  }
+
+  return streams?.[key]?.data || streams?.streams?.[key]?.data || [];
+};
+
+const hasActivityStreamData = (streams) => {
+  return getStreamData(streams, 'altitude').length > 1;
+};
+
+const hasPowerStreamData = (streams) => {
+  return getStreamData(streams, 'watts').some((watts) => Number(watts) > 0);
+};
 
 const getCachedDetailedActivity = (activityId) => {
   if (!activityId) {
@@ -85,6 +176,29 @@ const storeDetailedActivity = (activity) => {
   );
 };
 
+const getCachedActivityStreams = (activityId) => {
+  if (!activityId) {
+    return null;
+  }
+
+  try {
+    const cachedStreams = JSON.parse(
+      localStorage.getItem(getActivityStreamsCacheKey(activityId)),
+    );
+    return hasActivityStreamData(cachedStreams) ? cachedStreams : null;
+  } catch (error) {
+    return null;
+  }
+};
+
+const storeActivityStreams = (activityId, streams) => {
+  if (!activityId || !hasActivityStreamData(streams)) {
+    return;
+  }
+
+  localStorage.setItem(getActivityStreamsCacheKey(activityId), JSON.stringify(streams));
+};
+
 const getInitialDetailedActivity = (locationState) => {
   if (hasDetailedActivityData(locationState?.detailedActivity)) {
     return locationState.detailedActivity;
@@ -97,6 +211,16 @@ const getInitialDetailedActivity = (locationState) => {
   return getCachedDetailedActivity(
     locationState?.from?.id || locationState?.detailedActivity?.id,
   );
+};
+
+const getInitialActivityStreams = (locationState) => {
+  if (hasActivityStreamData(locationState?.athleteStreams)) {
+    return locationState.athleteStreams;
+  }
+
+  const activityId = locationState?.from?.id || locationState?.detailedActivity?.id;
+
+  return getCachedActivityStreams(activityId);
 };
 
 const fetchDetailedActivityWithRetry = async (activityId, token) => {
@@ -118,18 +242,45 @@ const fetchDetailedActivityWithRetry = async (activityId, token) => {
   }
 };
 
+const fetchActivityStreamsWithRetry = async (activityId, token) => {
+  try {
+    return await getAthleteStreams(activityId, token);
+  } catch (error) {
+    if (!isUnauthorizedError(error)) {
+      throw error;
+    }
+
+    const refreshedPayload = await getNewAccessToken();
+    const refreshedToken = refreshedPayload?.access_token;
+
+    if (!refreshedToken) {
+      throw error;
+    }
+
+    return getAthleteStreams(activityId, refreshedToken);
+  }
+};
+
 export default function ActivityList() {
   const location = useLocation();
   const [detailedActivity, setDetailedActivity] = useState(() =>
     getInitialDetailedActivity(location.state),
   );
+  const [activityStreams, setActivityStreams] = useState(() =>
+    getInitialActivityStreams(location.state),
+  );
   const [isDetailLoading, setIsDetailLoading] = useState(!detailedActivity);
+  const [isStreamLoading, setIsStreamLoading] = useState(!activityStreams);
   const [detailError, setDetailError] = useState(null);
+  const [streamError, setStreamError] = useState(null);
   const { isVisible, scrollToTop } = useScroll();
   const navigate = useNavigate();
 
   const { from, detailedActivity: routedDetailedActivity } = location.state || {};
   const activityId = from?.id || routedDetailedActivity?.id;
+  const isCycling = [detailedActivity, routedDetailedActivity, from].some(
+    (activity) => isCyclingActivity(activity) || hasCyclingPowerData(activity),
+  ) || hasPowerStreamData(activityStreams);
 
   if (!location.state) {
     navigate('/activities');
@@ -179,6 +330,43 @@ export default function ActivityList() {
     });
   }, [activityId, location.state]);
 
+  useEffect(() => {
+    async function fetchStreams() {
+      const initialStreams = getInitialActivityStreams(location.state);
+
+      if (initialStreams) {
+        setActivityStreams(initialStreams);
+        storeActivityStreams(activityId, initialStreams);
+        setIsStreamLoading(false);
+        setStreamError(null);
+        return;
+      }
+
+      setIsStreamLoading(true);
+      setStreamError(null);
+
+      const token = await fetchTokenInfo();
+
+      if (!activityId || !token) {
+        setIsStreamLoading(false);
+        setStreamError('Elevation stream data could not be loaded.');
+        return;
+      }
+
+      const response = await fetchActivityStreamsWithRetry(activityId, token);
+      setActivityStreams(response.data);
+      storeActivityStreams(activityId, response.data);
+      setStreamError(null);
+      setIsStreamLoading(false);
+    }
+
+    fetchStreams().catch((error) => {
+      console.error(error.message);
+      setStreamError('Elevation stream data could not be loaded.');
+      setIsStreamLoading(false);
+    });
+  }, [activityId, location.state]);
+
   return (
     <PageContainer>
       {isVisible && <ScrollToTop alt="Go to top" onClick={scrollToTop} />}
@@ -207,7 +395,11 @@ export default function ActivityList() {
           {isDetailLoading ? (
             <DetailLoading>Loading elevation data...</DetailLoading>
           ) : detailedActivity ? (
-            <ElevationChart props={detailedActivity} />
+            <ElevationChart
+              streams={activityStreams}
+              isLoading={isStreamLoading}
+              error={streamError}
+            />
           ) : (
             <DetailLoading>{detailError}</DetailLoading>
           )}
@@ -225,10 +417,20 @@ export default function ActivityList() {
               <th>Elevation</th>
               <th>Elapsed</th>
               <th>Speed</th>
-              <th>Cadence</th>
               <th>Avg HR</th>
               <th>Max HR</th>
-              <th>Pace Zone</th>
+              {isCycling ? (
+                <>
+                  <th>Avg Watts</th>
+                  <th>Weighted Power</th>
+                  <th>Normalized Power</th>
+                </>
+              ) : (
+                <>
+                  <th>Cadence</th>
+                  <th>Pace Zone</th>
+                </>
+              )}
             </tr>
           </thead>
 
@@ -240,10 +442,26 @@ export default function ActivityList() {
                 <td data-label="Elevation">{getSplitElevation(lap)}</td>
                 <td data-label="Elapsed">{getSecondstoMinutes(lap.elapsed_time)}</td>
                 <td data-label="Speed">{getMstoKmHr(lap?.average_speed)}</td>
-                <td data-label="Cadence">{lap.average_cadence || '—'}</td>
                 <td data-label="Avg HR">{lap.average_heartrate || '—'}</td>
                 <td data-label="Max HR">{lap.max_heartrate || '—'}</td>
-                <td data-label="Pace Zone">{lap.pace_zone || '—'}</td>
+                {isCycling ? (
+                  <>
+                    <td data-label="Avg Watts">
+                      {getAverageWatts(lap, detailedActivity)}
+                    </td>
+                    <td data-label="Weighted Power">
+                      {getWeightedAveragePower(lap, detailedActivity)}
+                    </td>
+                    <td data-label="Normalized Power">
+                      {getNormalizedPower(lap, detailedActivity)}
+                    </td>
+                  </>
+                ) : (
+                  <>
+                    <td data-label="Cadence">{lap.average_cadence || '—'}</td>
+                    <td data-label="Pace Zone">{lap.pace_zone || '—'}</td>
+                  </>
+                )}
               </tr>
             ))}
           </tbody>
@@ -258,11 +476,22 @@ export default function ActivityList() {
             <tr>
               <th>Name</th>
               <th>Distance</th>
-              <th>Max Grade</th>
-              <th>Average Grade</th>
+              <th>Elevation</th>
               <th>Elapsed</th>
               <th>Avg HR</th>
-              <th>Elevation High</th>
+              <th>Max HR</th>
+              {isCycling ? (
+                <>
+                  <th>Avg Watts</th>
+                  <th>Weighted Power</th>
+                  <th>Normalized Power</th>
+                </>
+              ) : (
+                <>
+                  <th>Max Grade</th>
+                  <th>Average Grade</th>
+                </>
+              )}
             </tr>
           </thead>
 
@@ -271,11 +500,30 @@ export default function ActivityList() {
               <tr key={`${segment.id}-${segment.elapsed_time}`}>
                 <td data-label="Name">{segment.name}</td>
                 <td data-label="Distance">{getSegmentDistance(segment)}</td>
-                <td data-label="Max Grade">{getSegmentMaxGrade(segment)}</td>
-                <td data-label="Average Grade">{getSegmentAverageGrade(segment)}</td>
+                <td data-label="Elevation">{getSegmentElevation(segment)}</td>
                 <td data-label="Elapsed">{getSecondstoMinutes(segment.elapsed_time)}</td>
                 <td data-label="Avg HR">{segment.average_heartrate || '—'}</td>
-                <td data-label="Elevation High">{getSegmentElevationHigh(segment)}</td>
+                <td data-label="Max HR">{segment.max_heartrate || '—'}</td>
+                {isCycling ? (
+                  <>
+                    <td data-label="Avg Watts">
+                      {getAverageWatts(segment, detailedActivity)}
+                    </td>
+                    <td data-label="Weighted Power">
+                      {getWeightedAveragePower(segment, detailedActivity)}
+                    </td>
+                    <td data-label="Normalized Power">
+                      {getNormalizedPower(segment, detailedActivity)}
+                    </td>
+                  </>
+                ) : (
+                  <>
+                    <td data-label="Max Grade">{getSegmentMaxGrade(segment)}</td>
+                    <td data-label="Average Grade">
+                      {getSegmentAverageGrade(segment)}
+                    </td>
+                  </>
+                )}
               </tr>
             ))}
           </tbody>
