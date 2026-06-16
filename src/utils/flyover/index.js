@@ -8,6 +8,10 @@ import {
   CAMERA_MARKER_LEAD_RATIO,
   CAMERA_MAX_TURN_LEAD_DEGREES,
   CAMERA_TARGET_SMOOTHING_RATIO,
+  COMPACT_CORNER_MAX_DIAMETER_KM,
+  COMPACT_CORNER_MIN_TOTAL_TURN_DEGREES,
+  COMPACT_CORNER_MIN_TURN_COUNT,
+  COMPACT_CORNER_MIN_TURN_DEGREES,
   DEFAULT_FLYOVER_ROUTE_GRADIENT,
   DEG_TO_RAD,
   DRAMATIC_BEARING_CHANGE_THRESHOLD,
@@ -545,12 +549,12 @@ const getRouteSectionCoordinates = (routeLine, startDistanceKm, endDistanceKm) =
   return coordinates;
 };
 
-const getSectionBearingSpread = (coordinates) => {
+const getSectionBearings = (coordinates) => {
   if (coordinates.length < 3) {
-    return 0;
+    return [];
   }
 
-  const bearings = coordinates.slice(1).reduce((sectionBearings, coordinate, index) => {
+  return coordinates.slice(1).reduce((sectionBearings, coordinate, index) => {
     const previousCoordinate = coordinates[index];
 
     if (
@@ -564,6 +568,10 @@ const getSectionBearingSpread = (coordinates) => {
 
     return Number.isFinite(bearing) ? [...sectionBearings, bearing] : sectionBearings;
   }, []);
+};
+
+const getSectionBearingSpread = (coordinates) => {
+  const bearings = getSectionBearings(coordinates);
 
   if (bearings.length < 2) {
     return 0;
@@ -585,6 +593,50 @@ const getSectionBearingSpread = (coordinates) => {
   return 360 - largestGap;
 };
 
+const getSectionTurnMetrics = (coordinates) => {
+  const bearings = getSectionBearings(coordinates);
+
+  return bearings.slice(1).reduce(
+    (metrics, bearing, index) => {
+      const turnDegrees = Math.abs(
+        normalizeBearingDifference(bearings[index], bearing),
+      );
+
+      return {
+        sharpTurnCount:
+          metrics.sharpTurnCount +
+          (turnDegrees >= COMPACT_CORNER_MIN_TURN_DEGREES ? 1 : 0),
+        totalTurnDegrees: metrics.totalTurnDegrees + turnDegrees,
+      };
+    },
+    { sharpTurnCount: 0, totalTurnDegrees: 0 },
+  );
+};
+
+const getLoopDetectionWindow = (distanceKm, routeDistanceKm, sectionDistanceKm) => {
+  const currentDistance = clampRouteDistance(distanceKm, routeDistanceKm);
+  let startDistance = clampRouteDistance(
+    currentDistance - sectionDistanceKm * 0.35,
+    routeDistanceKm,
+  );
+  let endDistance = clampRouteDistance(
+    currentDistance + sectionDistanceKm * 0.65,
+    routeDistanceKm,
+  );
+  const missingDistance = sectionDistanceKm - (endDistance - startDistance);
+
+  if (missingDistance > 0) {
+    startDistance = clampRouteDistance(startDistance - missingDistance, routeDistanceKm);
+    endDistance = clampRouteDistance(endDistance + missingDistance, routeDistanceKm);
+  }
+
+  return {
+    startDistance,
+    endDistance,
+    sectionLength: endDistance - startDistance,
+  };
+};
+
 /**
  * Detects compact loop sections where the route keeps turning inside a small
  * area. During these sections the camera bearing can spin faster than the
@@ -598,19 +650,22 @@ export const detectSmallLoopSection = ({
   maxDiameterKm = SMALL_LOOP_MAX_DIAMETER_KM,
   minPathToDiameterRatio = SMALL_LOOP_MIN_PATH_TO_DIAMETER_RATIO,
   minBearingSpread = SMALL_LOOP_MIN_BEARING_SPREAD_DEGREES,
+  compactCornerMaxDiameterKm = COMPACT_CORNER_MAX_DIAMETER_KM,
+  minSharpTurnCount = COMPACT_CORNER_MIN_TURN_COUNT,
+  minTotalTurnDegrees = COMPACT_CORNER_MIN_TOTAL_TURN_DEGREES,
 }) => {
-  if (!routeLine || !routeDistanceKm || routeDistanceKm < sectionDistanceKm) {
+  if (!routeLine || !routeDistanceKm || routeDistanceKm < sectionDistanceKm * 0.55) {
     return false;
   }
 
-  const endDistance = clampRouteDistance(distanceKm, routeDistanceKm);
-  const startDistance = clampRouteDistance(
-    endDistance - sectionDistanceKm,
+  const detectionDistanceKm = Math.min(sectionDistanceKm, routeDistanceKm);
+  const { startDistance, endDistance, sectionLength } = getLoopDetectionWindow(
+    distanceKm,
     routeDistanceKm,
+    detectionDistanceKm,
   );
-  const sectionLength = endDistance - startDistance;
 
-  if (sectionLength < sectionDistanceKm * 0.75) {
+  if (sectionLength < detectionDistanceKm * 0.65) {
     return false;
   }
 
@@ -626,12 +681,18 @@ export const detectSmallLoopSection = ({
   });
   const pathToDiameterRatio = sectionLength / Math.max(diagonalKm, Number.EPSILON);
   const bearingSpread = getSectionBearingSpread(coordinates);
-
-  return (
+  const { sharpTurnCount, totalTurnDegrees } = getSectionTurnMetrics(coordinates);
+  const isCompactLoop =
     diagonalKm <= maxDiameterKm &&
     pathToDiameterRatio >= minPathToDiameterRatio &&
-    bearingSpread >= minBearingSpread
-  );
+    bearingSpread >= minBearingSpread;
+  const hasRepeatedSharpTurns =
+    diagonalKm <= compactCornerMaxDiameterKm &&
+    sharpTurnCount >= minSharpTurnCount &&
+    totalTurnDegrees >= minTotalTurnDegrees &&
+    bearingSpread >= minBearingSpread;
+
+  return isCompactLoop || hasRepeatedSharpTurns;
 };
 
 const getCameraLeadRatio = (turnDelta, flyoverSpeed = 1) => {

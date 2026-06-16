@@ -125,9 +125,10 @@ describe('flyover camera framing', () => {
   });
 
   test('detects repeated compact route loops without flagging open routes', () => {
-    const loopCoordinates = turf
-      .circle([-0.1276, 51.5072], 0.08, { steps: 24, units: 'kilometers' })
-      .geometry.coordinates[0];
+    const loopCoordinates = turf.circle([-0.1276, 51.5072], 0.08, {
+      steps: 24,
+      units: 'kilometers',
+    }).geometry.coordinates[0];
     const repeatedLoopLine = turf.lineString([
       ...loopCoordinates,
       ...loopCoordinates.slice(1),
@@ -160,5 +161,31 @@ describe('flyover camera framing', () => {
         routeDistanceKm: openRouteDistanceKm,
       }),
     ).toBe(false);
+  });
+
+  test('detects compact sharp-corner routes before the camera spins around the full loop', () => {
+    const start = [-0.1276, 51.5072];
+    const sideLengthKm = 0.4;
+    const east = turf.destination(start, sideLengthKm, 90, {
+      units: 'kilometers',
+    }).geometry.coordinates;
+    const north = turf.destination(east, sideLengthKm, 0, {
+      units: 'kilometers',
+    }).geometry.coordinates;
+    const west = turf.destination(north, sideLengthKm, 270, {
+      units: 'kilometers',
+    }).geometry.coordinates;
+    const squareRouteLine = turf.lineString([start, east, north, west, start]);
+    const squareRouteDistanceKm = turf.length(squareRouteLine, {
+      units: 'kilometers',
+    });
+
+    expect(
+      detectSmallLoopSection({
+        routeLine: squareRouteLine,
+        distanceKm: squareRouteDistanceKm * 0.25,
+        routeDistanceKm: squareRouteDistanceKm,
+      }),
+    ).toBe(true);
   });
 });
