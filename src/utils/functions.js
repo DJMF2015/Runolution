@@ -164,6 +164,10 @@ export const getCommentsByActivityId = async (activityId, accessToken) => {
  * Fetches lap-level details for a Strava activity.
  */
 export const getUserActivityLaps = async (activityId, accessToken) => {
+  if (!activityId || !accessToken) {
+    throw new Error('Activity id and access token are required to fetch laps.');
+  }
+
   const apiUrl = `${baseURL}/activities/${activityId}/laps`;
   if (await stravaRateLimiter.request()) {
     try {
@@ -171,12 +175,16 @@ export const getUserActivityLaps = async (activityId, accessToken) => {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       if (response.status === 200) {
+        console.log({ response });
         return response;
       } else {
         throw new Error(`Failed to fetch athlete stats. Status: ${response.status}`);
       }
     } catch (error) {
-      throw new Error(`Error while fetching athlete stats: ${error.message}`);
+      throw createStravaError(
+        `Error while fetching athlete laps: ${error.message}`,
+        error,
+      );
     }
   } else {
     throw new Error('Exceeded the Strava rate limit. Please try again later.');
@@ -194,9 +202,33 @@ export const getDetailedAthleteData = async (id, accessToken) => {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       if (response.status === 200) {
+        console.log({ response });
         return response;
       } else {
         throw new Error(`Failed to fetch athlete stats. Status: ${response.status}`);
+      }
+    } catch (error) {
+      throw createStravaError(
+        `Error while fetching athlete stats: ${error.message}`,
+        error,
+      );
+    }
+  } else {
+    throw new Error('Exceeded the Strava rate limit. Please try again later.');
+  }
+};
+
+export const getDetailedAthletePhoto = async (id, accessToken) => {
+  if (await stravaRateLimiter.request()) {
+    const apiUrl = `${baseURL}/activities/${id}/photos?size=2048`;
+    try {
+      const response = await axios.get(apiUrl, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (response.status === 200) {
+        return response;
+      } else {
+        throw new Error(`Failed to fetch athlete photos. Status: ${response.status}`);
       }
     } catch (error) {
       throw createStravaError(
