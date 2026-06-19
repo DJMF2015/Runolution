@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { ArrowUpCircleFill } from '@styled-icons/bootstrap/ArrowUpCircleFill';
+import mapboxgl from 'mapbox-gl';
+import * as turf from '@turf/turf';
 import {
   FiBox,
   FiLayers,
@@ -24,6 +26,7 @@ import {
   getCommentsByActivityId,
   getDetailedAthleteData,
   getKudoersByActivityId,
+  getDetailedAthletePhoto,
   getAthleteStreams,
 } from '../utils/functions';
 import { fetchTokenInfo } from '../utils/helpers';
@@ -39,9 +42,373 @@ import {
   formatFlyoverDistance,
   getFlyoverRouteCoordinates,
   getFlyoverRouteFeatureFromStreams,
+  getPreparedFlyoverRouteLine,
   setFlyoverRouteGradient,
 } from '../utils/flyOverHelper';
 import { useFlyoverAnimation } from '../hooks/useFlyoverAnimation';
+
+const PHOTO_URL_SIZES = ['2048', '1200', '1000', '600', '300', '100'];
+
+const getStreamData = (streams, key) => {
+  if (Array.isArray(streams)) {
+    return streams.find((stream) => stream?.type === key)?.data || [];
+  }
+
+  if (Array.isArray(streams?.[key])) {
+    return streams[key];
+  }
+
+  return streams?.[key]?.data || streams?.streams?.[key]?.data || [];
+};
+
+const getBestPhotoUrl = (photo) => {
+  const urls = photo?.urls || photo?.photo?.urls || {};
+  const sizedUrl = PHOTO_URL_SIZES.map((size) => urls[size]).find(Boolean);
+
+  return (
+    sizedUrl ||
+    photo?.url ||
+    photo?.src ||
+    photo?.source ||
+    photo?.photo?.url ||
+    photo?.photo?.source ||
+    null
+  );
+};
+
+const getPhotoTimestamp = (photo) => {
+  return (
+    photo?.taken_at ||
+    photo?.captured_at ||
+    photo?.created_at ||
+    photo?.uploaded_at ||
+    photo?.timestamp ||
+    photo?.time ||
+    null
+  );
+};
+
+const getTimestampMs = (timestamp) => {
+  if (!timestamp) {
+    return null;
+  }
+
+  const numericTimestamp = Number(timestamp);
+
+  if (Number.isFinite(numericTimestamp)) {
+    return numericTimestamp > 1000000000000 ? numericTimestamp : numericTimestamp * 1000;
+  }
+
+  const parsedTimestamp = Date.parse(timestamp);
+
+  return Number.isFinite(parsedTimestamp) ? parsedTimestamp : null;
+};
+
+const getPhotoElapsedSeconds = (photoTimestamp, activityStartTimestamp) => {
+  const photoTimestampMs = getTimestampMs(photoTimestamp);
+  const activityStartTimestampMs = getTimestampMs(activityStartTimestamp);
+
+  if (!Number.isFinite(photoTimestampMs) || !Number.isFinite(activityStartTimestampMs)) {
+    return null;
+  }
+
+  return Math.max(0, (photoTimestampMs - activityStartTimestampMs) / 1000);
+};
+
+const getPhotoCoordinate = (photo) => {
+  const coordinate = photo?.location || photo?.latlng || photo?.coordinate;
+
+  if (!Array.isArray(coordinate) || coordinate.length < 2) {
+    return null;
+  }
+
+  const [lat, lng] = coordinate.map(Number);
+
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return null;
+  }
+
+  return [lng, lat];
+};
+
+const normalizeActivityPhotos = (photos) => {
+  const photoList = Array.isArray(photos)
+    ? photos
+    : photos?.data ||
+      photos?.photos ||
+      photos?.items ||
+      [photos?.primary].filter(Boolean);
+
+  return photoList
+    .map((photo, index) => ({
+      coordinate: getPhotoCoordinate(photo),
+      id: photo?.id || photo?.unique_id || `${getBestPhotoUrl(photo)}-${index}`,
+      sequence: index,
+      timestamp: getPhotoTimestamp(photo),
+      url: getBestPhotoUrl(photo),
+    }))
+    .filter((photo) => photo.url)
+    .sort((firstPhoto, secondPhoto) => {
+      const firstTimestamp = getTimestampMs(firstPhoto.timestamp);
+      const secondTimestamp = getTimestampMs(secondPhoto.timestamp);
+
+      if (Number.isFinite(firstTimestamp) && Number.isFinite(secondTimestamp)) {
+        return firstTimestamp - secondTimestamp;
+      }
+
+      return firstPhoto.sequence - secondPhoto.sequence;
+    });
+};
+
+const getPhotoRoutePointFromStreams = ({
+  photoIndex,
+  routeCoordinates,
+  streams,
+  targetElapsedSeconds,
+  totalPhotos,
+}) => {
+  const latLngStream = getStreamData(streams, 'latlng');
+  const distanceStream = getStreamData(streams, 'distance');
+  const timeStream = getStreamData(streams, 'time');
+  const photoProgress = totalPhotos > 0 ? (photoIndex + 1) / (totalPhotos + 1) : 0;
+  const streamLength = Math.min(
+    latLngStream.length,
+    distanceStream.length || latLngStream.length,
+    timeStream.length || latLngStream.length,
+  );
+
+  const getRoutePointAtStreamIndex = (streamIndex) => {
+    const coordinate = latLngStream[streamIndex];
+    const distanceMetres = Number(distanceStream[streamIndex]);
+
+    if (Array.isArray(coordinate) && coordinate.length >= 2) {
+      return {
+        coordinate: [coordinate[1], coordinate[0]],
+        distanceKm: Number.isFinite(distanceMetres) ? distanceMetres / 1000 : null,
+      };
+    }
+
+    return null;
+  };
+
+  if (
+    streamLength > 1 &&
+    Number.isFinite(targetElapsedSeconds) &&
+    timeStream.length > 1
+  ) {
+    const firstTime = Number(timeStream[0]);
+    const lastTime = Number(timeStream[streamLength - 1]);
+    const clampedTargetTime = Math.min(
+      Math.max(targetElapsedSeconds, Number.isFinite(firstTime) ? firstTime : 0),
+      Number.isFinite(lastTime) ? lastTime : targetElapsedSeconds,
+    );
+
+    if (Number.isFinite(firstTime) && clampedTargetTime <= firstTime) {
+      return getRoutePointAtStreamIndex(0);
+    }
+
+    for (let index = 1; index < streamLength; index += 1) {
+      const previousTime = Number(timeStream[index - 1]);
+      const currentTime = Number(timeStream[index]);
+
+      if (
+        !Number.isFinite(previousTime) ||
+        !Number.isFinite(currentTime) ||
+        currentTime < clampedTargetTime
+      ) {
+        continue;
+      }
+
+      const previousCoordinate = latLngStream[index - 1];
+      const currentCoordinate = latLngStream[index];
+      const previousDistance = Number(distanceStream[index - 1]);
+      const currentDistance = Number(distanceStream[index]);
+      const ratio =
+        currentTime === previousTime
+          ? 0
+          : (clampedTargetTime - previousTime) / (currentTime - previousTime);
+
+      if (
+        !Array.isArray(previousCoordinate) ||
+        !Array.isArray(currentCoordinate) ||
+        previousCoordinate.length < 2 ||
+        currentCoordinate.length < 2
+      ) {
+        return null;
+      }
+
+      return {
+        coordinate: [
+          previousCoordinate[1] + (currentCoordinate[1] - previousCoordinate[1]) * ratio,
+          previousCoordinate[0] + (currentCoordinate[0] - previousCoordinate[0]) * ratio,
+        ],
+        distanceKm:
+          Number.isFinite(previousDistance) && Number.isFinite(currentDistance)
+            ? (previousDistance + (currentDistance - previousDistance) * ratio) / 1000
+            : null,
+      };
+    }
+
+    return getRoutePointAtStreamIndex(streamLength - 1);
+  }
+
+  if (streamLength > 1 && totalPhotos > 0 && timeStream.length > 1) {
+    const firstTime = Number(timeStream[0]);
+    const lastTime = Number(timeStream[streamLength - 1]);
+    const targetTime =
+      Number.isFinite(firstTime) && Number.isFinite(lastTime)
+        ? firstTime + (lastTime - firstTime) * photoProgress
+        : null;
+
+    if (targetTime !== null) {
+      for (let index = 1; index < streamLength; index += 1) {
+        const previousTime = Number(timeStream[index - 1]);
+        const currentTime = Number(timeStream[index]);
+
+        if (
+          !Number.isFinite(previousTime) ||
+          !Number.isFinite(currentTime) ||
+          currentTime < targetTime
+        ) {
+          continue;
+        }
+
+        const previousCoordinate = latLngStream[index - 1];
+        const currentCoordinate = latLngStream[index];
+        const previousDistance = Number(distanceStream[index - 1]);
+        const currentDistance = Number(distanceStream[index]);
+        const ratio =
+          currentTime === previousTime
+            ? 0
+            : (targetTime - previousTime) / (currentTime - previousTime);
+
+        if (
+          !Array.isArray(previousCoordinate) ||
+          !Array.isArray(currentCoordinate) ||
+          previousCoordinate.length < 2 ||
+          currentCoordinate.length < 2
+        ) {
+          return null;
+        }
+
+        return {
+          coordinate: [
+            previousCoordinate[1] +
+              (currentCoordinate[1] - previousCoordinate[1]) * ratio,
+            previousCoordinate[0] +
+              (currentCoordinate[0] - previousCoordinate[0]) * ratio,
+          ],
+          distanceKm:
+            Number.isFinite(previousDistance) && Number.isFinite(currentDistance)
+              ? (previousDistance + (currentDistance - previousDistance) * ratio) / 1000
+              : null,
+        };
+      }
+    }
+  }
+
+  if (streamLength > 1 && totalPhotos > 0) {
+    const streamIndex = Math.min(
+      streamLength - 1,
+      Math.max(0, Math.round(photoProgress * (streamLength - 1))),
+    );
+
+    return getRoutePointAtStreamIndex(streamIndex);
+  }
+
+  if (routeCoordinates.length > 1 && totalPhotos > 0) {
+    const routeIndex = Math.min(
+      routeCoordinates.length - 1,
+      Math.max(
+        0,
+        Math.round(
+          ((photoIndex + 1) / (totalPhotos + 1)) * (routeCoordinates.length - 1),
+        ),
+      ),
+    );
+
+    return {
+      coordinate: routeCoordinates[routeIndex],
+      distanceKm: null,
+    };
+  }
+
+  return null;
+};
+
+const getPhotoDistanceOnRoute = (coordinate, routeCoordinates) => {
+  if (!coordinate || routeCoordinates.length < 2) {
+    return null;
+  }
+
+  try {
+    const routeLine = turf.lineString(routeCoordinates);
+    const snappedPoint = turf.nearestPointOnLine(routeLine, turf.point(coordinate), {
+      units: 'kilometers',
+    });
+
+    return snappedPoint?.properties?.location ?? null;
+  } catch (error) {
+    return null;
+  }
+};
+
+const createActivityPhotoMarkerElement = (photo, onSelectPhoto) => {
+  const markerElement = document.createElement('div');
+  const button = document.createElement('button');
+  const image = document.createElement('img');
+  const pointer = document.createElement('span');
+
+  markerElement.className = 'activity-photo-marker';
+  markerElement.style.width = 'clamp(32px, 3.4vw, 38px)';
+  markerElement.style.padding = '0 0 14px';
+  markerElement.style.background = 'transparent';
+  markerElement.style.position = 'relative';
+  markerElement.style.boxSizing = 'border-box';
+  markerElement.style.pointerEvents = 'auto';
+
+  button.type = 'button';
+  button.style.display = 'block';
+  button.style.width = '100%';
+  button.style.padding = '3px';
+  button.style.border = '1px solid rgba(255, 255, 255, 0.72)';
+  button.style.borderRadius = '8px';
+  button.style.background = 'rgba(2, 6, 23, 0.88)';
+  button.style.backdropFilter = 'blur(12px)';
+  button.style.boxShadow = '0 10px 20px rgba(0, 0, 0, 0.3)';
+  button.style.cursor = 'pointer';
+  button.style.overflow = 'hidden';
+  button.addEventListener('click', (event) => {
+    event.stopPropagation();
+    onSelectPhoto(photo);
+  });
+
+  image.src = photo.url;
+  image.alt = '';
+  image.loading = 'lazy';
+  image.style.display = 'block';
+  image.style.width = '100%';
+  image.style.height = 'clamp(28px, 6vw, 34px)';
+  image.style.objectFit = 'cover';
+  image.style.borderRadius = '6px';
+
+  pointer.style.position = 'absolute';
+  pointer.style.left = '50%';
+  pointer.style.bottom = '0';
+  pointer.style.width = '4px';
+  pointer.style.height = '15px';
+  pointer.style.background =
+    'linear-gradient(180deg, rgba(241, 6, 6, 0.92), rgb(225, 36, 29))';
+  pointer.style.boxShadow = '0 8px 16px rgba(0, 0, 0, 0.35)';
+  pointer.style.transform = 'translateX(-50%)';
+  pointer.style.transformOrigin = 'top';
+
+  button.appendChild(image);
+  markerElement.appendChild(button);
+  markerElement.appendChild(pointer);
+
+  return markerElement;
+};
 
 export default function ActivitiesCard() {
   const { isVisible, scrollToTop } = useScroll();
@@ -60,12 +427,14 @@ export default function ActivitiesCard() {
   const [isMapStyleOpen, setIsMapStyleOpen] = useState(false);
   const [isThreeDimensional, setIsThreeDimensional] = useState(false);
   const [isActivityNavCollapsed, setIsActivityNavCollapsed] = useState(false);
+  const [selectedPhoto, setSelectedPhoto] = useState(null);
 
   const location = useLocation();
   const from = location.state?.from;
   const coordinates = from?.map?.summary_polyline;
   const mapContainer = useRef(null);
   const mapRef = useRef(null);
+  const photoMarkersRef = useRef([]);
   const currentMapStyleRef = useRef('street');
   const isActivityNavCollapsedRef = useRef(false);
   const data = useMemo(() => getActivityLineFeature(coordinates), [coordinates]);
@@ -76,9 +445,15 @@ export default function ActivitiesCard() {
   const flyoverRouteLine = useMemo(() => {
     return getFlyoverRouteFeatureFromStreams(athleteData?.athleteStreams);
   }, [athleteData?.athleteStreams]);
+  const preparedFlyoverRouteLine = useMemo(() => {
+    return getPreparedFlyoverRouteLine(flyoverRouteLine);
+  }, [flyoverRouteLine]);
   const flyoverRouteCoordinates = useMemo(() => {
     return getFlyoverRouteCoordinates(flyoverRouteLine, routeCoordinates);
   }, [flyoverRouteLine, routeCoordinates]);
+  const preparedFlyoverRouteCoordinates = useMemo(() => {
+    return getFlyoverRouteCoordinates(preparedFlyoverRouteLine, flyoverRouteCoordinates);
+  }, [flyoverRouteCoordinates, preparedFlyoverRouteLine]);
 
   const {
     consumeRouteFitSkip,
@@ -145,11 +520,13 @@ export default function ActivitiesCard() {
           kudoersResponse,
           commentsResponse,
           detailedActivityResponse,
+          athletePhotosResponse,
           athleteStreamsResponse,
         ] = await Promise.all([
           getKudoersByActivityId(from.id, token),
           getCommentsByActivityId(from.id, token),
           getDetailedAthleteData(from.id, token),
+          getDetailedAthletePhoto(from.id, token).catch(() => null),
           getAthleteStreams(from.id, token).catch(() => null),
         ]);
 
@@ -158,6 +535,7 @@ export default function ActivitiesCard() {
           kudosoers: kudoersResponse.data,
           comments: commentsResponse.data,
           detailedActivity: detailedActivityResponse.data,
+          athletePhotos: athletePhotosResponse?.data || [],
           athleteStreams: athleteStreamsResponse?.data || null,
         }));
 
@@ -177,6 +555,61 @@ export default function ActivitiesCard() {
     fetchData();
   }, [from?.id, isOnline]);
 
+  const activityPhotos = useMemo(() => {
+    return normalizeActivityPhotos(athleteData?.athletePhotos);
+  }, [athleteData?.athletePhotos]);
+
+  const routePhotoMarkers = useMemo(() => {
+    const activityStartTimestamp =
+      athleteData?.detailedActivity?.start_date ||
+      athleteData?.detailedActivity?.start_date_local ||
+      from?.start_date ||
+      from?.start_date_local;
+    const revealRouteCoordinates =
+      preparedFlyoverRouteCoordinates?.length > 1
+        ? preparedFlyoverRouteCoordinates
+        : flyoverRouteCoordinates || routeCoordinates;
+
+    return activityPhotos
+      .map((photo, index) => {
+        const routePoint = photo.coordinate
+          ? null
+          : getPhotoRoutePointFromStreams({
+              photoIndex: index,
+              routeCoordinates,
+              streams: athleteData?.athleteStreams,
+              targetElapsedSeconds: getPhotoElapsedSeconds(
+                photo.timestamp,
+                activityStartTimestamp,
+              ),
+              totalPhotos: activityPhotos.length,
+            });
+        const coordinate = photo.coordinate || routePoint?.coordinate;
+        const distanceKm =
+          getPhotoDistanceOnRoute(coordinate, revealRouteCoordinates) ??
+          routePoint?.distanceKm;
+
+        return coordinate
+          ? {
+              ...photo,
+              coordinate,
+              distanceKm,
+            }
+          : null;
+      })
+      .filter(Boolean);
+  }, [
+    activityPhotos,
+    athleteData?.athleteStreams,
+    athleteData?.detailedActivity?.start_date,
+    athleteData?.detailedActivity?.start_date_local,
+    flyoverRouteCoordinates,
+    from?.start_date,
+    from?.start_date_local,
+    preparedFlyoverRouteCoordinates,
+    routeCoordinates,
+  ]);
+
   useEffect(() => {
     if (!data || !mapContainer.current || !isOnline) {
       return;
@@ -193,7 +626,7 @@ export default function ActivitiesCard() {
 
     map.on('style.load', () => {
       addActivityMapLayers(map, data);
-      setFlyoverRouteGradient(map, from);
+      setFlyoverRouteGradient(map);
     });
 
     map.on('load', () => {
@@ -204,8 +637,56 @@ export default function ActivitiesCard() {
       map.remove();
       mapRef.current = null;
       currentMapStyleRef.current = 'street';
+      photoMarkersRef.current.forEach((marker) => marker.remove());
+      photoMarkersRef.current = [];
     };
   }, [data, from, from?.end_latlng, isOnline, routeCenter, routeCoordinates]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+
+    photoMarkersRef.current.forEach((marker) => marker.remove());
+    photoMarkersRef.current = [];
+
+    if (!map || !routePhotoMarkers.length) {
+      return;
+    }
+
+    const visiblePhotos = routePhotoMarkers.filter((photo) => {
+      if (!isFlyoverPlaying) {
+        return true;
+      }
+
+      return (
+        Number.isFinite(photo.distanceKm) && photo.distanceKm <= flyoverDistanceKm + 0.015
+      );
+    });
+
+    const markers = visiblePhotos
+      .map((photo) => {
+        if (!photo.coordinate) {
+          return null;
+        }
+
+        return new mapboxgl.Marker({
+          anchor: 'bottom',
+          element: createActivityPhotoMarkerElement(photo, setSelectedPhoto),
+          offset: [0, 0],
+          pitchAlignment: 'map',
+          rotationAlignment: 'map',
+        })
+          .setLngLat(photo.coordinate)
+          .addTo(map);
+      })
+      .filter(Boolean);
+
+    photoMarkersRef.current = markers;
+
+    return () => {
+      markers.forEach((marker) => marker.remove());
+      photoMarkersRef.current = [];
+    };
+  }, [flyoverDistanceKm, isFlyoverPlaying, routePhotoMarkers]);
 
   useEffect(() => {
     const map = mapRef?.current;
@@ -285,7 +766,9 @@ export default function ActivitiesCard() {
     from?.start_date_local ||
     from?.start_date;
   const activityDateLabel = formattedDate(activityDate) || 'Date unavailable';
-  const primaryPhotoUrl = athleteData?.detailedActivity?.photos?.primary?.urls?.['100'];
+  const primaryPhotoUrl =
+    activityPhotos[0]?.url ||
+    getBestPhotoUrl(athleteData?.detailedActivity?.photos?.primary);
 
   return (
     <>
@@ -295,6 +778,25 @@ export default function ActivitiesCard() {
           $navCollapsed={isActivityNavCollapsed}
           onClick={scrollToTop}
         />
+      )}
+      {selectedPhoto && (
+        <PhotoLightbox
+          role="dialog"
+          aria-modal="true"
+          aria-label="Activity photo"
+          onClick={() => setSelectedPhoto(null)}
+        >
+          <PhotoLightboxPanel onClick={(event) => event.stopPropagation()}>
+            <PhotoLightboxCloseButton
+              type="button"
+              aria-label="Close activity photo"
+              onClick={() => setSelectedPhoto(null)}
+            >
+              &times;
+            </PhotoLightboxCloseButton>
+            <PhotoLightboxImage alt="" src={selectedPhoto.url} />
+          </PhotoLightboxPanel>
+        </PhotoLightbox>
       )}
       <PageShell>
         <SideNavigation
@@ -688,6 +1190,65 @@ const Map = styled.div`
     width: 100%;
     height: 100vh;
     margin: 0 auto;
+  }
+`;
+
+const PhotoLightbox = styled.div`
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+  background: rgba(2, 6, 23, 0.72);
+  backdrop-filter: blur(14px);
+`;
+
+const PhotoLightboxPanel = styled.div`
+  position: relative;
+  width: min(920px, 94vw);
+  max-height: 88vh;
+  padding: 0.55rem;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 14px;
+  background:
+    linear-gradient(135deg, rgba(15, 23, 42, 0.96), rgba(2, 6, 23, 0.96)),
+    linear-gradient(135deg, rgba(252, 82, 0, 0.18), rgba(14, 165, 233, 0.12));
+  box-shadow: 0 26px 70px rgba(0, 0, 0, 0.55);
+`;
+
+const PhotoLightboxImage = styled.img`
+  display: block;
+  width: 100%;
+  max-height: calc(88vh - 1.1rem);
+  border-radius: 10px;
+  object-fit: contain;
+`;
+
+const PhotoLightboxCloseButton = styled.button`
+  position: absolute;
+  top: 0.85rem;
+  right: 0.85rem;
+  z-index: 1;
+  width: 2.45rem;
+  height: 2.45rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.36);
+  border-radius: 999px;
+  background: rgba(252, 82, 0, 0.96);
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 1.4rem;
+  font-weight: 900;
+  line-height: 1;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.38);
+
+  &:hover,
+  &:focus-visible {
+    background: rgba(255, 106, 36, 1);
+    outline: none;
   }
 `;
 

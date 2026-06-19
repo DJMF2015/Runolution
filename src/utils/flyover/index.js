@@ -23,28 +23,31 @@ import {
   FLYOVER_HIGH_ROUTE_CLEARANCE_METRES,
   FLYOVER_HIGH_ROUTE_MAX_CAMERA_ALTITUDE,
   FLYOVER_HIGH_ROUTE_MAX_ZOOM_OUT,
+  FLYOVER_PREP_CHAIKIN_PASSES,
+  FLYOVER_PREP_MAX_COORDINATES,
+  FLYOVER_PREP_MIN_COORDINATES,
+  FLYOVER_PREP_SIMPLIFY_TOLERANCE,
   FLYOVER_HIGH_SPEED_THRESHOLD,
   FLYOVER_ROUTE_GRADIENT,
   FLYOVER_ZOOM,
   FLYOVER_ZOOM_LIMITS,
-  LOOPING_ROUTE_BEARING_THRESHOLD,
-  LOOPING_ROUTE_MACRO_BEARING_WEIGHT,
-  LOOPING_ROUTE_MACRO_LOOKAHEAD_RATIO,
   MAX_CAMERA_TARGET_SMOOTHING_KM,
-  MAX_LOOPING_ROUTE_MACRO_LOOKAHEAD_KM,
   MIN_CAMERA_TARGET_SMOOTHING_KM,
-  MIN_LOOPING_ROUTE_MACRO_LOOKAHEAD_KM,
   NORMAL_TURN_RATE,
   RAD_TO_DEG,
   RESPONSIVE_CAMERA_ADJUSTMENTS,
   ROUTE_DISTANCE_ALTITUDE_STOPS,
   ROUTE_DISTANCE_ZOOM_STOPS,
   SAME_DIRECTION_BEARING_THRESHOLD,
+  SATELLITE_FLYOVER_ROUTE_GRADIENT,
   SMALL_LOOP_DETECTION_DISTANCE_KM,
   SMALL_LOOP_MAX_DIAMETER_KM,
   SMALL_LOOP_MIN_BEARING_SPREAD_DEGREES,
   SMALL_LOOP_MIN_PATH_TO_DIAMETER_RATIO,
   SMOOTHING_SAMPLE_COUNT,
+  TIGHT_LOOP_DETECTION_DISTANCE_KM,
+  TIGHT_LOOP_MAX_DIAMETER_KM,
+  TIGHT_LOOP_MIN_TOTAL_TURN_DEGREES,
   DRAMATIC_TURN_RATE,
 } from './config';
 
@@ -69,14 +72,20 @@ export {
   FLYOVER_HIGH_SPEED_CAMERA_CENTER_SMOOTHING,
   FLYOVER_HIGH_SPEED_THRESHOLD,
   FLYOVER_INTRO_DURATION_MS,
-  FLYOVER_INTRO_START_ALTITUDE,
+  FLYOVER_INTRO_MAX_PULLBACK_ALTITUDE,
+  FLYOVER_INTRO_MIN_PULLBACK_ALTITUDE,
+  FLYOVER_INTRO_PULLBACK_METRES,
+  FLYOVER_INTRO_PULLBACK_PITCH,
+  FLYOVER_INTRO_PULLBACK_PROGRESS,
   FLYOVER_OUTRO_DURATION_MS,
   FLYOVER_OUTRO_PITCH,
   FLYOVER_PITCH,
+  FLYOVER_PROGRESS_UPDATE_MS,
   FLYOVER_ROUTE_GRADIENT,
   FLYOVER_SPEEDS,
   FLYOVER_TILE_WAIT_MS,
   FLYOVER_ZOOM,
+  SATELLITE_FLYOVER_ROUTE_GRADIENT,
 } from './config';
 
 // simple linear interpolation between two values
@@ -96,6 +105,13 @@ export const easeCubicOut = (progress) => {
 
 const clamp = (value, min, max) => {
   return Math.min(Math.max(value, min), max);
+};
+
+const areSameCoordinate = (firstCoordinate, secondCoordinate) => {
+  return (
+    firstCoordinate?.[0] === secondCoordinate?.[0] &&
+    firstCoordinate?.[1] === secondCoordinate?.[1]
+  );
 };
 
 const interpolateLngLat = (fromLngLat, toLngLat, ratio) => {
@@ -125,6 +141,129 @@ export const computeCameraPosition = (pitch, bearing, targetPosition, altitude) 
     lng: targetPosition.lng + lngDiff,
     lat: targetPosition.lat - latDiff,
   };
+};
+
+// implement Chaikin’s Algorithm to create corner-cutting and generate smooth curves from polygonal line
+const getChaikinSmoothedCoordinates = (
+  coordinates,
+  passes = FLYOVER_PREP_CHAIKIN_PASSES,
+) => {
+  if (!Array.isArray(coordinates) || coordinates.length < 3 || passes <= 0) {
+    return coordinates;
+  }
+
+  const isClosedRoute = areSameCoordinate(
+    coordinates[0],
+    coordinates[coordinates.length - 1],
+  );
+  let smoothedCoordinates = coordinates;
+
+  for (let pass = 0; pass < passes; pass += 1) {
+    const nextCoordinates = isClosedRoute ? [] : [smoothedCoordinates[0]];
+    const lastSegmentIndex = smoothedCoordinates.length - 1;
+
+    for (let index = 0; index < lastSegmentIndex; index += 1) {
+      const currentCoordinate = smoothedCoordinates[index];
+      const nextCoordinate = smoothedCoordinates[index + 1];
+
+      if (!currentCoordinate || !nextCoordinate) {
+        continue;
+      }
+
+      nextCoordinates.push(
+        interpolateLngLat(currentCoordinate, nextCoordinate, 0.25),
+        interpolateLngLat(currentCoordinate, nextCoordinate, 0.75),
+      );
+    }
+
+    if (isClosedRoute) {
+      nextCoordinates.push(nextCoordinates[0]);
+    } else {
+      nextCoordinates.push(smoothedCoordinates[smoothedCoordinates.length - 1]);
+    }
+
+    smoothedCoordinates = nextCoordinates;
+  }
+
+  return smoothedCoordinates;
+};
+
+// reduce the number of coordinates from raw data to a manageable size while maintain overall shape
+const sampleRouteCoordinates = (routeLine, maxCoordinates) => {
+  const coordinateCount = routeLine?.geometry?.coordinates?.length || 0;
+
+  if (!routeLine || coordinateCount <= maxCoordinates) {
+    return routeLine?.geometry?.coordinates || [];
+  }
+
+  const routeDistanceKm = turf.length(routeLine, { units: 'kilometers' });
+
+  if (!routeDistanceKm) {
+    return routeLine.geometry.coordinates;
+  }
+
+  const lastIndex = maxCoordinates - 1;
+
+  return Array.from({ length: maxCoordinates }, (_, index) => {
+    const distanceKm = routeDistanceKm * (index / lastIndex);
+
+    return turf.along(routeLine, distanceKm, {
+      units: 'kilometers',
+    }).geometry.coordinates;
+  });
+};
+
+const getPreparedRouteProperties = (properties) => {
+  if (!properties?.streams?.distance) {
+    return properties;
+  }
+
+  const { distance, ...preparedStreams } = properties.streams;
+
+  return {
+    ...properties,
+    streams: preparedStreams,
+  };
+};
+
+/**
+ * Reduces dense GPS noise before flyover playback while preserving the
+ * original route data for normal static rendering and post-animation cleanup.
+ * Prepared geometry intentionally drops the original distance stream so
+ * playback distance is measured against the same geometry that marker/camera
+ * movement follows.
+ */
+export const getPreparedFlyoverRouteLine = (routeLine) => {
+  const coordinates = routeLine?.geometry?.coordinates;
+
+  if (!Array.isArray(coordinates) || coordinates.length < FLYOVER_PREP_MIN_COORDINATES) {
+    return routeLine;
+  }
+
+  const simplifiedRouteLine = turf.simplify(routeLine, {
+    highQuality: false,
+    mutate: false,
+    tolerance: FLYOVER_PREP_SIMPLIFY_TOLERANCE,
+  });
+  const simplifiedCoordinates = simplifiedRouteLine?.geometry?.coordinates;
+
+  if (!Array.isArray(simplifiedCoordinates) || simplifiedCoordinates.length < 2) {
+    return routeLine;
+  }
+
+  const shouldSmooth = simplifiedCoordinates.length * 2 <= FLYOVER_PREP_MAX_COORDINATES;
+  const preparedProperties = getPreparedRouteProperties(routeLine.properties);
+  const preparedCoordinates = sampleRouteCoordinates(
+    turf.lineString(
+      shouldSmooth
+        ? getChaikinSmoothedCoordinates(simplifiedCoordinates)
+        : simplifiedCoordinates,
+      preparedProperties,
+    ),
+    FLYOVER_PREP_MAX_COORDINATES,
+  );
+
+  return turf.lineString(preparedCoordinates, preparedProperties);
 };
 
 /**
@@ -323,14 +462,6 @@ const getLookaheadDistance = (routeDistanceKm) => {
   return Math.min(Math.max(routeDistanceKm * 0.12, 0.45), 2.4);
 };
 
-const getLoopingRouteLookaheadDistance = (routeDistanceKm) => {
-  return clamp(
-    routeDistanceKm * LOOPING_ROUTE_MACRO_LOOKAHEAD_RATIO,
-    MIN_LOOPING_ROUTE_MACRO_LOOKAHEAD_KM,
-    Math.min(MAX_LOOPING_ROUTE_MACRO_LOOKAHEAD_KM, routeDistanceKm),
-  );
-};
-
 const getCameraTargetSmoothingDistance = (routeDistanceKm) => {
   return clamp(
     routeDistanceKm * CAMERA_TARGET_SMOOTHING_RATIO,
@@ -467,54 +598,6 @@ export const getRouteBearing = (routeLine, distanceKm, routeDistanceKm) => {
   return getWeightedBearingMean(bearingSamples);
 };
 
-/**
- * getMacroRoutebearing looks at a longer route segment to determine the broader route direction.
- * This helps stabilize the camera bearing on looping routes where the local direction can spin wildly.
- * When the local and macro bearings diverge sharply, getLoopStableBearing blends them to keep the camera steady.
- * @param {*} routeLine
- * @param {*} distanceKm
- * @param {*} routeDistanceKm
- * @returns
- */
-const getMacroRouteBearing = (routeLine, distanceKm, routeDistanceKm) => {
-  const lookaheadDistance = getLoopingRouteLookaheadDistance(routeDistanceKm);
-  const fromDistance = clampRouteDistance(
-    distanceKm - lookaheadDistance * 0.35,
-    routeDistanceKm,
-  );
-  const toDistance = clampRouteDistance(distanceKm + lookaheadDistance, routeDistanceKm);
-
-  if (fromDistance === toDistance) {
-    return getRouteBearing(routeLine, distanceKm, routeDistanceKm);
-  }
-
-  const fromPoint = turf.point(getPointOnRoute(routeLine, fromDistance));
-  const toPoint = turf.point(getPointOnRoute(routeLine, toDistance));
-  const bearing = turf.bearing(fromPoint, toPoint);
-
-  return Number.isFinite(bearing)
-    ? bearing
-    : getRouteBearing(routeLine, distanceKm, routeDistanceKm);
-};
-
-/**
- * Repeated laps can make the local route bearing spin continuously. When the
- * local bearing diverges sharply from the broader route direction, bias the
- * camera toward the macro bearing while still preserving some local movement.
- */
-const getLoopStableBearing = (localBearing, macroBearing) => {
-  const bearingDelta = Math.abs(normalizeBearing(localBearing - macroBearing));
-
-  if (bearingDelta < LOOPING_ROUTE_BEARING_THRESHOLD) {
-    return localBearing;
-  }
-
-  return getWeightedBearingMean([
-    { bearing: localBearing, weight: 1 - LOOPING_ROUTE_MACRO_BEARING_WEIGHT },
-    { bearing: macroBearing, weight: LOOPING_ROUTE_MACRO_BEARING_WEIGHT },
-  ]);
-};
-
 const getRouteSectionCoordinates = (routeLine, startDistanceKm, endDistanceKm) => {
   const startDistance = clamp(startDistanceKm, 0, endDistanceKm);
   const endDistance = Math.max(endDistanceKm, 0);
@@ -549,30 +632,7 @@ const getRouteSectionCoordinates = (routeLine, startDistanceKm, endDistanceKm) =
   return coordinates;
 };
 
-const getSectionBearings = (coordinates) => {
-  if (coordinates.length < 3) {
-    return [];
-  }
-
-  return coordinates.slice(1).reduce((sectionBearings, coordinate, index) => {
-    const previousCoordinate = coordinates[index];
-
-    if (
-      previousCoordinate?.[0] === coordinate?.[0] &&
-      previousCoordinate?.[1] === coordinate?.[1]
-    ) {
-      return sectionBearings;
-    }
-
-    const bearing = turf.bearing(turf.point(previousCoordinate), turf.point(coordinate));
-
-    return Number.isFinite(bearing) ? [...sectionBearings, bearing] : sectionBearings;
-  }, []);
-};
-
-const getSectionBearingSpread = (coordinates) => {
-  const bearings = getSectionBearings(coordinates);
-
+const getBearingSpread = (bearings) => {
   if (bearings.length < 2) {
     return 0;
   }
@@ -593,14 +653,32 @@ const getSectionBearingSpread = (coordinates) => {
   return 360 - largestGap;
 };
 
-const getSectionTurnMetrics = (coordinates) => {
-  const bearings = getSectionBearings(coordinates);
+const getSectionMetrics = (coordinates) => {
+  if (coordinates.length < 3) {
+    return {
+      bearingSpread: 0,
+      sharpTurnCount: 0,
+      totalTurnDegrees: 0,
+    };
+  }
 
-  return bearings.slice(1).reduce(
+  const bearings = coordinates.slice(1).reduce((sectionBearings, coordinate, index) => {
+    const previousCoordinate = coordinates[index];
+
+    if (
+      previousCoordinate?.[0] === coordinate?.[0] &&
+      previousCoordinate?.[1] === coordinate?.[1]
+    ) {
+      return sectionBearings;
+    }
+
+    const bearing = turf.bearing(turf.point(previousCoordinate), turf.point(coordinate));
+
+    return Number.isFinite(bearing) ? [...sectionBearings, bearing] : sectionBearings;
+  }, []);
+  const turnMetrics = bearings.slice(1).reduce(
     (metrics, bearing, index) => {
-      const turnDegrees = Math.abs(
-        normalizeBearingDifference(bearings[index], bearing),
-      );
+      const turnDegrees = Math.abs(normalizeBearingDifference(bearings[index], bearing));
 
       return {
         sharpTurnCount:
@@ -611,6 +689,11 @@ const getSectionTurnMetrics = (coordinates) => {
     },
     { sharpTurnCount: 0, totalTurnDegrees: 0 },
   );
+
+  return {
+    bearingSpread: getBearingSpread(bearings),
+    ...turnMetrics,
+  };
 };
 
 const getLoopDetectionWindow = (distanceKm, routeDistanceKm, sectionDistanceKm) => {
@@ -637,6 +720,43 @@ const getLoopDetectionWindow = (distanceKm, routeDistanceKm, sectionDistanceKm) 
   };
 };
 
+const getRouteSectionLoopRisk = ({
+  routeLine,
+  startDistance,
+  endDistance,
+  sectionLength,
+  maxDiameterKm,
+  minPathToDiameterRatio,
+  minBearingSpread,
+  compactCornerMaxDiameterKm,
+  minSharpTurnCount,
+  minTotalTurnDegrees,
+}) => {
+  const coordinates = getRouteSectionCoordinates(routeLine, startDistance, endDistance);
+
+  if (coordinates.length < 4) {
+    return false;
+  }
+
+  const bbox = turf.bbox(turf.lineString(coordinates));
+  const diagonalKm = turf.distance([bbox[0], bbox[1]], [bbox[2], bbox[3]], {
+    units: 'kilometers',
+  });
+  const pathToDiameterRatio = sectionLength / Math.max(diagonalKm, Number.EPSILON);
+  const { bearingSpread, sharpTurnCount, totalTurnDegrees } =
+    getSectionMetrics(coordinates);
+
+  return (
+    (diagonalKm <= maxDiameterKm &&
+      pathToDiameterRatio >= minPathToDiameterRatio &&
+      bearingSpread >= minBearingSpread) ||
+    (diagonalKm <= compactCornerMaxDiameterKm &&
+      sharpTurnCount >= minSharpTurnCount &&
+      totalTurnDegrees >= minTotalTurnDegrees &&
+      bearingSpread >= minBearingSpread)
+  );
+};
+
 /**
  * Detects compact loop sections where the route keeps turning inside a small
  * area. During these sections the camera bearing can spin faster than the
@@ -653,46 +773,49 @@ export const detectSmallLoopSection = ({
   compactCornerMaxDiameterKm = COMPACT_CORNER_MAX_DIAMETER_KM,
   minSharpTurnCount = COMPACT_CORNER_MIN_TURN_COUNT,
   minTotalTurnDegrees = COMPACT_CORNER_MIN_TOTAL_TURN_DEGREES,
+  tightSectionDistanceKm = TIGHT_LOOP_DETECTION_DISTANCE_KM,
+  tightMaxDiameterKm = TIGHT_LOOP_MAX_DIAMETER_KM,
+  tightMinTotalTurnDegrees = TIGHT_LOOP_MIN_TOTAL_TURN_DEGREES,
 }) => {
-  if (!routeLine || !routeDistanceKm || routeDistanceKm < sectionDistanceKm * 0.55) {
+  if (!routeLine || !routeDistanceKm || routeDistanceKm < tightSectionDistanceKm * 0.55) {
     return false;
   }
 
-  const detectionDistanceKm = Math.min(sectionDistanceKm, routeDistanceKm);
-  const { startDistance, endDistance, sectionLength } = getLoopDetectionWindow(
-    distanceKm,
-    routeDistanceKm,
-    detectionDistanceKm,
-  );
+  return [
+    {
+      distanceKm: tightSectionDistanceKm,
+      maxDiameterKm: tightMaxDiameterKm,
+      compactCornerMaxDiameterKm: tightMaxDiameterKm,
+      minTotalTurnDegrees: tightMinTotalTurnDegrees,
+    },
+    {
+      distanceKm: sectionDistanceKm,
+      maxDiameterKm,
+      compactCornerMaxDiameterKm,
+      minTotalTurnDegrees,
+    },
+  ].some((windowConfig) => {
+    const detectionDistanceKm = Math.min(windowConfig.distanceKm, routeDistanceKm);
+    const sectionWindow = getLoopDetectionWindow(
+      distanceKm,
+      routeDistanceKm,
+      detectionDistanceKm,
+    );
 
-  if (sectionLength < detectionDistanceKm * 0.65) {
-    return false;
-  }
-
-  const coordinates = getRouteSectionCoordinates(routeLine, startDistance, endDistance);
-
-  if (coordinates.length < 4) {
-    return false;
-  }
-
-  const bbox = turf.bbox(turf.lineString(coordinates));
-  const diagonalKm = turf.distance([bbox[0], bbox[1]], [bbox[2], bbox[3]], {
-    units: 'kilometers',
+    return (
+      sectionWindow.sectionLength >= detectionDistanceKm * 0.65 &&
+      getRouteSectionLoopRisk({
+        routeLine,
+        ...sectionWindow,
+        maxDiameterKm: windowConfig.maxDiameterKm,
+        minPathToDiameterRatio,
+        minBearingSpread,
+        compactCornerMaxDiameterKm: windowConfig.compactCornerMaxDiameterKm,
+        minSharpTurnCount,
+        minTotalTurnDegrees: windowConfig.minTotalTurnDegrees,
+      })
+    );
   });
-  const pathToDiameterRatio = sectionLength / Math.max(diagonalKm, Number.EPSILON);
-  const bearingSpread = getSectionBearingSpread(coordinates);
-  const { sharpTurnCount, totalTurnDegrees } = getSectionTurnMetrics(coordinates);
-  const isCompactLoop =
-    diagonalKm <= maxDiameterKm &&
-    pathToDiameterRatio >= minPathToDiameterRatio &&
-    bearingSpread >= minBearingSpread;
-  const hasRepeatedSharpTurns =
-    diagonalKm <= compactCornerMaxDiameterKm &&
-    sharpTurnCount >= minSharpTurnCount &&
-    totalTurnDegrees >= minTotalTurnDegrees &&
-    bearingSpread >= minBearingSpread;
-
-  return isCompactLoop || hasRepeatedSharpTurns;
 };
 
 const getCameraLeadRatio = (turnDelta, flyoverSpeed = 1) => {
@@ -740,12 +863,10 @@ export const getFlyoverCameraTarget = (
     { bearing: targetBearing, weight: 0.7 },
     { bearing: routeBearing, weight: 0.3 },
   ]);
-  const macroBearing = getMacroRouteBearing(routeLine, distanceKm, routeDistanceKm);
-  const bearing = getLoopStableBearing(localBearing, macroBearing);
 
   return {
     center: cameraCenter,
-    bearing: Number.isFinite(bearing) ? bearing : 0,
+    bearing: Number.isFinite(localBearing) ? localBearing : 0,
   };
 };
 
@@ -819,9 +940,15 @@ export const setFlyoverRouteProgress = (map, routeLine, distanceKm, routeDistanc
  * Selects the flyover route color for the active map style.
  */
 export const getFlyoverRouteGradient = (mapStyle) => {
-  return mapStyle === 'satellite'
-    ? FLYOVER_ROUTE_GRADIENT
-    : DEFAULT_FLYOVER_ROUTE_GRADIENT;
+  if (mapStyle === 'satellite') {
+    return SATELLITE_FLYOVER_ROUTE_GRADIENT;
+  }
+
+  if (mapStyle === 'street') {
+    return FLYOVER_ROUTE_GRADIENT;
+  }
+
+  return DEFAULT_FLYOVER_ROUTE_GRADIENT;
 };
 
 /**
