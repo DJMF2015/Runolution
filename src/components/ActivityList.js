@@ -129,6 +129,13 @@ const hasDetailedActivityData = (activity) => {
 
 const getDetailedActivityCacheKey = (activityId) => `activity-detail-${activityId}`;
 const getActivityStreamsCacheKey = (activityId) => `activity-streams-${activityId}`;
+const CACHEABLE_STREAM_KEYS = [
+  'altitude',
+  'distance',
+  'heartrate',
+  'velocity_smooth',
+  'watts',
+];
 
 const getStreamData = (streams, key) => {
   if (Array.isArray(streams)) {
@@ -148,6 +155,21 @@ const hasActivityStreamData = (streams) => {
 
 const hasPowerStreamData = (streams) => {
   return getStreamData(streams, 'watts').some((watts) => Number(watts) > 0);
+};
+
+const getCacheableActivityStreams = (streams) => {
+  return CACHEABLE_STREAM_KEYS.reduce((cacheableStreams, streamKey) => {
+    const streamData = getStreamData(streams, streamKey);
+
+    if (streamData.length) {
+      return {
+        ...cacheableStreams,
+        [streamKey]: { data: streamData },
+      };
+    }
+
+    return cacheableStreams;
+  }, {});
 };
 
 const getCachedDetailedActivity = (activityId) => {
@@ -196,7 +218,19 @@ const storeActivityStreams = (activityId, streams) => {
     return;
   }
 
-  localStorage.setItem(getActivityStreamsCacheKey(activityId), JSON.stringify(streams));
+  const cacheKey = getActivityStreamsCacheKey(activityId);
+  const cacheableStreams = getCacheableActivityStreams(streams);
+
+  if (!hasActivityStreamData(cacheableStreams)) {
+    return;
+  }
+
+  try {
+    localStorage.setItem(cacheKey, JSON.stringify(cacheableStreams));
+  } catch (error) {
+    localStorage.removeItem(cacheKey);
+    console.warn(`Activity stream cache skipped for ${activityId}: ${error.message}`);
+  }
 };
 
 const getInitialDetailedActivity = (locationState) => {
@@ -278,9 +312,10 @@ export default function ActivityList() {
 
   const { from, detailedActivity: routedDetailedActivity } = location.state || {};
   const activityId = from?.id || routedDetailedActivity?.id;
-  const isCycling = [detailedActivity, routedDetailedActivity, from].some(
-    (activity) => isCyclingActivity(activity) || hasCyclingPowerData(activity),
-  ) || hasPowerStreamData(activityStreams);
+  const isCycling =
+    [detailedActivity, routedDetailedActivity, from].some(
+      (activity) => isCyclingActivity(activity) || hasCyclingPowerData(activity),
+    ) || hasPowerStreamData(activityStreams);
 
   if (!location.state) {
     navigate('/activities');
@@ -289,7 +324,6 @@ export default function ActivityList() {
   const handleGoBack = () => {
     navigate(-1);
   };
-
   const splitRows = getSplitRows(detailedActivity);
   const segmentEfforts = detailedActivity?.segment_efforts || [];
 
@@ -384,7 +418,7 @@ export default function ActivityList() {
           {isDetailLoading ? (
             <DetailLoading>Loading best efforts...</DetailLoading>
           ) : detailedActivity ? (
-            <PaceZoneBarChart props={detailedActivity} />
+            <PaceZoneBarChart props={detailedActivity} streams={activityStreams} />
           ) : (
             <DetailLoading>{detailError}</DetailLoading>
           )}
@@ -399,6 +433,7 @@ export default function ActivityList() {
               streams={activityStreams}
               isLoading={isStreamLoading}
               error={streamError}
+              isCycling={isCycling}
             />
           ) : (
             <DetailLoading>{detailError}</DetailLoading>
@@ -519,9 +554,7 @@ export default function ActivityList() {
                 ) : (
                   <>
                     <td data-label="Max Grade">{getSegmentMaxGrade(segment)}</td>
-                    <td data-label="Average Grade">
-                      {getSegmentAverageGrade(segment)}
-                    </td>
+                    <td data-label="Average Grade">{getSegmentAverageGrade(segment)}</td>
                   </>
                 )}
               </tr>

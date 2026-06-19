@@ -1,10 +1,17 @@
 import * as turf from '@turf/turf';
 import {
   FLYOVER_PITCH,
+  FLYOVER_INTRO_MAX_PULLBACK_ALTITUDE,
+  FLYOVER_INTRO_MIN_PULLBACK_ALTITUDE,
+  FLYOVER_INTRO_PULLBACK_METRES,
+  FLYOVER_INTRO_PULLBACK_PITCH,
   detectSmallLoopSection,
   getFlyoverAltitude,
   getFlyoverZoom,
   formatFlyoverStreamAveragePace,
+  getFlyoverRouteGradient,
+  getFlyoverRouteDistanceKm,
+  getPreparedFlyoverRouteLine,
   getStableBearing,
   smoothBearing,
 } from '../src/utils/flyover';
@@ -23,6 +30,13 @@ describe('flyover camera framing', () => {
 
   test('uses the configured cinematic pitch', () => {
     expect(FLYOVER_PITCH).toBe(58);
+  });
+
+  test('keeps the flyover intro near the route rather than at globe altitude', () => {
+    expect(FLYOVER_INTRO_PULLBACK_METRES).toBeLessThan(5500);
+    expect(FLYOVER_INTRO_MIN_PULLBACK_ALTITUDE).toBeGreaterThanOrEqual(2000);
+    expect(FLYOVER_INTRO_MAX_PULLBACK_ALTITUDE).toBeLessThan(10000);
+    expect(FLYOVER_INTRO_PULLBACK_PITCH).toBeGreaterThan(35);
   });
 
   test('uses monotonic distance stops for route framing', () => {
@@ -97,6 +111,12 @@ describe('flyover camera framing', () => {
     });
 
     expect(pace).toBe('5:30 /km');
+  });
+
+  test('uses static red route color and map-specific flyover route colors', () => {
+    expect(getFlyoverRouteGradient()).toBe('#fb0707');
+    expect(getFlyoverRouteGradient('street')).toBe('#ff0000');
+    expect(getFlyoverRouteGradient('satellite')).toBe('#e1ff00');
   });
 
   test('smooths bearing changes without snapping to large turns', () => {
@@ -187,5 +207,73 @@ describe('flyover camera framing', () => {
         routeDistanceKm: squareRouteDistanceKm,
       }),
     ).toBe(true);
+  });
+
+  test('detects repeated tight athletics-track loops under 500 metres', () => {
+    const lapCoordinates = turf.circle([-0.1276, 51.5072], 0.064, {
+      steps: 32,
+      units: 'kilometers',
+    }).geometry.coordinates[0];
+    const trackRouteLine = turf.lineString([
+      ...lapCoordinates,
+      ...lapCoordinates.slice(1),
+      ...lapCoordinates.slice(1),
+    ]);
+    const trackRouteDistanceKm = turf.length(trackRouteLine, {
+      units: 'kilometers',
+    });
+
+    expect(
+      detectSmallLoopSection({
+        routeLine: trackRouteLine,
+        distanceKm: trackRouteDistanceKm * 0.12,
+        routeDistanceKm: trackRouteDistanceKm,
+      }),
+    ).toBe(true);
+  });
+
+  test('prepares dense flyover routes without changing sparse routes', () => {
+    const sparseRouteLine = turf.lineString([
+      [-0.14, 51.5],
+      [-0.13, 51.505],
+      [-0.12, 51.51],
+    ]);
+    const denseRouteCoordinates = Array.from({ length: 1200 }, (_, index) => [
+      -0.14 + index * 0.00002,
+      51.5 + Math.sin(index / 18) * 0.0004,
+    ]);
+    const denseRouteLine = turf.lineString(denseRouteCoordinates, {
+      streams: { altitude: [1, 2, 3] },
+    });
+    const preparedDenseRouteLine = getPreparedFlyoverRouteLine(denseRouteLine);
+
+    expect(getPreparedFlyoverRouteLine(sparseRouteLine)).toBe(sparseRouteLine);
+    expect(preparedDenseRouteLine.geometry.coordinates.length).toBeLessThan(
+      denseRouteCoordinates.length,
+    );
+    expect(preparedDenseRouteLine.geometry.coordinates.length).toBeLessThanOrEqual(900);
+    expect(preparedDenseRouteLine.properties.streams).toEqual({ altitude: [1, 2, 3] });
+  });
+
+  test('uses prepared geometry distance instead of original stream distance', () => {
+    const denseRouteCoordinates = Array.from({ length: 1200 }, (_, index) => [
+      -0.14 + index * 0.00002,
+      51.5 + Math.sin(index / 10) * 0.0005,
+    ]);
+    const denseRouteLine = turf.lineString(denseRouteCoordinates, {
+      streams: {
+        altitude: [1, 2, 3],
+        distance: [0, 50000],
+      },
+    });
+    const preparedDenseRouteLine = getPreparedFlyoverRouteLine(denseRouteLine);
+    const preparedGeometryDistanceKm = turf.length(preparedDenseRouteLine, {
+      units: 'kilometers',
+    });
+
+    expect(preparedDenseRouteLine.properties.streams.distance).toBeUndefined();
+    expect(getFlyoverRouteDistanceKm(preparedDenseRouteLine)).toBeCloseTo(
+      preparedGeometryDistanceKm,
+    );
   });
 });

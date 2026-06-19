@@ -32,11 +32,68 @@ const secondsToMinutes = (seconds) => {
   return Number((Number(seconds || 0) / 60).toFixed(2));
 };
 
-const secondsToPaceLabel = (seconds) => {
+const secondsToTimeLabel = (seconds) => {
   const totalSeconds = Number(seconds || 0);
   const minutes = Math.floor(totalSeconds / 60);
   const remainder = Math.round(totalSeconds % 60);
   return `${minutes}:${String(remainder).padStart(2, '0')}`;
+};
+
+const getPaceMinutesPerKm = (row) => {
+  const distanceMetres = Number(row?.distance);
+  const elapsedSeconds = Number(row?.elapsed_time);
+
+  if (
+    !Number.isFinite(distanceMetres) ||
+    !Number.isFinite(elapsedSeconds) ||
+    distanceMetres <= 0 ||
+    elapsedSeconds <= 0
+  ) {
+    return null;
+  }
+
+  return Number((elapsedSeconds / (distanceMetres / 1000) / 60).toFixed(2));
+};
+
+const getPaceFromRow = (row) => {
+  return getPaceMinutesPerKm(row);
+};
+
+const getStreamData = (streams, key) => {
+  if (Array.isArray(streams)) {
+    return streams.find((stream) => stream?.type === key)?.data || [];
+  }
+
+  if (Array.isArray(streams?.[key])) {
+    return streams[key];
+  }
+
+  return streams?.[key]?.data || streams?.streams?.[key]?.data || [];
+};
+
+const sampleStreamToLength = (streamData, itemCount) => {
+  if (!Array.isArray(streamData) || !streamData.length || !itemCount) {
+    return [];
+  }
+
+  if (itemCount === 1) {
+    return [streamData[0]];
+  }
+
+  const lastStreamIndex = streamData.length - 1;
+
+  return Array.from({ length: itemCount }, (_, index) => {
+    const streamIndex = Math.round((index / (itemCount - 1)) * lastStreamIndex);
+
+    return streamData[streamIndex];
+  });
+};
+
+const getStreamSampleValue = (streams, key, index, itemCount, formatter = Number) => {
+  const samples = sampleStreamToLength(getStreamData(streams, key), itemCount);
+  const value = formatter(samples[index]);
+
+  return Number.isFinite(value) ? value : null;
 };
 
 const getAxisRange = (values, fallbackMax, paddingRatio = 0.12) => {
@@ -60,11 +117,12 @@ const getAxisRange = (values, fallbackMax, paddingRatio = 0.12) => {
   };
 };
 
-const getChartOptions = (elapsedTimes, heartRates) => {
-  const elapsedRange = getAxisRange(elapsedTimes, 10, 0.18);
-  const heartRateRange = getAxisRange(heartRates, 180, 0.2);
+const getChartOptions = (paces, heartRates, velocities, hasHeartRate, hasVelocity) => {
+  const paceRange = getAxisRange(paces, 6, 0.16);
+  const heartRateRange = getAxisRange(heartRates, 180, 0.18);
 
   return {
+    indexAxis: 'y',
     responsive: true,
     maintainAspectRatio: false,
     interaction: {
@@ -95,22 +153,22 @@ const getChartOptions = (elapsedTimes, heartRates) => {
         displayColors: true,
         callbacks: {
           label: (context) => {
-            if (context.dataset.yAxisID === 'heartRate') {
-              return `Avg HR: ${context.parsed.y || 0} bpm`;
+            if (context.dataset.xAxisID === 'heartRate') {
+              return `Avg HR: ${context.parsed.x || 0} bpm`;
             }
-            return `Elapsed: ${secondsToPaceLabel((context.parsed.y || 0) * 60)}`;
+            return `Pace: ${secondsToTimeLabel((context.parsed.x || 0) * 60)} /km`;
           },
         },
       },
     },
     scales: {
-      x: {
+      y: {
+        type: 'category',
+        position: 'left',
         ticks: {
           color: '#0b0b0b',
           autoSkip: true,
-          maxRotation: 0,
-          minRotation: 0,
-          maxTicksLimit: 8,
+          maxTicksLimit: 10,
           font: {
             size: 11,
             weight: '700',
@@ -120,38 +178,38 @@ const getChartOptions = (elapsedTimes, heartRates) => {
           display: false,
         },
       },
-      elapsed: {
+      pace: {
         type: 'linear',
-        position: 'left',
-        beginAtZero: true,
-        min: 0,
-        suggestedMax: elapsedRange.max,
+        position: 'bottom',
+        min: paceRange.min,
+        suggestedMax: paceRange.max,
         ticks: {
-          color: '#020202',
+          color: '#fc5200',
           maxTicksLimit: 6,
-          callback: (value) => `${value}m`,
+          callback: (value) => `${secondsToTimeLabel(Number(value) * 60)}`,
         },
         grid: {
-          color: 'rgba(6, 6, 6, 0.18)',
+          color: 'rgba(252, 82, 0, 0.13)',
         },
         title: {
           display: true,
-          text: 'Elapsed time',
-          color: '#060606',
+          text: 'Pace /km',
+          color: '#fc5200',
           font: {
-            size: 14,
+            size: 12,
             weight: '800',
           },
         },
       },
       heartRate: {
         type: 'linear',
-        position: 'right',
+        position: 'top',
+        display: hasHeartRate,
         min: heartRateRange.min,
         suggestedMax: heartRateRange.max,
         ticks: {
-          color: '#141414',
-          maxTicksLimit: 6,
+          color: '#dc2626',
+          maxTicksLimit: 5,
           callback: (value) => `${value}`,
         },
         grid: {
@@ -159,10 +217,10 @@ const getChartOptions = (elapsedTimes, heartRates) => {
         },
         title: {
           display: true,
-          text: 'Avg heart rate',
-          color: '#040404',
+          text: 'Heart rate (bpm)',
+          color: '#dc2626',
           font: {
-            size: 14,
+            size: 12,
             weight: '800',
           },
         },
@@ -171,14 +229,17 @@ const getChartOptions = (elapsedTimes, heartRates) => {
   };
 };
 
-const getMileSplits = (activity) => {
+const getMileSplits = (activity, streams) => {
   const splits = activity?.splits_standard || [];
 
   if (splits.length) {
     return splits.map((split, index) => ({
       label: `Mile ${split.split || index + 1}`,
       elapsedTime: secondsToMinutes(split.elapsed_time),
-      heartRate: split.average_heartrate ? Math.round(split.average_heartrate) : null,
+      pace: getPaceFromRow(split),
+      heartRate:
+        getStreamSampleValue(streams, 'heartrate', index, splits.length, Math.round) ??
+        (split.average_heartrate ? Math.round(split.average_heartrate) : null),
     }));
   }
 
@@ -188,7 +249,15 @@ const getMileSplits = (activity) => {
     return metricSplits.map((split, index) => ({
       label: `Km ${split.split || index + 1}`,
       elapsedTime: secondsToMinutes(split.elapsed_time),
-      heartRate: split.average_heartrate ? Math.round(split.average_heartrate) : null,
+      pace: getPaceFromRow(split),
+      heartRate:
+        getStreamSampleValue(
+          streams,
+          'heartrate',
+          index,
+          metricSplits.length,
+          Math.round,
+        ) ?? (split.average_heartrate ? Math.round(split.average_heartrate) : null),
     }));
   }
 
@@ -198,7 +267,10 @@ const getMileSplits = (activity) => {
     return laps.map((lap, index) => ({
       label: `Lap ${lap.split || index + 1}`,
       elapsedTime: secondsToMinutes(lap.elapsed_time),
-      heartRate: lap.average_heartrate ? Math.round(lap.average_heartrate) : null,
+      pace: getPaceFromRow(lap),
+      heartRate:
+        getStreamSampleValue(streams, 'heartrate', index, laps.length, Math.round) ??
+        (lap.average_heartrate ? Math.round(lap.average_heartrate) : null),
     }));
   }
 
@@ -207,50 +279,66 @@ const getMileSplits = (activity) => {
   return bestEfforts.map((effort, index) => ({
     label: effort.name || `Mile ${index + 1}`,
     elapsedTime: secondsToMinutes(effort.elapsed_time),
-    heartRate: effort.average_heartrate ? Math.round(effort.average_heartrate) : null,
+    pace: getPaceFromRow(effort),
+    heartRate:
+      getStreamSampleValue(streams, 'heartrate', index, bestEfforts.length, Math.round) ??
+      (effort.average_heartrate ? Math.round(effort.average_heartrate) : null),
   }));
 };
 
-export default function BestEffortsChart({ props }) {
-  const mileSplits = getMileSplits(props);
+export default function BestEffortsChart({ props, streams }) {
+  const mileSplits = getMileSplits(props, streams);
 
   if (!mileSplits.length) {
     return <EmptyChart>No mile split data available for this activity.</EmptyChart>;
   }
 
   const labels = mileSplits.map((split) => split.label);
-  const elapsedTimes = mileSplits.map((split) => split.elapsedTime);
+  const paces = mileSplits.map((split) => split.pace);
   const heartRates = mileSplits.map((split) => split.heartRate);
+  const velocities = mileSplits.map((split) => split.velocity);
+  const hasPace = paces.some((pace) => Number.isFinite(pace));
   const hasHeartRate = heartRates.some((heartRate) => Number.isFinite(heartRate));
-  const options = getChartOptions(elapsedTimes, heartRates);
+  const hasVelocity = velocities.some((velocity) => Number.isFinite(velocity));
+  const options = getChartOptions(
+    paces,
+    heartRates,
+    velocities,
+    hasHeartRate,
+    hasVelocity,
+  );
 
   const data = {
     labels,
     datasets: [
       {
-        label: 'Elapsed Time (mins)',
+        label: 'Split pace (/km)',
         type: 'bar',
-        data: elapsedTimes,
-        yAxisID: 'elapsed',
-        borderColor: '#141414',
-        backgroundColor: 'rgba(44, 216, 28, 0.68)',
+        data: paces,
+        xAxisID: 'pace',
+        yAxisID: 'y',
+        borderColor: 'rgba(194, 65, 12, 0.9)',
+        backgroundColor: 'rgba(252, 82, 0, 0.96)',
+        hoverBackgroundColor: 'rgba(255, 106, 36, 1)',
         borderWidth: 1,
-        borderRadius: 7,
-        barPercentage: 0.72,
-        categoryPercentage: 0.72,
+        borderRadius: 5,
+        barPercentage: 0.7,
+        categoryPercentage: 0.74,
+        hidden: !hasPace,
       },
       {
         label: 'Average Heart Rate (bpm)',
         type: 'line',
         data: heartRates,
-        yAxisID: 'heartRate',
-        borderColor: '#f20707',
-        backgroundColor: '#120202',
-        pointBackgroundColor: '#f20707',
-        pointBorderColor: '#174c11',
+        xAxisID: 'heartRate',
+        yAxisID: 'y',
+        borderColor: '#dc2626',
+        backgroundColor: 'rgba(220, 38, 38, 0.1)',
+        pointBackgroundColor: '#dc2626',
+        pointBorderColor: '#ffffff',
         pointHoverRadius: 6,
-        pointRadius: 4,
-        tension: 0.32,
+        pointRadius: 3,
+        tension: 0.38,
         borderWidth: 3,
         spanGaps: true,
         hidden: !hasHeartRate,
@@ -262,12 +350,16 @@ export default function BestEffortsChart({ props }) {
     <ChartPanel>
       <ChartHeader>
         <ChartTitle>Mile Splits</ChartTitle>
-        <ChartSubtitle>
-          Elapsed time per mile with average heart rate overlay
-        </ChartSubtitle>
+        <ChartSubtitle>Pace by split with heart rate and velocity overlays</ChartSubtitle>
       </ChartHeader>
-      <ChartWrapper>
-        <Chart type="bar" data={data} options={options} />
+      <ChartWrapper $rowCount={mileSplits.length}>
+        <Chart
+          type="bar"
+          data={data}
+          options={options}
+          role="img"
+          aria-label="Mile splits chart showing split pace, heart rate and velocity"
+        />
       </ChartWrapper>
     </ChartPanel>
   );
@@ -280,11 +372,11 @@ const ChartPanel = styled.div`
   padding: 1rem;
   box-sizing: border-box;
   border: 1px solid rgba(148, 163, 184, 0.2);
-  border-radius: 14px;
+  border-radius: 12px;
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(228, 232, 237, 0.94)),
-    radial-gradient(circle at top right, rgba(252, 82, 0, 0.22), transparent 36%);
-  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.24);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 247, 249, 0.96)),
+    radial-gradient(circle at top right, rgba(252, 82, 0, 0.14), transparent 34%);
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.18);
 
   @media screen and (max-width: 700px) {
     padding: 0.85rem;
@@ -298,14 +390,14 @@ const ChartHeader = styled.div`
 
 const ChartTitle = styled.h3`
   margin: 0;
-  color: black;
+  color: #111827;
   font-size: 1rem;
   line-height: 1.2;
 `;
 
 const ChartSubtitle = styled.p`
   margin: 0.25rem 0 0;
-  color: #080808;
+  color: #4b5563;
   font-size: 0.82rem;
   line-height: 1.35;
 `;
@@ -313,7 +405,8 @@ const ChartSubtitle = styled.p`
 const ChartWrapper = styled.div`
   width: 100%;
   max-width: 100%;
-  height: 340px;
+  height: ${({ $rowCount }) =>
+    `${Math.min(Math.max(Number($rowCount || 0) * 42 + 150, 340), 680)}px`};
   min-width: 0;
   position: relative;
   overflow: hidden;
@@ -323,11 +416,13 @@ const ChartWrapper = styled.div`
   }
 
   @media screen and (max-width: 700px) {
-    height: 310px;
+    height: ${({ $rowCount }) =>
+      `${Math.min(Math.max(Number($rowCount || 0) * 38 + 145, 320), 620)}px`};
   }
 
   @media screen and (max-width: 420px) {
-    height: 285px;
+    height: ${({ $rowCount }) =>
+      `${Math.min(Math.max(Number($rowCount || 0) * 36 + 140, 320), 580)}px`};
   }
 `;
 

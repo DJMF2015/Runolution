@@ -7,6 +7,7 @@ import {
   BarElement,
   PointElement,
   LineElement,
+  Filler,
   Tooltip,
   Legend,
 } from 'chart.js';
@@ -18,6 +19,7 @@ ChartJS.register(
   BarElement,
   PointElement,
   LineElement,
+  Filler,
   Tooltip,
   Legend,
 );
@@ -83,6 +85,30 @@ const getAxisRange = (values, fallbackMax = 100) => {
   };
 };
 
+const formatPace = (paceMinutesPerKm) => {
+  if (!Number.isFinite(paceMinutesPerKm) || paceMinutesPerKm <= 0) {
+    return '—';
+  }
+
+  const totalSeconds = Math.round(paceMinutesPerKm * 60);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  return `${minutes}:${String(seconds).padStart(2, '0')} /km`;
+};
+
+const getPerformancePoint = (velocity, isCycling) => {
+  if (!Number.isFinite(velocity) || velocity <= 0) {
+    return null;
+  }
+
+  if (isCycling) {
+    return Number((velocity * 3.6).toFixed(1));
+  }
+
+  return Number((METRES_PER_KM / (velocity * 60)).toFixed(2));
+};
+
 /**
  * Effort is calculated from a weighted formula: - elevation/climb load: 40%, - heart-rate load: 35%, - velocity strain: 25%
  * @param {number} grade point
@@ -111,7 +137,7 @@ const getGradeAdjustedEffort = ({
   return Number((EFFORT_BASELINE * weightedLoad).toFixed(1));
 };
 
-const getProfilePoints = (streams) => {
+const getProfilePoints = (streams, isCycling = false) => {
   const altitudeStream = getStreamData(streams, 'altitude');
   const distanceStream = getStreamData(streams, 'distance');
   const heartRateStream = getStreamData(streams, 'heartrate');
@@ -158,6 +184,7 @@ const getProfilePoints = (streams) => {
         velocity,
       }),
       heartRate,
+      performance: getPerformancePoint(velocity, isCycling),
       velocity,
     });
   });
@@ -169,15 +196,20 @@ const formatDistance = (distanceKm) => {
   return `${Number(distanceKm || 0).toFixed(2)} km`;
 };
 
-const getChartOptions = (profilePoints) => {
-  const elevationRange = getAxisRange(
-    profilePoints.map((point) => point.elevationDifference),
-    50,
+const getChartOptions = (profilePoints, isCycling = false) => {
+  const altitudeRange = getAxisRange(
+    profilePoints.map((point) => point.altitude),
+    100,
   );
   const effortRange = getAxisRange(
     profilePoints.map((point) => point.gradeAdjustedEffort),
     120,
   );
+  const performanceRange = getAxisRange(
+    profilePoints.map((point) => point.performance),
+    isCycling ? 35 : 6,
+  );
+  const performanceLabel = isCycling ? 'Speed' : 'Pace';
 
   return {
     responsive: true,
@@ -193,9 +225,9 @@ const getChartOptions = (profilePoints) => {
           color: '#0b0b0b',
           boxWidth: 12,
           usePointStyle: true,
-          padding: 14,
+          padding: 12,
           font: {
-            size: 12,
+            size: 11,
             weight: '700',
           },
         },
@@ -231,7 +263,13 @@ const getChartOptions = (profilePoints) => {
               return `Grade adjusted effort: ${context.parsed.y}`;
             }
 
-            return `Elevation difference: ${context.parsed.y.toFixed(1)} m`;
+            if (context.dataset.yAxisID === 'performance') {
+              return isCycling
+                ? `${performanceLabel}: ${context.parsed.y.toFixed(1)} km/h`
+                : `${performanceLabel}: ${formatPace(context.parsed.y)}`;
+            }
+
+            return `Altitude: ${context.parsed.y.toFixed(1)} m`;
           },
         },
       },
@@ -243,7 +281,7 @@ const getChartOptions = (profilePoints) => {
           autoSkip: true,
           maxRotation: 0,
           minRotation: 0,
-          maxTicksLimit: 8,
+          maxTicksLimit: 7,
           font: {
             size: 11,
             weight: '700',
@@ -265,22 +303,22 @@ const getChartOptions = (profilePoints) => {
       elevation: {
         type: 'linear',
         position: 'left',
-        min: elevationRange.min,
-        suggestedMax: elevationRange.max,
+        min: altitudeRange.min,
+        suggestedMax: altitudeRange.max,
         ticks: {
           color: '#000000',
-          maxTicksLimit: 6,
+          maxTicksLimit: 5,
           callback: (value) => `${value}m`,
         },
         grid: {
-          color: 'rgba(0, 0, 0, 0.16)',
+          color: 'rgba(15, 23, 42, 0.1)',
         },
         title: {
           display: true,
-          text: 'Elevation difference',
+          text: 'Altitude',
           color: '#000000',
           font: {
-            size: 12,
+            size: 11,
             weight: '800',
           },
         },
@@ -292,7 +330,7 @@ const getChartOptions = (profilePoints) => {
         suggestedMax: effortRange.max,
         ticks: {
           color: '#000000',
-          maxTicksLimit: 6,
+          maxTicksLimit: 5,
           callback: (value) => `${value}`,
         },
         grid: {
@@ -303,54 +341,99 @@ const getChartOptions = (profilePoints) => {
           text: 'Grade adjusted effort',
           color: '#000000',
           font: {
-            size: 12,
+            size: 11,
             weight: '800',
           },
+        },
+      },
+      performance: {
+        type: 'linear',
+        position: 'right',
+        min: Math.max(0, performanceRange.min),
+        suggestedMax: performanceRange.max,
+        display: false,
+        grid: {
+          drawOnChartArea: false,
         },
       },
     },
   };
 };
 
-export default function ElevationBarChart({ streams, isLoading, error }) {
-  const profilePoints = getProfilePoints(streams);
+const getChartDatasets = (profilePoints, isCycling = false) => {
+  const datasets = [
+    {
+      type: 'line',
+      label: 'Altitude',
+      data: profilePoints.map((point) => point.altitude),
+      fill: 'start',
+      borderColor: '#2563eb',
+      backgroundColor: 'rgba(37, 99, 235, 0.18)',
+      pointRadius: 0,
+      pointHoverRadius: 4,
+      tension: 0.35,
+      borderWidth: 2.5,
+      yAxisID: 'elevation',
+      order: 3,
+    },
+    {
+      type: 'line',
+      label: 'Grade adjusted effort',
+      data: profilePoints.map((point) => point.gradeAdjustedEffort),
+      fill: false,
+      borderColor: '#ff6b35',
+      backgroundColor: '#ff6b35',
+      pointBackgroundColor: '#ffedd5',
+      pointBorderColor: '#c2410c',
+      pointRadius: profilePoints.length > 80 ? 0 : 2,
+      pointHoverRadius: 5,
+      tension: 0.3,
+      borderWidth: 3,
+      yAxisID: 'effort',
+      order: 1,
+    },
+  ];
+  const hasPerformanceData = profilePoints.some((point) =>
+    Number.isFinite(point.performance),
+  );
+
+  if (hasPerformanceData) {
+    datasets.push({
+      type: 'line',
+      label: isCycling ? 'Speed' : 'Pace',
+      data: profilePoints.map((point) => point.performance),
+      fill: false,
+      borderColor: '#ed3ae4',
+      backgroundColor: '#de16c0',
+      borderDash: [6, 4],
+      pointRadius: 0,
+      pointHoverRadius: 4,
+      tension: 0.28,
+      borderWidth: 2,
+      yAxisID: 'performance',
+      order: 2,
+    });
+  }
+
+  return datasets;
+};
+
+export default function ElevationBarChart({
+  streams,
+  isLoading,
+  error,
+  isCycling = false,
+}) {
+  const profilePoints = getProfilePoints(streams, isCycling);
   const hasProfile = profilePoints.length > 0;
   const labels = hasProfile
     ? profilePoints.map((point) => formatDistance(point.distanceKm))
     : [];
-  const options = hasProfile ? getChartOptions(profilePoints) : null;
+  const options = hasProfile ? getChartOptions(profilePoints, isCycling) : null;
   const data = hasProfile
     ? {
         labels,
-        datasets: [
-          {
-            type: 'bar',
-            label: 'Elevation difference',
-            data: profilePoints.map((point) => point.elevationDifference),
-            backgroundColor: (context) =>
-              context.raw >= 0 ? 'rgba(38, 251, 0, 0.94)' : 'rgb(255, 0, 195)',
-            borderColor: '#16a34a',
-            borderWidth: 0,
-            borderRadius: 3,
-            maxBarThickness: 10,
-            yAxisID: 'elevation',
-          },
-          {
-            type: 'line',
-            label: 'Grade adjusted effort',
-            data: profilePoints.map((point) => point.gradeAdjustedEffort),
-            fill: false,
-            borderColor: ' #ff6b35',
-            backgroundColor: '#ff6b35',
-            pointBackgroundColor: '#ffedd5',
-            pointBorderColor: '#c2410c',
-            pointRadius: profilePoints.length > 80 ? 0 : 2,
-            pointHoverRadius: 5,
-            tension: 0.3,
-            borderWidth: 3,
-            yAxisID: 'effort',
-          },
-        ],
+        datasets: getChartDatasets(profilePoints, isCycling),
       }
     : null;
 
@@ -358,14 +441,10 @@ export default function ElevationBarChart({ streams, isLoading, error }) {
     <ChartPanel>
       <ChartHeader>
         <ChartTitle>Elevation & Grade Adjusted Effort</ChartTitle>
-        <ChartSubtitle>
-          Elevation difference bars with effort weighted by climb, heart rate and
-          velocity.
-        </ChartSubtitle>
       </ChartHeader>
       <ChartWrapper>
         {hasProfile ? (
-          <Chart type="bar" data={data} options={options} />
+          <Chart type="line" data={data} options={options} />
         ) : (
           <EmptyChart>
             {isLoading
@@ -382,20 +461,16 @@ const ChartPanel = styled.div`
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  padding: 1rem;
+  padding: 0;
   box-sizing: border-box;
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  border-radius: 14px;
-  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.24);
 
   @media screen and (max-width: 700px) {
-    padding: 0.85rem;
-    border-radius: 12px;
+    overflow-x: hidden;
   }
 `;
 
 const ChartHeader = styled.div`
-  margin-bottom: 0.85rem;
+  margin-bottom: 0.65rem;
 `;
 
 const ChartTitle = styled.h3`
@@ -405,17 +480,10 @@ const ChartTitle = styled.h3`
   line-height: 1.2;
 `;
 
-const ChartSubtitle = styled.p`
-  margin: 0.25rem 0 0;
-  color: #000000;
-  font-size: 0.82rem;
-  line-height: 1.35;
-`;
-
 const ChartWrapper = styled.div`
   width: 100%;
   max-width: 100%;
-  height: 340px;
+  height: clamp(285px, 42vw, 360px);
   min-width: 0;
   position: relative;
   overflow: hidden;
@@ -425,11 +493,11 @@ const ChartWrapper = styled.div`
   }
 
   @media screen and (max-width: 700px) {
-    height: 310px;
+    height: 315px;
   }
 
   @media screen and (max-width: 420px) {
-    height: 285px;
+    height: 300px;
   }
 `;
 
