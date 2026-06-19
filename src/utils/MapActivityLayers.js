@@ -137,6 +137,7 @@ export const addActivityMapLayers = (map, data) => {
     return;
   }
 
+  setMapTerrain(map);
   setMapAtmosphere(map);
 
   if (!map.getSource(ACTIVITY_ROUTE_SOURCE_ID)) {
@@ -160,7 +161,6 @@ export const addActivityMapLayers = (map, data) => {
       },
     });
   }
-  setMapTerrain(map);
 };
 
 export default addActivitiesLayers;

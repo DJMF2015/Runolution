@@ -27,23 +27,19 @@ export const isRunningActivity = (activity) => {
 };
 
 export const isCyclingActivity = (activity) => {
-  return [
-    'ride',
-    'virtualride',
-    'ebikeride',
-    'mountainbikeride',
-    'gravelride',
-  ].includes(getActivityType(activity));
+  return ['ride', 'virtualride', 'ebikeride', 'mountainbikeride', 'gravelride'].includes(
+    getActivityType(activity),
+  );
 };
 
 export const hasCyclingPowerData = (activity) => {
   return Boolean(
     activity &&
-      (hasPowerData(activity) ||
-        activity.laps?.some(hasPowerData) ||
-        activity.splits_standard?.some(hasPowerData) ||
-        activity.splits_metric?.some(hasPowerData) ||
-        activity.segment_efforts?.some(hasPowerData)),
+    (hasPowerData(activity) ||
+      activity.laps?.some(hasPowerData) ||
+      activity.splits_standard?.some(hasPowerData) ||
+      activity.splits_metric?.some(hasPowerData) ||
+      activity.segment_efforts?.some(hasPowerData)),
   );
 };
 
