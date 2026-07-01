@@ -18,6 +18,7 @@ import {
   DRAMATIC_TURN_DAMPING,
   ELEVATION_CAMERA_ADJUSTMENTS,
   FLYOVER_ALTITUDE_LIMITS,
+  FLYOVER_HIGH_SPEED_CAMERA_CENTER_SMOOTHING,
   FLYOVER_HIGH_ROUTE_ALTITUDE_METRES,
   FLYOVER_HIGH_ROUTE_ALTITUDE_RAMP_METRES,
   FLYOVER_HIGH_ROUTE_CLEARANCE_METRES,
@@ -76,7 +77,8 @@ export {
   FLYOVER_INTRO_MIN_PULLBACK_ALTITUDE,
   FLYOVER_INTRO_PULLBACK_METRES,
   FLYOVER_INTRO_PULLBACK_PITCH,
-  FLYOVER_INTRO_PULLBACK_PROGRESS,
+  FLYOVER_INTRO_ROTATION_DEGREES,
+  FLYOVER_OUTRO_BEARING,
   FLYOVER_OUTRO_DURATION_MS,
   FLYOVER_OUTRO_PITCH,
   FLYOVER_PITCH,
@@ -87,6 +89,10 @@ export {
   FLYOVER_ZOOM,
   SATELLITE_FLYOVER_ROUTE_GRADIENT,
 } from './config';
+
+export const clamp = (value, min, max) => {
+  return Math.min(Math.max(value, min), max);
+};
 
 // simple linear interpolation between two values
 export const lerp = (start, end, ratio) => {
@@ -103,8 +109,12 @@ export const easeCubicOut = (progress) => {
   return 1 - Math.pow(1 - clampedProgress, 3);
 };
 
-const clamp = (value, min, max) => {
-  return Math.min(Math.max(value, min), max);
+export const easeCubicInOut = (progress) => {
+  const clampedProgress = clamp(progress, 0, 1);
+
+  return clampedProgress < 0.5
+    ? 4 * Math.pow(clampedProgress, 3)
+    : 1 - Math.pow(-2 * clampedProgress + 2, 3) / 2;
 };
 
 const areSameCoordinate = (firstCoordinate, secondCoordinate) => {
@@ -435,6 +445,34 @@ export const getFlyoverZoom = ({ routeDistanceKm, streams, totalElevationGain })
     streams,
     totalElevationGain,
   });
+};
+
+export const getDroneBaseZoom = ({ routeDistanceKm, streams, totalElevationGain }) => {
+  const elevationGainPerKm = getElevationGainPerKm(
+    routeDistanceKm,
+    totalElevationGain,
+    streams,
+  );
+  const distanceZoom =
+    routeDistanceKm > 35
+      ? 15.1
+      : routeDistanceKm > 20
+        ? 15.5
+        : routeDistanceKm > 10
+          ? 16.1
+          : routeDistanceKm > 5
+            ? 16.5
+            : 17;
+  const hillAdjustment =
+    elevationGainPerKm >= 45
+      ? -0.8
+      : elevationGainPerKm >= 30
+        ? -0.55
+        : elevationGainPerKm >= 15
+          ? -0.3
+          : 0;
+
+  return clamp(distanceZoom + hillAdjustment, 13.5, 16.8);
 };
 
 export const getFlyoverAltitude = ({ routeDistanceKm, streams, totalElevationGain }) => {
@@ -1047,4 +1085,46 @@ export const smoothLngLat = (
     lerp(currentLngLat[0], targetLngLat[0], smoothingRatio),
     lerp(currentLngLat[1], targetLngLat[1], smoothingRatio),
   ];
+};
+
+/**
+ * Builds the per-frame flyover camera state from the existing route target,
+ * center smoothing, and bearing stability helpers.
+ */
+export const getFlyoverCameraState = ({
+  routeLine,
+  distanceKm,
+  routeDistanceKm,
+  previousCameraPosition,
+  previousBearing,
+  flyoverSpeed = 1,
+  isLooping = false,
+}) => {
+  const clampedDistance = clampRouteDistance(distanceKm, routeDistanceKm);
+  const runnerPosition = getPointOnRoute(routeLine, clampedDistance);
+  const cameraTarget = getFlyoverCameraTarget(
+    routeLine,
+    clampedDistance,
+    routeDistanceKm,
+    flyoverSpeed,
+  );
+  const cameraPosition = smoothLngLat(
+    previousCameraPosition,
+    cameraTarget.center,
+    flyoverSpeed >= FLYOVER_HIGH_SPEED_THRESHOLD
+      ? FLYOVER_HIGH_SPEED_CAMERA_CENTER_SMOOTHING
+      : undefined,
+  );
+  const bearing = getStableBearing({
+    previousBearing,
+    targetBearing: cameraTarget.bearing,
+    isLooping,
+  });
+
+  return {
+    bearing,
+    cameraPosition,
+    runnerPosition,
+    targetBearing: cameraTarget.bearing,
+  };
 };
