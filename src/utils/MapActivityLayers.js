@@ -156,7 +156,7 @@ export const addActivityMapLayers = (map, data) => {
       source: ACTIVITY_ROUTE_SOURCE_ID,
       id: ACTIVITY_ROUTE_LAYER_ID,
       paint: {
-        'line-width': 5,
+        'line-width': 7,
         'line-color': DEFAULT_FLYOVER_ROUTE_GRADIENT,
       },
     });
