@@ -1131,26 +1131,26 @@ export default function ActivitiesCard() {
                     <DroneRange
                       id="drone-camera-zoom"
                       type="range"
-                      min="13.5"
-                      max="16.8"
+                      min="13"
+                      max="17.3"
                       step="0.1"
                       value={effectiveDroneCameraZoom}
                       aria-label="Drone camera zoom"
-                      onChange={(event) =>
-                        setDroneCameraZoom(Number(event.target.value))
-                      }
+                      onChange={(event) => setDroneCameraZoom(Number(event.target.value))}
                     />
                   </DroneSliderRow>
                   <DroneSliderRow>
                     <DroneSliderLabel htmlFor="drone-camera-pitch">
                       Pitch <strong>{droneCameraPitch}°</strong>
                     </DroneSliderLabel>
-                    <DroneSliderHint>Higher pitch sits closer to the line</DroneSliderHint>
+                    <DroneSliderHint>
+                      Higher pitch sits closer to the line
+                    </DroneSliderHint>
                     <DroneRange
                       id="drone-camera-pitch"
                       type="range"
-                      min="55"
-                      max="78"
+                      min="45"
+                      max="85"
                       step="1"
                       value={droneCameraPitch}
                       aria-label="Drone camera pitch"

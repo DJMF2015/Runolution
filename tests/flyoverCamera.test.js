@@ -69,7 +69,7 @@ describe('flyover camera framing', () => {
         routeDistanceKm: 4,
         totalElevationGain: 20,
       }),
-    ).toBe(16.8);
+    ).toBe(17);
     expect(
       getDroneBaseZoom({
         routeDistanceKm: 25,

@@ -50,8 +50,8 @@ const MIN_VALID_TERRAIN_ELEVATION_METRES = -500;
 const MAX_VALID_TERRAIN_ELEVATION_METRES = 9000;
 const LOOP_DETECTION_DISTANCE_BUCKET_KM = 0.05;
 const DRONE_FLYOVER_CAMERA_MODE = 'drone';
-const DRONE_CAMERA_ZOOM_LIMITS = { min: 13.5, max: 16.8 };
-const DRONE_CAMERA_PITCH_LIMITS = { min: 55, max: 78 };
+const DRONE_CAMERA_ZOOM_LIMITS = { min: 13, max: 17.3 };
+const DRONE_CAMERA_PITCH_LIMITS = { min: 45, max: 85 };
 const DRONE_LOOK_AHEAD_DISTANCE_METRES = 80;
 const DRONE_LONG_ROUTE_LOOK_AHEAD_DISTANCE_METRES = 130;
 const DRONE_LONG_ROUTE_DISTANCE_KM = 15;
@@ -69,7 +69,8 @@ const DRONE_DESKTOP_CAMERA_PADDING = {
   right: 60,
 };
 const DRONE_CLIMB_ANGLE_SMOOTHING = 0.06;
-const DRONE_PITCH_SMOOTHING = 0.08;
+const DRONE_PITCH_SMOOTHING = 0.05;
+const DRONE_ZOOM_SMOOTHING = 0.05;
 const DRONE_BEARING_SMOOTHING = 0.055;
 const DRONE_HIGH_RISK_BEARING_SMOOTHING = 0.025;
 const DRONE_CENTER_SMOOTHING = 0.12;
@@ -219,10 +220,6 @@ const getTerrainElevation = (map, lngLat) => {
     elevation <= MAX_VALID_TERRAIN_ELEVATION_METRES
     ? elevation
     : null;
-};
-
-const getTerrainElevationOrZero = (map, coordinate) => {
-  return getTerrainElevation(map, coordinate) ?? 0;
 };
 
 const getInterpolatedLngLat = (start, end, ratio) => ({
@@ -380,11 +377,19 @@ const getTerrainAwareDroneFrame = ({
     distanceKm + (lookAheadMeters * 2) / 1000,
     routeDistanceKm,
   );
-  const markerElevation = getTerrainElevationOrZero(map, markerCoord);
-  const lookAheadElevation = getTerrainElevationOrZero(map, lookAheadCoord);
-  const farAheadElevation = getTerrainElevationOrZero(map, farAheadCoord);
+  const markerElevation = getTerrainElevation(map, markerCoord);
+  const lookAheadElevation = getTerrainElevation(map, lookAheadCoord);
+  const farAheadElevation = getTerrainElevation(map, farAheadCoord);
+  const hasNearTerrain =
+    Number.isFinite(markerElevation) && Number.isFinite(lookAheadElevation);
+  const safeMarkerElevation = markerElevation ?? 0;
+  const safeLookAheadElevation = lookAheadElevation ?? safeMarkerElevation;
+  const safeFarAheadElevation = farAheadElevation ?? safeLookAheadElevation;
   const climbAngleDegrees =
-    Math.atan2(lookAheadElevation - markerElevation, lookAheadMeters) * (180 / Math.PI);
+    hasNearTerrain
+      ? Math.atan2(safeLookAheadElevation - safeMarkerElevation, lookAheadMeters) *
+        (180 / Math.PI)
+      : refs.climbAngle.current ?? 0;
 
   refs.climbAngle.current = lerp(
     refs.climbAngle.current ?? 0,
@@ -397,8 +402,8 @@ const getTerrainAwareDroneFrame = ({
     smoothedClimbAngle > 0
       ? clamp(smoothedClimbAngle * 0.8, 0, 12)
       : clamp(smoothedClimbAngle * 0.35, -8, 0);
-  const nearGradient = lookAheadElevation - markerElevation;
-  const farGradient = farAheadElevation - lookAheadElevation;
+  const nearGradient = safeLookAheadElevation - safeMarkerElevation;
+  const farGradient = safeFarAheadElevation - safeLookAheadElevation;
   const climbIsLevelling = nearGradient > 0 && farGradient < nearGradient * 0.4;
   const summitAdjustment = climbIsLevelling ? -5 : 0;
   const pitchRisk = clamp(
@@ -441,6 +446,16 @@ const getTerrainAwareDroneFrame = ({
     bearing,
     lerp(DRONE_BEARING_SMOOTHING, DRONE_HIGH_RISK_BEARING_SMOOTHING, framingRisk),
   );
+  const targetZoom = clamp(
+    baseZoom - framingRisk * DRONE_MAX_TERRAIN_ZOOM_REDUCTION,
+    DRONE_CAMERA_ZOOM_LIMITS.min,
+    DRONE_CAMERA_ZOOM_LIMITS.max,
+  );
+  refs.zoom.current = lerp(
+    refs.zoom.current ?? targetZoom,
+    targetZoom,
+    DRONE_ZOOM_SMOOTHING,
+  );
 
   return {
     bearing: refs.bearing.current,
@@ -449,35 +464,23 @@ const getTerrainAwareDroneFrame = ({
     framingRisk,
     lookAheadMeters,
     pitch: refs.pitch.current,
-    zoom: clamp(
-      baseZoom - framingRisk * DRONE_MAX_TERRAIN_ZOOM_REDUCTION,
-      DRONE_CAMERA_ZOOM_LIMITS.min,
-      DRONE_CAMERA_ZOOM_LIMITS.max,
-    ),
+    zoom: refs.zoom.current,
   };
 };
 
 const setTerrainAwareDroneCamera = ({ droneFrame, map }) => {
-  if (typeof map?.easeTo !== 'function') {
-    map?.jumpTo({
-      center: droneFrame.center,
-      bearing: droneFrame.bearing,
-      pitch: droneFrame.pitch,
-      zoom: droneFrame.zoom,
-    });
+  if (typeof map?.jumpTo !== 'function') {
     return;
   }
 
-  map.easeTo({
+  map.jumpTo({
     center: droneFrame.center,
     zoom: droneFrame.zoom,
     pitch: droneFrame.pitch,
     bearing: droneFrame.bearing,
-    duration: 0,
     padding: getIsMobileViewport()
       ? DRONE_MOBILE_CAMERA_PADDING
       : DRONE_DESKTOP_CAMERA_PADDING,
-    essential: true,
   });
 };
 
@@ -548,6 +551,7 @@ export const useFlyoverAnimation = ({
     center: { current: null },
     climbAngle: { current: 0 },
     pitch: { current: null },
+    zoom: { current: null },
   });
   const skipNextRouteFitRef = useRef(false);
   const terrainAltitudeRef = useRef(null);
@@ -620,6 +624,7 @@ export const useFlyoverAnimation = ({
       droneTerrainRefs.current.center.current = null;
       droneTerrainRefs.current.climbAngle.current = 0;
       droneTerrainRefs.current.pitch.current = null;
+      droneTerrainRefs.current.zoom.current = null;
       return;
     }
 
@@ -649,6 +654,7 @@ export const useFlyoverAnimation = ({
       droneTerrainRefs.current.center.current = null;
       droneTerrainRefs.current.climbAngle.current = 0;
       droneTerrainRefs.current.pitch.current = null;
+      droneTerrainRefs.current.zoom.current = null;
       flyoverMarkerRef.current?.remove();
       flyoverMarkerRef.current = null;
       setActivityRouteData(mapRef.current, data);
@@ -680,6 +686,7 @@ export const useFlyoverAnimation = ({
     droneTerrainRefs.current.center.current = null;
     droneTerrainRefs.current.climbAngle.current = 0;
     droneTerrainRefs.current.pitch.current = null;
+    droneTerrainRefs.current.zoom.current = null;
     setFlyoverDistanceKm(0);
     setShowFlyoverSummary(false);
     setFlyoverTilePrefetch(map);
@@ -738,6 +745,7 @@ export const useFlyoverAnimation = ({
       center: { current: null },
       climbAngle: { current: 0 },
       pitch: { current: null },
+      zoom: { current: null },
     };
     const initialDroneCameraFrame =
       initialCameraSettings.mode === DRONE_FLYOVER_CAMERA_MODE
@@ -966,6 +974,7 @@ export const useFlyoverAnimation = ({
         droneTerrainRefs.current.center.current = initialDroneCameraFrame.center;
         droneTerrainRefs.current.climbAngle.current = droneIntroRefs.climbAngle.current;
         droneTerrainRefs.current.pitch.current = initialDroneCameraFrame.pitch;
+        droneTerrainRefs.current.zoom.current = initialDroneCameraFrame.zoom;
       }
 
       previousTimestamp = null;
