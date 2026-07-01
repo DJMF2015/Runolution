@@ -5,13 +5,17 @@ import {
   FLYOVER_INTRO_MIN_PULLBACK_ALTITUDE,
   FLYOVER_INTRO_PULLBACK_METRES,
   FLYOVER_INTRO_PULLBACK_PITCH,
+  FLYOVER_INTRO_ROTATION_DEGREES,
+  FLYOVER_OUTRO_BEARING,
   detectSmallLoopSection,
+  getDroneBaseZoom,
   getFlyoverAltitude,
   getFlyoverZoom,
   formatFlyoverStreamAveragePace,
   getFlyoverRouteGradient,
   getFlyoverRouteDistanceKm,
   getPreparedFlyoverRouteLine,
+  getFlyoverCameraState,
   getStableBearing,
   smoothBearing,
 } from '../src/utils/flyover';
@@ -32,25 +36,59 @@ describe('flyover camera framing', () => {
     expect(FLYOVER_PITCH).toBe(58);
   });
 
+  test('returns the flyover outro to north-facing orientation', () => {
+    expect(FLYOVER_OUTRO_BEARING).toBe(0);
+  });
+
   test('keeps the flyover intro near the route rather than at globe altitude', () => {
-    expect(FLYOVER_INTRO_PULLBACK_METRES).toBeLessThan(5500);
-    expect(FLYOVER_INTRO_MIN_PULLBACK_ALTITUDE).toBeGreaterThanOrEqual(2000);
-    expect(FLYOVER_INTRO_MAX_PULLBACK_ALTITUDE).toBeLessThan(10000);
-    expect(FLYOVER_INTRO_PULLBACK_PITCH).toBeGreaterThan(35);
+    expect(FLYOVER_INTRO_PULLBACK_METRES).toBeLessThan(3000);
+    expect(FLYOVER_INTRO_MIN_PULLBACK_ALTITUDE).toBeGreaterThanOrEqual(1000);
+    expect(FLYOVER_INTRO_MAX_PULLBACK_ALTITUDE).toBeLessThan(5000);
+    expect(FLYOVER_INTRO_PULLBACK_PITCH).toBe(0);
+    expect(FLYOVER_INTRO_ROTATION_DEGREES).toBeLessThanOrEqual(90);
   });
 
   test('uses monotonic distance stops for route framing', () => {
-    expect(getFlyoverZoom({ routeDistanceKm: 2 })).toBe(16.1);
-    expect(getFlyoverZoom({ routeDistanceKm: 4 })).toBe(15.45);
-    expect(getFlyoverZoom({ routeDistanceKm: 9 })).toBe(14.75);
-    expect(getFlyoverZoom({ routeDistanceKm: 16.9 })).toBe(13.8);
-    expect(getFlyoverZoom({ routeDistanceKm: 30 })).toBe(13.45);
+    expect(getFlyoverZoom({ routeDistanceKm: 2 })).toBe(16.4);
+    expect(getFlyoverZoom({ routeDistanceKm: 4 })).toBe(15.9);
+    expect(getFlyoverZoom({ routeDistanceKm: 9 })).toBe(13.9);
+    expect(getFlyoverZoom({ routeDistanceKm: 16.9 })).toBe(13.4);
+    expect(getFlyoverZoom({ routeDistanceKm: 30 })).toBe(13.1);
 
-    expect(getFlyoverAltitude({ routeDistanceKm: 2 })).toBe(850);
-    expect(getFlyoverAltitude({ routeDistanceKm: 4 })).toBe(1100);
-    expect(getFlyoverAltitude({ routeDistanceKm: 9 })).toBe(1450);
-    expect(getFlyoverAltitude({ routeDistanceKm: 16.9 })).toBe(2400);
-    expect(getFlyoverAltitude({ routeDistanceKm: 30 })).toBe(3300);
+    expect(getFlyoverAltitude({ routeDistanceKm: 2 })).toBe(210);
+    expect(getFlyoverAltitude({ routeDistanceKm: 4 })).toBe(240);
+    expect(getFlyoverAltitude({ routeDistanceKm: 5 })).toBe(240);
+    expect(getFlyoverAltitude({ routeDistanceKm: 9 })).toBe(520);
+    expect(getFlyoverAltitude({ routeDistanceKm: 16.9 })).toBe(710);
+    expect(getFlyoverAltitude({ routeDistanceKm: 30 })).toBe(1040);
+  });
+
+  test('sets drone base zoom from route distance and climbing density', () => {
+    expect(
+      getDroneBaseZoom({
+        routeDistanceKm: 4,
+        totalElevationGain: 20,
+      }),
+    ).toBe(16.8);
+    expect(
+      getDroneBaseZoom({
+        routeDistanceKm: 25,
+        totalElevationGain: 250,
+      }),
+    ).toBe(15.5);
+    expect(
+      getDroneBaseZoom({
+        routeDistanceKm: 25,
+        totalElevationGain: 1200,
+      }),
+    ).toBeLessThan(15.5);
+  });
+
+  test('keeps sub-10km routes close to the linestring marker', () => {
+    expect(getFlyoverAltitude({ routeDistanceKm: 0.8 })).toBe(180);
+    expect(getFlyoverAltitude({ routeDistanceKm: 5 })).toBe(240);
+    expect(getFlyoverAltitude({ routeDistanceKm: 6 })).toBe(520);
+    expect(getFlyoverAltitude({ routeDistanceKm: 16 })).toBe(550);
   });
 
   test('keeps high-altitude routes farther out so the marker remains visible', () => {
@@ -82,7 +120,7 @@ describe('flyover camera framing', () => {
       }),
     };
 
-    expect(highAltitudeFrame.altitude).toBeGreaterThanOrEqual(4400);
+    expect(highAltitudeFrame.altitude).toBeGreaterThanOrEqual(3050);
     expect(highAltitudeFrame.altitude).toBeGreaterThan(normalFrame.altitude);
     expect(highAltitudeFrame.zoom).toBeLessThan(normalFrame.zoom);
   });
@@ -95,8 +133,8 @@ describe('flyover camera framing', () => {
       },
     });
 
-    expect(altitude).toBeGreaterThan(5200);
-    expect(altitude).toBeLessThanOrEqual(7600);
+    expect(altitude).toBeGreaterThan(2200);
+    expect(altitude).toBeLessThanOrEqual(3200);
   });
 
   test('formats average pace from stream distance and time at the current flyover point', () => {
@@ -123,8 +161,8 @@ describe('flyover camera framing', () => {
     const smallTurn = smoothBearing(0, 8);
     const sharpTurn = smoothBearing(0, 160);
 
-    expect(smallTurn).toBe(0);
-    expect(sharpTurn).toBeCloseTo(6.08);
+    expect(smallTurn).toBe(0.44000000000005457);
+    expect(sharpTurn).toBeCloseTo(1.8);
   });
 
   test('locks bearing while the route is repeatedly looping in a compact area', () => {
@@ -142,6 +180,35 @@ describe('flyover camera framing', () => {
     expect(lockedBearing).toBe(30);
     expect(resumedBearing).toBeGreaterThan(30);
     expect(resumedBearing).toBeLessThan(90);
+  });
+
+  test('builds camera state from runner position, center smoothing, and stable bearing', () => {
+    const routeLine = turf.lineString([
+      [-0.14, 51.5],
+      [-0.13, 51.505],
+      [-0.12, 51.51],
+    ]);
+    const routeDistanceKm = turf.length(routeLine, { units: 'kilometers' });
+    const distanceKm = routeDistanceKm / 2;
+    const previousCameraPosition = [-0.2, 51.45];
+    const previousBearing = 42;
+    const cameraState = getFlyoverCameraState({
+      routeLine,
+      distanceKm,
+      routeDistanceKm,
+      previousCameraPosition,
+      previousBearing,
+      isLooping: true,
+    });
+    const expectedRunnerPosition = turf.along(routeLine, distanceKm, {
+      units: 'kilometers',
+    }).geometry.coordinates;
+
+    expect(cameraState.runnerPosition[0]).toBeCloseTo(expectedRunnerPosition[0]);
+    expect(cameraState.runnerPosition[1]).toBeCloseTo(expectedRunnerPosition[1]);
+    expect(cameraState.cameraPosition[0]).toBeGreaterThan(previousCameraPosition[0]);
+    expect(cameraState.cameraPosition[1]).toBeGreaterThan(previousCameraPosition[1]);
+    expect(cameraState.bearing).toBe(previousBearing);
   });
 
   test('detects repeated compact route loops without flagging open routes', () => {
