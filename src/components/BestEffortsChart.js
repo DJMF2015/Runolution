@@ -28,6 +28,10 @@ ChartJS.register(
   Filler,
 );
 
+const HEART_RATE_AREA_COLOR = 'rgba(220, 38, 38, 0.16)';
+const HEART_RATE_BORDER_COLOR = '#111111';
+const HEART_RATE_POINT_COLOR = '#dc2626';
+
 const secondsToMinutes = (seconds) => {
   return Number((Number(seconds || 0) / 60).toFixed(2));
 };
@@ -96,6 +100,13 @@ const getStreamSampleValue = (streams, key, index, itemCount, formatter = Number
   return Number.isFinite(value) ? value : null;
 };
 
+const getSplitHeartRate = (streams, split, index, splitCount) => {
+  return (
+    getStreamSampleValue(streams, 'heartrate', index, splitCount, Math.round) ??
+    (split?.average_heartrate ? Math.round(split.average_heartrate) : null)
+  );
+};
+
 const getAxisRange = (values, fallbackMax, paddingRatio = 0.12) => {
   const numericValues = values.filter((value) => Number.isFinite(value));
 
@@ -154,7 +165,7 @@ const getChartOptions = (paces, heartRates, velocities, hasHeartRate, hasVelocit
         callbacks: {
           label: (context) => {
             if (context.dataset.xAxisID === 'heartRate') {
-              return `Avg HR: ${context.parsed.x || 0} bpm`;
+              return `Heart rate: ${context.parsed.x || 0} bpm`;
             }
             return `Pace: ${secondsToTimeLabel((context.parsed.x || 0) * 60)} /km`;
           },
@@ -208,7 +219,7 @@ const getChartOptions = (paces, heartRates, velocities, hasHeartRate, hasVelocit
         min: heartRateRange.min,
         suggestedMax: heartRateRange.max,
         ticks: {
-          color: '#dc2626',
+          color: HEART_RATE_BORDER_COLOR,
           maxTicksLimit: 5,
           callback: (value) => `${value}`,
         },
@@ -218,7 +229,7 @@ const getChartOptions = (paces, heartRates, velocities, hasHeartRate, hasVelocit
         title: {
           display: true,
           text: 'Heart rate (bpm)',
-          color: '#dc2626',
+          color: HEART_RATE_BORDER_COLOR,
           font: {
             size: 12,
             weight: '800',
@@ -237,9 +248,7 @@ const getMileSplits = (activity, streams) => {
       label: `Mile ${split.split || index + 1}`,
       elapsedTime: secondsToMinutes(split.elapsed_time),
       pace: getPaceFromRow(split),
-      heartRate:
-        getStreamSampleValue(streams, 'heartrate', index, splits.length, Math.round) ??
-        (split.average_heartrate ? Math.round(split.average_heartrate) : null),
+      heartRate: getSplitHeartRate(streams, split, index, splits.length),
     }));
   }
 
@@ -250,14 +259,7 @@ const getMileSplits = (activity, streams) => {
       label: `Km ${split.split || index + 1}`,
       elapsedTime: secondsToMinutes(split.elapsed_time),
       pace: getPaceFromRow(split),
-      heartRate:
-        getStreamSampleValue(
-          streams,
-          'heartrate',
-          index,
-          metricSplits.length,
-          Math.round,
-        ) ?? (split.average_heartrate ? Math.round(split.average_heartrate) : null),
+      heartRate: getSplitHeartRate(streams, split, index, metricSplits.length),
     }));
   }
 
@@ -268,9 +270,7 @@ const getMileSplits = (activity, streams) => {
       label: `Lap ${lap.split || index + 1}`,
       elapsedTime: secondsToMinutes(lap.elapsed_time),
       pace: getPaceFromRow(lap),
-      heartRate:
-        getStreamSampleValue(streams, 'heartrate', index, laps.length, Math.round) ??
-        (lap.average_heartrate ? Math.round(lap.average_heartrate) : null),
+      heartRate: getSplitHeartRate(streams, lap, index, laps.length),
     }));
   }
 
@@ -280,9 +280,7 @@ const getMileSplits = (activity, streams) => {
     label: effort.name || `Mile ${index + 1}`,
     elapsedTime: secondsToMinutes(effort.elapsed_time),
     pace: getPaceFromRow(effort),
-    heartRate:
-      getStreamSampleValue(streams, 'heartrate', index, bestEfforts.length, Math.round) ??
-      (effort.average_heartrate ? Math.round(effort.average_heartrate) : null),
+    heartRate: getSplitHeartRate(streams, effort, index, bestEfforts.length),
   }));
 };
 
@@ -324,22 +322,26 @@ export default function BestEffortsChart({ props, streams }) {
         borderRadius: 5,
         barPercentage: 0.7,
         categoryPercentage: 0.74,
+        order: 1,
         hidden: !hasPace,
       },
       {
-        label: 'Average Heart Rate (bpm)',
+        label: 'Heart rate from stream (bpm)',
         type: 'line',
         data: heartRates,
         xAxisID: 'heartRate',
         yAxisID: 'y',
-        borderColor: '#dc2626',
-        backgroundColor: 'rgba(220, 38, 38, 0.1)',
-        pointBackgroundColor: '#dc2626',
-        pointBorderColor: '#ffffff',
+        borderColor: HEART_RATE_BORDER_COLOR,
+        backgroundColor: HEART_RATE_AREA_COLOR,
+        pointBackgroundColor: HEART_RATE_POINT_COLOR,
+        pointBorderColor: HEART_RATE_BORDER_COLOR,
+        pointBorderWidth: 2,
         pointHoverRadius: 6,
-        pointRadius: 3,
+        pointRadius: 3.5,
         tension: 0.38,
-        borderWidth: 3,
+        borderWidth: 2,
+        fill: 'origin',
+        order: 2,
         spanGaps: true,
         hidden: !hasHeartRate,
       },

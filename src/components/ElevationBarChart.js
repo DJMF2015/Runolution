@@ -85,18 +85,6 @@ const getAxisRange = (values, fallbackMax = 100) => {
   };
 };
 
-const formatPace = (paceMinutesPerKm) => {
-  if (!Number.isFinite(paceMinutesPerKm) || paceMinutesPerKm <= 0) {
-    return '—';
-  }
-
-  const totalSeconds = Math.round(paceMinutesPerKm * 60);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-
-  return `${minutes}:${String(seconds).padStart(2, '0')} /km`;
-};
-
 const getPerformancePoint = (velocity, isCycling) => {
   if (!Number.isFinite(velocity) || velocity <= 0) {
     return null;
@@ -264,9 +252,7 @@ const getChartOptions = (profilePoints, isCycling = false) => {
             }
 
             if (context.dataset.yAxisID === 'performance') {
-              return isCycling
-                ? `${performanceLabel}: ${context.parsed.y.toFixed(1)} km/h`
-                : `${performanceLabel}: ${formatPace(context.parsed.y)}`;
+              return isCycling`${performanceLabel}: ${context.parsed.y.toFixed(1)} km/h`;
             }
 
             return `Altitude: ${context.parsed.y.toFixed(1)} m`;
@@ -393,27 +379,27 @@ const getChartDatasets = (profilePoints, isCycling = false) => {
       order: 1,
     },
   ];
-  const hasPerformanceData = profilePoints.some((point) =>
-    Number.isFinite(point.performance),
-  );
+  // const hasPerformanceData = profilePoints.some((point) =>
+  //   Number.isFinite(point.performance),
+  // );
 
-  if (hasPerformanceData) {
-    datasets.push({
-      type: 'line',
-      label: isCycling ? 'Speed' : 'Pace',
-      data: profilePoints.map((point) => point.performance),
-      fill: false,
-      borderColor: '#ed3ae4',
-      backgroundColor: '#de16c0',
-      borderDash: [6, 4],
-      pointRadius: 0,
-      pointHoverRadius: 4,
-      tension: 0.28,
-      borderWidth: 2,
-      yAxisID: 'performance',
-      order: 2,
-    });
-  }
+  // if (hasPerformanceData) {
+  //   datasets.push({
+  //     type: 'line',
+  //     label: isCycling ? 'Speed' : 'Pace',
+  //     data: profilePoints.map((point) => point.performance),
+  //     fill: false,
+  //     borderColor: '#ed3ae4',
+  //     backgroundColor: '#de16c0',
+  //     borderDash: [6, 4],
+  //     pointRadius: 0,
+  //     pointHoverRadius: 4,
+  //     tension: 0.28,
+  //     borderWidth: 2,
+  //     yAxisID: 'performance',
+  //     order: 2,
+  //   });
+  // }
 
   return datasets;
 };

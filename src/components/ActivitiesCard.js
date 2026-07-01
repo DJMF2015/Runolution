@@ -5,10 +5,14 @@ import mapboxgl from 'mapbox-gl';
 import * as turf from '@turf/turf';
 import {
   FiBox,
+  FiCamera,
+  FiChevronDown,
+  FiChevronUp,
   FiLayers,
   FiMenu,
   FiMinus,
   FiPlay,
+  FiSliders,
   FiSquare,
   FiPlus,
 } from 'react-icons/fi';
@@ -40,7 +44,9 @@ import {
 } from '../utils/activityDetailMap';
 import {
   formatFlyoverDistance,
+  getDroneBaseZoom,
   getFlyoverRouteCoordinates,
+  getFlyoverRouteDistanceKm,
   getFlyoverRouteFeatureFromStreams,
   getPreparedFlyoverRouteLine,
   setFlyoverRouteGradient,
@@ -48,6 +54,9 @@ import {
 import { useFlyoverAnimation } from '../hooks/useFlyoverAnimation';
 
 const PHOTO_URL_SIZES = ['2048', '1200', '1000', '600', '300', '100'];
+const CINEMATIC_FLYOVER_CAMERA_MODE = 'cinematic';
+const DRONE_FLYOVER_CAMERA_MODE = 'drone';
+const DRONE_CAMERA_PITCH = 68;
 
 const getStreamData = (streams, key) => {
   if (Array.isArray(streams)) {
@@ -426,6 +435,12 @@ export default function ActivitiesCard() {
   const [mapStyle, setMapStyle] = useState('street');
   const [isMapStyleOpen, setIsMapStyleOpen] = useState(false);
   const [isThreeDimensional, setIsThreeDimensional] = useState(false);
+  const [flyoverCameraMode, setFlyoverCameraMode] = useState(
+    CINEMATIC_FLYOVER_CAMERA_MODE,
+  );
+  const [isDroneSettingsOpen, setIsDroneSettingsOpen] = useState(true);
+  const [droneCameraPitch, setDroneCameraPitch] = useState(DRONE_CAMERA_PITCH);
+  const [droneCameraZoom, setDroneCameraZoom] = useState(null);
   const [isActivityNavCollapsed, setIsActivityNavCollapsed] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState(null);
 
@@ -454,6 +469,16 @@ export default function ActivitiesCard() {
   const preparedFlyoverRouteCoordinates = useMemo(() => {
     return getFlyoverRouteCoordinates(preparedFlyoverRouteLine, flyoverRouteCoordinates);
   }, [flyoverRouteCoordinates, preparedFlyoverRouteLine]);
+  const droneBaseZoom = useMemo(() => {
+    const routeLineForZoom = preparedFlyoverRouteLine || flyoverRouteLine;
+
+    return getDroneBaseZoom({
+      routeDistanceKm: getFlyoverRouteDistanceKm(routeLineForZoom),
+      streams: routeLineForZoom?.properties?.streams,
+      totalElevationGain: from?.total_elevation_gain,
+    });
+  }, [flyoverRouteLine, from?.total_elevation_gain, preparedFlyoverRouteLine]);
+  const effectiveDroneCameraZoom = droneCameraZoom ?? droneBaseZoom;
 
   const {
     consumeRouteFitSkip,
@@ -476,6 +501,9 @@ export default function ActivitiesCard() {
     activity: from,
     currentMapStyleRef,
     data,
+    droneCameraPitch,
+    droneCameraZoom: effectiveDroneCameraZoom,
+    flyoverCameraMode,
     flyoverRouteLine,
     isActivityNavCollapsedRef,
     mapRef,
@@ -485,6 +513,15 @@ export default function ActivitiesCard() {
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
   }, [from?.id]);
+
+  useEffect(() => {
+    setDroneCameraZoom(null);
+    setDroneCameraPitch(DRONE_CAMERA_PITCH);
+  }, [from?.id]);
+
+  useEffect(() => {
+    setDroneCameraZoom((currentZoom) => currentZoom ?? droneBaseZoom);
+  }, [droneBaseZoom]);
 
   useEffect(() => {
     isActivityNavCollapsedRef.current = isActivityNavCollapsed;
@@ -672,8 +709,8 @@ export default function ActivitiesCard() {
           anchor: 'bottom',
           element: createActivityPhotoMarkerElement(photo, setSelectedPhoto),
           offset: [0, 0],
-          pitchAlignment: 'map',
-          rotationAlignment: 'map',
+          pitchAlignment: 'viewport',
+          rotationAlignment: 'viewport',
         })
           .setLngLat(photo.coordinate)
           .addTo(map);
@@ -769,6 +806,7 @@ export default function ActivitiesCard() {
   const primaryPhotoUrl =
     activityPhotos[0]?.url ||
     getBestPhotoUrl(athleteData?.detailedActivity?.photos?.primary);
+  const isDroneFlyoverCamera = flyoverCameraMode === DRONE_FLYOVER_CAMERA_MODE;
 
   return (
     <>
@@ -1029,6 +1067,101 @@ export default function ActivitiesCard() {
                 {mapStyle === 'satellite' ? 'satellite' : 'streets'}
               </MapStyleButtonLabel>
             </MapStyleIconButton>
+            <DroneCameraControl>
+              <DroneCameraToggle
+                type="button"
+                aria-label={
+                  isDroneFlyoverCamera
+                    ? 'Use standard flyover camera'
+                    : 'Use drone flyover camera'
+                }
+                aria-pressed={isDroneFlyoverCamera}
+                $active={isDroneFlyoverCamera}
+                onClick={() =>
+                  setFlyoverCameraMode((currentMode) => {
+                    const nextMode =
+                      currentMode === DRONE_FLYOVER_CAMERA_MODE
+                        ? CINEMATIC_FLYOVER_CAMERA_MODE
+                        : DRONE_FLYOVER_CAMERA_MODE;
+
+                    if (nextMode === DRONE_FLYOVER_CAMERA_MODE) {
+                      setIsDroneSettingsOpen(true);
+                    }
+
+                    return nextMode;
+                  })
+                }
+              >
+                <DroneCameraIcon aria-hidden="true" />
+                <MapStyleButtonLabel>
+                  {isDroneFlyoverCamera ? 'drone' : 'flyover'}
+                </MapStyleButtonLabel>
+              </DroneCameraToggle>
+              {isDroneFlyoverCamera && (
+                <DronePanelToggle
+                  type="button"
+                  aria-expanded={isDroneSettingsOpen}
+                  aria-label={
+                    isDroneSettingsOpen
+                      ? 'Hide drone camera settings'
+                      : 'Show drone camera settings'
+                  }
+                  onClick={() => setIsDroneSettingsOpen((isOpen) => !isOpen)}
+                >
+                  <FiSliders aria-hidden="true" />
+                  <span>{isDroneSettingsOpen ? 'Hide' : 'Tune'}</span>
+                  {isDroneSettingsOpen ? (
+                    <FiChevronDown aria-hidden="true" />
+                  ) : (
+                    <FiChevronUp aria-hidden="true" />
+                  )}
+                </DronePanelToggle>
+              )}
+              {isDroneFlyoverCamera && isDroneSettingsOpen && (
+                <DroneCameraPanel aria-label="Drone camera settings">
+                  <DroneSliderHeader>
+                    <FiSliders aria-hidden="true" />
+                    <span>Drone view</span>
+                  </DroneSliderHeader>
+                  <DroneSliderRow>
+                    <DroneSliderLabel htmlFor="drone-camera-zoom">
+                      Zoom <strong>{effectiveDroneCameraZoom.toFixed(1)}</strong>
+                    </DroneSliderLabel>
+                    <DroneSliderHint>Closer cockpit view at higher zoom</DroneSliderHint>
+                    <DroneRange
+                      id="drone-camera-zoom"
+                      type="range"
+                      min="13.5"
+                      max="16.8"
+                      step="0.1"
+                      value={effectiveDroneCameraZoom}
+                      aria-label="Drone camera zoom"
+                      onChange={(event) =>
+                        setDroneCameraZoom(Number(event.target.value))
+                      }
+                    />
+                  </DroneSliderRow>
+                  <DroneSliderRow>
+                    <DroneSliderLabel htmlFor="drone-camera-pitch">
+                      Pitch <strong>{droneCameraPitch}°</strong>
+                    </DroneSliderLabel>
+                    <DroneSliderHint>Higher pitch sits closer to the line</DroneSliderHint>
+                    <DroneRange
+                      id="drone-camera-pitch"
+                      type="range"
+                      min="55"
+                      max="78"
+                      step="1"
+                      value={droneCameraPitch}
+                      aria-label="Drone camera pitch"
+                      onChange={(event) =>
+                        setDroneCameraPitch(Number(event.target.value))
+                      }
+                    />
+                  </DroneSliderRow>
+                </DroneCameraPanel>
+              )}
+            </DroneCameraControl>
           </MapStyleControl>
           <Map
             id="map"
@@ -1627,6 +1760,155 @@ const MapViewModeIcon = styled(FiBox)`
   width: 1.2rem;
   height: 1.2rem;
   flex: 0 0 auto;
+`;
+
+const DroneCameraControl = styled.div`
+  display: grid;
+  justify-items: end;
+  gap: 0.5rem;
+`;
+
+const DroneCameraToggle = styled(MapStyleIconButton)`
+  min-height: 2.75rem;
+  padding: 0 0.72rem;
+  background: ${(props) =>
+    props.$active
+      ? 'linear-gradient(135deg, rgba(252, 82, 0, 0.98), rgba(14, 165, 233, 0.92))'
+      : 'rgba(15, 23, 42, 0.9)'};
+
+  @media screen and (max-width: 420px) {
+    width: 2.9rem;
+    min-height: 2.9rem;
+    padding: 0;
+  }
+`;
+
+const DroneCameraIcon = styled(FiCamera)`
+  width: 1.18rem;
+  height: 1.18rem;
+  flex: 0 0 auto;
+`;
+
+const DronePanelToggle = styled.button`
+  display: inline-flex;
+  min-height: 2.25rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.32rem;
+  padding: 0 0.58rem;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.82);
+  color: #ffffff;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 900;
+  line-height: 1;
+  backdrop-filter: blur(12px);
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    transform 160ms ease;
+
+  svg {
+    width: 0.9rem;
+    height: 0.9rem;
+    flex: 0 0 auto;
+  }
+
+  &:hover,
+  &:focus-visible {
+    background: rgba(252, 82, 0, 0.92);
+    border-color: rgba(255, 255, 255, 0.58);
+    outline: none;
+    transform: translateY(-1px);
+  }
+
+  @media screen and (max-width: 420px) {
+    min-height: 2.1rem;
+    padding: 0 0.48rem;
+    font-size: 0.68rem;
+  }
+`;
+
+const DroneCameraPanel = styled.div`
+  width: min(13.75rem, calc(100vw - 1.5rem));
+  display: grid;
+  gap: 0.62rem;
+  padding: 0.68rem;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 8px;
+  background:
+    linear-gradient(145deg, rgba(15, 23, 42, 0.95), rgba(2, 6, 23, 0.9)),
+    linear-gradient(135deg, rgba(252, 82, 0, 0.2), rgba(14, 165, 233, 0.16));
+  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.38);
+  color: #ffffff;
+  backdrop-filter: blur(16px);
+
+  @media screen and (max-width: 420px) {
+    width: min(12.25rem, calc(100vw - 1.25rem));
+    padding: 0.58rem;
+  }
+`;
+
+const DroneSliderHeader = styled.div`
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.45rem;
+  color: #ffffff;
+  font-size: 0.78rem;
+  font-weight: 900;
+  line-height: 1;
+
+  svg {
+    width: 0.95rem;
+    height: 0.95rem;
+    flex: 0 0 auto;
+    color: #38bdf8;
+  }
+`;
+
+const DroneSliderRow = styled.div`
+  display: grid;
+  gap: 0.35rem;
+`;
+
+const DroneSliderLabel = styled.label`
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1;
+
+  strong {
+    color: #ffffff;
+    font-size: 0.76rem;
+    white-space: nowrap;
+  }
+`;
+
+const DroneSliderHint = styled.span`
+  color: rgba(255, 255, 255, 0.56);
+  font-size: 0.66rem;
+  font-weight: 700;
+  line-height: 1;
+`;
+
+const DroneRange = styled.input`
+  width: 100%;
+  accent-color: #fc5200;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid rgba(56, 189, 248, 0.9);
+    outline-offset: 3px;
+  }
 `;
 
 const MapStyleButtonLabel = styled.span`
