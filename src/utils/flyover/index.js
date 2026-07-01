@@ -472,7 +472,7 @@ export const getDroneBaseZoom = ({ routeDistanceKm, streams, totalElevationGain 
           ? -0.3
           : 0;
 
-  return clamp(distanceZoom + hillAdjustment, 13.5, 16.8);
+  return clamp(distanceZoom + hillAdjustment, 13, 17.3);
 };
 
 export const getFlyoverAltitude = ({ routeDistanceKm, streams, totalElevationGain }) => {

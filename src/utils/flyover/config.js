@@ -1,4 +1,4 @@
-export const FLYOVER_SPEEDS = [0, 0.5, 1, 1.5, 2, 2.5, 3.0];
+export const FLYOVER_SPEEDS = [0, 0.25, 0.5, 1, 1.5, 2, 2.5, 3.0];
 export const FLYOVER_INTRO_DURATION_MS = 4200;
 export const FLYOVER_OUTRO_DURATION_MS = 3600;
 export const FLYOVER_ZOOM = 13.25;
