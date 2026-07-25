@@ -89,6 +89,34 @@ export const getRouteMapPadding = (isNavigationCollapsed) => {
   return { top: 86, bottom: 80, left: 360, right: 80 };
 };
 
+export const getRouteOverviewCamera = (
+  map,
+  coordinates,
+  isThreeDimensional,
+  isNavigationCollapsed,
+) => {
+  const bounds = getBoundsForCoordinates(coordinates);
+
+  if (!map || !bounds || typeof map.cameraForBounds !== 'function') {
+    return null;
+  }
+
+  const camera = map.cameraForBounds(bounds, {
+    padding: getRouteMapPadding(isNavigationCollapsed),
+    maxZoom: isThreeDimensional ? 15 : 16,
+  });
+
+  if (!camera) {
+    return null;
+  }
+
+  return {
+    ...camera,
+    bearing: isThreeDimensional ? -18 : 0,
+    pitch: isThreeDimensional ? 55 : 0,
+  };
+};
+
 /**
  * Fits the map camera around the activity route, optionally using the 3D view
  * pitch and bearing.
@@ -107,11 +135,18 @@ export const fitRouteToMap = (
     return;
   }
 
+  const overviewCamera = getRouteOverviewCamera(
+    map,
+    coordinates,
+    isThreeDimensional,
+    isNavigationCollapsed,
+  );
+
   map.fitBounds(bounds, {
     padding: getRouteMapPadding(isNavigationCollapsed),
     duration,
-    pitch: cameraOptions.pitch ?? (isThreeDimensional ? 55 : 0),
-    bearing: cameraOptions.bearing ?? (isThreeDimensional ? -18 : 0),
+    pitch: cameraOptions.pitch ?? overviewCamera?.pitch ?? 0,
+    bearing: cameraOptions.bearing ?? overviewCamera?.bearing ?? 0,
     maxZoom: isThreeDimensional ? 15 : 16,
   });
 };

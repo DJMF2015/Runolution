@@ -55,6 +55,7 @@ import {
 export {
   formatFlyoverDistance,
   formatFlyoverElevation,
+  formatFlyoverLiveStreamMetric,
   formatFlyoverPace,
   formatFlyoverStreamAveragePace,
   formatFlyoverTotalDistance,
@@ -124,7 +125,19 @@ const areSameCoordinate = (firstCoordinate, secondCoordinate) => {
   );
 };
 
+export const isValidLngLatCoordinate = (coordinate) => {
+  return (
+    Array.isArray(coordinate) &&
+    Number.isFinite(coordinate[0]) &&
+    Number.isFinite(coordinate[1])
+  );
+};
+
 const interpolateLngLat = (fromLngLat, toLngLat, ratio) => {
+  if (!isValidLngLatCoordinate(fromLngLat) || !isValidLngLatCoordinate(toLngLat)) {
+    return isValidLngLatCoordinate(toLngLat) ? toLngLat : fromLngLat;
+  }
+
   return [
     lerp(fromLngLat[0], toLngLat[0], ratio),
     lerp(fromLngLat[1], toLngLat[1], ratio),
@@ -486,10 +499,31 @@ export const getFlyoverAltitude = ({ routeDistanceKm, streams, totalElevationGai
   });
 };
 
-const getPointOnRoute = (routeLine, distanceKm) => {
-  return turf.along(routeLine, distanceKm, {
+export const getFlyoverRouteCoordinateAtDistance = (
+  routeLine,
+  distanceKm,
+  routeDistanceKm = null,
+) => {
+  const fallbackCoordinate = routeLine?.geometry?.coordinates?.find(
+    isValidLngLatCoordinate,
+  );
+
+  if (!routeLine || !fallbackCoordinate) {
+    return null;
+  }
+
+  const safeDistanceKm = Number.isFinite(routeDistanceKm)
+    ? clamp(distanceKm, 0, routeDistanceKm)
+    : Math.max(Number(distanceKm) || 0, 0);
+  const coordinate = turf.along(routeLine, safeDistanceKm, {
     units: 'kilometers',
   }).geometry.coordinates;
+
+  return isValidLngLatCoordinate(coordinate) ? coordinate : fallbackCoordinate;
+};
+
+const getPointOnRoute = (routeLine, distanceKm) => {
+  return getFlyoverRouteCoordinateAtDistance(routeLine, distanceKm);
 };
 
 const clampRouteDistance = (distanceKm, routeDistanceKm) => {
@@ -547,7 +581,13 @@ const getSmoothedPointOnRoute = (routeLine, distanceKm, routeDistanceKm) => {
   let totalWeight = 0;
 
   samples.forEach(({ distance, weight }) => {
-    const [lng, lat] = getPointOnRoute(routeLine, distance);
+    const coordinate = getPointOnRoute(routeLine, distance);
+
+    if (!isValidLngLatCoordinate(coordinate)) {
+      return;
+    }
+
+    const [lng, lat] = coordinate;
     weightedLng += lng * weight;
     weightedLat += lat * weight;
     totalWeight += weight;
@@ -598,13 +638,31 @@ const getWeightedBearingMean = (bearingSamples) => {
  */
 const getRouteBearingAtDistance = (routeLine, distanceKm, routeDistanceKm) => {
   const lookAheadStep = getLookaheadDistance(routeDistanceKm);
-  const currentPoint = turf.point(getPointOnRoute(routeLine, distanceKm));
+  const currentCoordinate = getPointOnRoute(routeLine, distanceKm);
+
+  if (!isValidLngLatCoordinate(currentCoordinate)) {
+    return 0;
+  }
+
+  const currentPoint = turf.point(currentCoordinate);
   const lookAheadDistance = Math.min(distanceKm + lookAheadStep, routeDistanceKm);
-  const lookAheadPoint = turf.point(getPointOnRoute(routeLine, lookAheadDistance));
+  const lookAheadCoordinate = getPointOnRoute(routeLine, lookAheadDistance);
+
+  if (!isValidLngLatCoordinate(lookAheadCoordinate)) {
+    return 0;
+  }
+
+  const lookAheadPoint = turf.point(lookAheadCoordinate);
 
   if (lookAheadDistance === distanceKm) {
     const lookBehindDistance = Math.max(distanceKm - lookAheadStep, 0);
-    const lookBehindPoint = turf.point(getPointOnRoute(routeLine, lookBehindDistance));
+    const lookBehindCoordinate = getPointOnRoute(routeLine, lookBehindDistance);
+
+    if (!isValidLngLatCoordinate(lookBehindCoordinate)) {
+      return 0;
+    }
+
+    const lookBehindPoint = turf.point(lookBehindCoordinate);
 
     return turf.bearing(lookBehindPoint, currentPoint);
   }
@@ -641,6 +699,10 @@ const getRouteSectionCoordinates = (routeLine, startDistanceKm, endDistanceKm) =
   const endDistance = Math.max(endDistanceKm, 0);
   const startCoordinate = getPointOnRoute(routeLine, startDistance);
   const endCoordinate = getPointOnRoute(routeLine, endDistance);
+
+  if (!isValidLngLatCoordinate(startCoordinate) || !isValidLngLatCoordinate(endCoordinate)) {
+    return routeLine?.geometry?.coordinates?.filter(isValidLngLatCoordinate) || [];
+  }
 
   if (startDistance === endDistance) {
     return [startCoordinate];
@@ -889,12 +951,19 @@ export const getFlyoverCameraTarget = (
     lookAheadDistance,
     routeDistanceKm,
   );
-  const targetBearing = turf.bearing(turf.point(currentPoint), turf.point(focusPoint));
+  const safeFocusPoint = isValidLngLatCoordinate(focusPoint) ? focusPoint : currentPoint;
+  if (!isValidLngLatCoordinate(currentPoint) || !isValidLngLatCoordinate(safeFocusPoint)) {
+    return {
+      center: routeLine?.geometry?.coordinates?.find(isValidLngLatCoordinate) || [0, 0],
+      bearing: 0,
+    };
+  }
+  const targetBearing = turf.bearing(turf.point(currentPoint), turf.point(safeFocusPoint));
   const routeBearing = getRouteBearing(routeLine, distanceKm, routeDistanceKm);
   const turnDelta = normalizeBearing(targetBearing - routeBearing);
   const cameraCenter = interpolateLngLat(
     currentPoint,
-    focusPoint,
+    safeFocusPoint,
     getCameraLeadRatio(turnDelta, flyoverSpeed),
   );
   const localBearing = getWeightedBearingMean([
@@ -926,6 +995,13 @@ export const getFlyoverRouteProgressFeature = (
 
   const startCoordinate = routeLine.geometry.coordinates[0];
   const currentCoordinate = getPointOnRoute(routeLine, clampedDistance);
+
+  if (
+    !isValidLngLatCoordinate(startCoordinate) ||
+    !isValidLngLatCoordinate(currentCoordinate)
+  ) {
+    return routeLine;
+  }
 
   if (clampedDistance === 0) {
     return turf.lineString([startCoordinate, currentCoordinate], routeLine.properties);
