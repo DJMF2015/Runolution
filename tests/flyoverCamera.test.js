@@ -8,6 +8,7 @@ import {
   FLYOVER_INTRO_ROTATION_DEGREES,
   FLYOVER_OUTRO_BEARING,
   detectSmallLoopSection,
+  formatFlyoverLiveStreamMetric,
   getDroneBaseZoom,
   getFlyoverAltitude,
   getFlyoverZoom,
@@ -149,6 +150,41 @@ describe('flyover camera framing', () => {
     });
 
     expect(pace).toBe('5:30 /km');
+  });
+
+  test('formats live running pace from velocity stream at the current flyover point', () => {
+    const metric = formatFlyoverLiveStreamMetric({
+      distanceKm: 1.5,
+      fallbackDistanceMetres: 3000,
+      fallbackMovingTimeSeconds: 900,
+      streams: {
+        distance: [0, 1000, 2000],
+        velocity_smooth: [3, 4, 5],
+      },
+    });
+
+    expect(metric).toEqual({
+      label: 'Pace',
+      value: '3:42 /km',
+    });
+  });
+
+  test('formats live cycling speed from velocity stream at the current flyover point', () => {
+    const metric = formatFlyoverLiveStreamMetric({
+      distanceKm: 1,
+      fallbackDistanceMetres: 3000,
+      fallbackMovingTimeSeconds: 600,
+      showSpeed: true,
+      streams: {
+        distance: [0, 1000, 2000],
+        velocity_smooth: [7, 8, 9],
+      },
+    });
+
+    expect(metric).toEqual({
+      label: 'Speed',
+      value: '28.8 km/h',
+    });
   });
 
   test('uses static red route color and map-specific flyover route colors', () => {
