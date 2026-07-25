@@ -32,12 +32,133 @@ export const formatFlyoverPace = (distanceMetres, movingTimeSeconds) => {
   return `${minutes}:${String(seconds).padStart(2, '0')} /km`;
 };
 
+const formatFlyoverPaceFromVelocity = (metresPerSecond) => {
+  const speed = Number(metresPerSecond || 0);
+
+  if (!Number.isFinite(speed) || speed <= 0) {
+    return '-- /km';
+  }
+
+  const paceSeconds = Math.round(METRES_PER_KM / speed);
+  const minutes = Math.floor(paceSeconds / SECONDS_PER_MINUTE);
+  const seconds = paceSeconds % SECONDS_PER_MINUTE;
+
+  return `${minutes}:${String(seconds).padStart(2, '0')} /km`;
+};
+
+const formatFlyoverSpeedFromVelocity = (metresPerSecond) => {
+  const speed = Number(metresPerSecond || 0);
+
+  if (!Number.isFinite(speed) || speed <= 0) {
+    return '-- km/h';
+  }
+
+  return `${(speed * 3.6).toFixed(1)} km/h`;
+};
+
 const getStreamArray = (streams, key) => {
   if (Array.isArray(streams?.[key])) {
     return streams[key];
   }
 
   return streams?.[key]?.data || [];
+};
+
+const getFiniteNumber = (value) => {
+  const number = Number(value);
+
+  return Number.isFinite(number) ? number : null;
+};
+
+const interpolateValues = (startValue, endValue, ratio) => {
+  const start = getFiniteNumber(startValue);
+  const end = getFiniteNumber(endValue);
+
+  if (start === null && end === null) {
+    return null;
+  }
+
+  if (start === null) {
+    return end;
+  }
+
+  if (end === null) {
+    return start;
+  }
+
+  return start + (end - start) * ratio;
+};
+
+const getInterpolatedStreamVelocity = ({
+  distanceKm,
+  fallbackDistanceMetres,
+  streams,
+}) => {
+  const distanceStream = getStreamArray(streams, 'distance');
+  const velocityStream = getStreamArray(streams, 'velocity_smooth');
+
+  if (!velocityStream.length) {
+    return null;
+  }
+
+  const distanceMetres = Number(distanceKm || 0) * METRES_PER_KM;
+
+  if (distanceStream.length > 1) {
+    const firstDistance = getFiniteNumber(distanceStream[0]);
+    const targetDistance =
+      firstDistance === null ? null : firstDistance + distanceMetres;
+
+    if (targetDistance === null) {
+      return null;
+    }
+
+    if (targetDistance <= firstDistance) {
+      return getFiniteNumber(velocityStream[0]);
+    }
+
+    for (let index = 1; index < distanceStream.length; index += 1) {
+      const previousDistance = getFiniteNumber(distanceStream[index - 1]);
+      const currentDistance = getFiniteNumber(distanceStream[index]);
+
+      if (
+        previousDistance === null ||
+        currentDistance === null ||
+        currentDistance <= previousDistance
+      ) {
+        continue;
+      }
+
+      if (targetDistance <= currentDistance) {
+        const segmentRatio = Math.min(
+          Math.max((targetDistance - previousDistance) / (currentDistance - previousDistance), 0),
+          1,
+        );
+
+        return interpolateValues(
+          velocityStream[index - 1],
+          velocityStream[index],
+          segmentRatio,
+        );
+      }
+    }
+  }
+
+  const totalDistanceMetres = Number(fallbackDistanceMetres || 0);
+
+  if (!Number.isFinite(totalDistanceMetres) || totalDistanceMetres <= 0) {
+    return getFiniteNumber(velocityStream[velocityStream.length - 1]);
+  }
+
+  const progressRatio = Math.min(Math.max(distanceMetres / totalDistanceMetres, 0), 1);
+  const streamIndex = progressRatio * (velocityStream.length - 1);
+  const previousIndex = Math.floor(streamIndex);
+  const nextIndex = Math.min(previousIndex + 1, velocityStream.length - 1);
+
+  return interpolateValues(
+    velocityStream[previousIndex],
+    velocityStream[nextIndex],
+    streamIndex - previousIndex,
+  );
 };
 
 const getInterpolatedStreamTime = (streams, distanceKm) => {
@@ -111,6 +232,43 @@ export const formatFlyoverStreamAveragePace = ({
   }
 
   return formatFlyoverPace(distanceMetres, movingSeconds);
+};
+
+export const formatFlyoverLiveStreamMetric = ({
+  distanceKm,
+  fallbackDistanceMetres,
+  fallbackMovingTimeSeconds,
+  showSpeed = false,
+  streams,
+}) => {
+  const liveVelocity = getInterpolatedStreamVelocity({
+    distanceKm,
+    fallbackDistanceMetres,
+    streams,
+  });
+
+  if (liveVelocity) {
+    return {
+      label: showSpeed ? 'Speed' : 'Pace',
+      value: showSpeed
+        ? formatFlyoverSpeedFromVelocity(liveVelocity)
+        : formatFlyoverPaceFromVelocity(liveVelocity),
+    };
+  }
+
+  return {
+    label: showSpeed ? 'Avg speed' : 'Avg pace',
+    value: showSpeed
+      ? formatFlyoverSpeedFromVelocity(
+          Number(fallbackDistanceMetres || 0) / Number(fallbackMovingTimeSeconds || 0),
+        )
+      : formatFlyoverStreamAveragePace({
+          distanceKm,
+          fallbackDistanceMetres,
+          fallbackMovingTimeSeconds,
+          streams,
+        }),
+  };
 };
 
 /**
