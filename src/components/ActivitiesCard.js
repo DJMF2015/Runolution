@@ -36,7 +36,6 @@ import {
 import { fetchTokenInfo } from '../utils/helpers';
 import { ACTIVITY_DETAIL_MAP_STYLES } from '../utils/mapStyles';
 import {
-  addActivityDetailMapControls,
   createActivityDetailMap,
   fitRouteToMap,
   getActivityLineFeature,
@@ -140,6 +139,11 @@ const getPhotoCoordinate = (photo) => {
   return [lng, lat];
 };
 
+/**
+ * Normalizes the photo data into a consistent format, filtering out invalid or incomplete entries, and sorting by timestamp or sequence.
+ * @param {Array|Object} photos - The photo data to normalize.
+ * @returns {Array} The normalized photo list.
+ */
 const normalizeActivityPhotos = (photos) => {
   const photoList = Array.isArray(photos)
     ? photos
@@ -186,6 +190,11 @@ const getPhotoRoutePointFromStreams = ({
     timeStream.length || latLngStream.length,
   );
 
+  /**
+   * Gets the route point at a specific stream index.
+   * @param {*} streamIndex
+   * @returns {Object|null} The route point with coordinate and distanceKm, or null if invalid.
+   */
   const getRoutePointAtStreamIndex = (streamIndex) => {
     const coordinate = latLngStream[streamIndex];
     const distanceMetres = Number(distanceStream[streamIndex]);
@@ -387,6 +396,7 @@ const createActivityPhotoMarkerElement = (photo, onSelectPhoto) => {
   button.style.boxShadow = '0 10px 20px rgba(0, 0, 0, 0.3)';
   button.style.cursor = 'pointer';
   button.style.overflow = 'hidden';
+
   button.addEventListener('click', (event) => {
     event.stopPropagation();
     onSelectPhoto(photo);
@@ -433,7 +443,6 @@ export default function ActivitiesCard() {
   );
   const [detailError, setDetailError] = React.useState(null);
   const [mapStyle, setMapStyle] = useState('street');
-  const [isMapStyleOpen, setIsMapStyleOpen] = useState(false);
   const [isThreeDimensional, setIsThreeDimensional] = useState(false);
   const [flyoverCameraMode, setFlyoverCameraMode] = useState(
     CINEMATIC_FLYOVER_CAMERA_MODE,
@@ -486,6 +495,7 @@ export default function ActivitiesCard() {
     dismissFlyoverSummary,
     flyoverAveragePace,
     flyoverDistanceKm,
+    flyoverLiveMetricLabel,
     flyoverLivePace,
     flyoverSpeed,
     flyoverTotalDistance,
@@ -506,6 +516,7 @@ export default function ActivitiesCard() {
     flyoverCameraMode,
     flyoverRouteLine,
     isActivityNavCollapsedRef,
+    isThreeDimensional,
     mapRef,
     routeCoordinates,
   });
@@ -667,7 +678,6 @@ export default function ActivitiesCard() {
     });
 
     map.on('load', () => {
-      addActivityDetailMapControls(map);
       fitRouteToMap(map, routeCoordinates, false, false, 1800);
     });
     return () => {
@@ -807,6 +817,7 @@ export default function ActivitiesCard() {
     activityPhotos[0]?.url ||
     getBestPhotoUrl(athleteData?.detailedActivity?.photos?.primary);
   const isDroneFlyoverCamera = flyoverCameraMode === DRONE_FLYOVER_CAMERA_MODE;
+  const nextMapStyle = mapStyle === 'satellite' ? 'street' : 'satellite';
 
   return (
     <>
@@ -945,45 +956,58 @@ export default function ActivitiesCard() {
         </SideNavigation>
 
         <MapShell>
-          <FlyoverControl>
-            <FlyoverButton
+          <TopFlyoverControlBar>
+            <MapViewModeButton
               type="button"
-              aria-label="Play route flyover"
-              disabled={isFlyoverPlaying || flyoverRouteCoordinates.length < 2}
-              onClick={startFlyover}
+              aria-label={`Switch to ${isThreeDimensional ? '2D' : '3D'} map view`}
+              $active={isThreeDimensional}
+              onClick={() => setIsThreeDimensional((enabled) => !enabled)}
             >
-              <FiPlay aria-hidden="true" />
-              <FlyoverLabel>Play</FlyoverLabel>
-            </FlyoverButton>
-            <FlyoverButton
-              type="button"
-              aria-label="Stop route flyover"
-              disabled={!isFlyoverPlaying}
-              onClick={stopFlyover}
-            >
-              <FiSquare aria-hidden="true" />
-              <FlyoverLabel>Stop</FlyoverLabel>
-            </FlyoverButton>
-            <FlyoverSpeedGroup aria-label="Flyover speed controls">
+              <MapViewModeIcon aria-hidden="true" />
+              <MapStyleButtonLabel>
+                {isThreeDimensional ? '3D' : '2D'}
+              </MapStyleButtonLabel>
+            </MapViewModeButton>
+            <FlyoverControl>
               <FlyoverButton
                 type="button"
-                aria-label="Decrease flyover speed"
-                disabled={isFlyoverSpeedMin}
-                onClick={decreaseFlyoverSpeed}
+                aria-label="Play route flyover"
+                disabled={isFlyoverPlaying || flyoverRouteCoordinates.length < 2}
+                onClick={startFlyover}
               >
-                <FiMinus aria-hidden="true" />
+                <FiPlay aria-hidden="true" />
+                <FlyoverLabel>Play</FlyoverLabel>
               </FlyoverButton>
-              <FlyoverSpeedValue aria-live="polite">{flyoverSpeed}x</FlyoverSpeedValue>
               <FlyoverButton
                 type="button"
-                aria-label="Increase flyover speed"
-                disabled={isFlyoverSpeedMax}
-                onClick={increaseFlyoverSpeed}
+                aria-label="Stop route flyover"
+                disabled={!isFlyoverPlaying}
+                onClick={stopFlyover}
               >
-                <FiPlus aria-hidden="true" />
+                <FiSquare aria-hidden="true" />
+                <FlyoverLabel>Stop</FlyoverLabel>
               </FlyoverButton>
-            </FlyoverSpeedGroup>
-          </FlyoverControl>
+              <FlyoverSpeedGroup aria-label="Flyover speed controls">
+                <FlyoverButton
+                  type="button"
+                  aria-label="Decrease flyover speed"
+                  disabled={isFlyoverSpeedMin}
+                  onClick={decreaseFlyoverSpeed}
+                >
+                  <FiMinus aria-hidden="true" />
+                </FlyoverButton>
+                <FlyoverSpeedValue aria-live="polite">{flyoverSpeed}x</FlyoverSpeedValue>
+                <FlyoverButton
+                  type="button"
+                  aria-label="Increase flyover speed"
+                  disabled={isFlyoverSpeedMax}
+                  onClick={increaseFlyoverSpeed}
+                >
+                  <FiPlus aria-hidden="true" />
+                </FlyoverButton>
+              </FlyoverSpeedGroup>
+            </FlyoverControl>
+          </TopFlyoverControlBar>
           {isFlyoverPlaying && (
             <FlyoverLiveStats $navCollapsed={isActivityNavCollapsed}>
               <FlyoverLiveStat $featured>
@@ -991,7 +1015,7 @@ export default function ActivitiesCard() {
                 <strong>{formatFlyoverDistance(flyoverDistanceKm)}</strong>
               </FlyoverLiveStat>
               <FlyoverLiveStat>
-                <span>Avg pace</span>
+                <span>{flyoverLiveMetricLabel}</span>
                 <strong>{flyoverLivePace}</strong>
               </FlyoverLiveStat>
             </FlyoverLiveStats>
@@ -1021,50 +1045,16 @@ export default function ActivitiesCard() {
             </FlyoverSummary>
           )}
           <MapStyleControl $navCollapsed={isActivityNavCollapsed}>
-            <MapViewModeButton
-              type="button"
-              aria-label={`Switch to ${isThreeDimensional ? '2D' : '3D'} map view`}
-              $active={isThreeDimensional}
-              onClick={() => setIsThreeDimensional((enabled) => !enabled)}
-            >
-              <MapViewModeIcon aria-hidden="true" />
-              <MapStyleButtonLabel>
-                {isThreeDimensional ? '3D' : '2D'}
-              </MapStyleButtonLabel>
-            </MapViewModeButton>
-            {isMapStyleOpen && (
-              <MapStylePopup aria-label="Choose map style">
-                <MapStyleButton
-                  type="button"
-                  $active={mapStyle === 'street'}
-                  onClick={() => {
-                    setMapStyle('street');
-                    setIsMapStyleOpen(false);
-                  }}
-                >
-                  Outdoors
-                </MapStyleButton>
-                <MapStyleButton
-                  type="button"
-                  $active={mapStyle === 'satellite'}
-                  onClick={() => {
-                    setMapStyle('satellite');
-                    setIsMapStyleOpen(false);
-                  }}
-                >
-                  Satellite
-                </MapStyleButton>
-              </MapStylePopup>
-            )}
             <MapStyleIconButton
               type="button"
-              aria-label="Open map style options"
-              aria-expanded={isMapStyleOpen}
-              onClick={() => setIsMapStyleOpen((isOpen) => !isOpen)}
+              aria-label={`Switch to ${
+                nextMapStyle === 'satellite' ? 'satellite' : 'outdoors'
+              } map`}
+              onClick={() => setMapStyle(nextMapStyle)}
             >
               <MapStyleIcon aria-hidden="true" />
               <MapStyleButtonLabel>
-                {mapStyle === 'satellite' ? 'satellite' : 'streets'}
+                {mapStyle === 'satellite' ? 'satellite' : 'outdoors'}
               </MapStyleButtonLabel>
             </MapStyleIconButton>
             <DroneCameraControl>
@@ -1410,26 +1400,43 @@ const MapStyleControl = styled.div`
   }
 `;
 
-const MapStylePopup = styled.div`
-  display: grid;
-  gap: 0.45rem;
-  width: min(13rem, calc(100vw - 1.5rem));
-  padding: 0.55rem;
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  border-radius: 8px;
-  background:
-    linear-gradient(135deg, rgba(15, 23, 42, 0.96), rgba(31, 41, 55, 0.92)),
-    linear-gradient(135deg, rgba(252, 82, 0, 0.24), rgba(59, 130, 246, 0.16));
-  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.38);
-  backdrop-filter: blur(16px);
+const TopFlyoverControlBar = styled.div`
+  position: absolute;
+  top: 1rem;
+  z-index: 1030;
+  right: 5rem;
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-end;
+  gap: 0.55rem;
+  max-width: calc(100vw - 6rem);
+
+  @media screen and (max-width: 800px) {
+    right: 4.75rem;
+    max-width: calc(100vw - 5.5rem);
+  }
+
+  @media screen and (max-width: 640px) {
+    left: 1rem;
+    right: 1rem;
+    max-width: none;
+  }
+
+  @media screen and (max-width: 520px) {
+    gap: 0.42rem;
+  }
+
+  @media screen and (max-width: 420px) {
+    left: 0.75rem;
+    right: 0.75rem;
+    gap: 0.35rem;
+  }
 `;
 
 const FlyoverControl = styled.div`
-  position: absolute;
-  top: 1rem;
-  right: 5rem;
-  z-index: 1030;
   display: inline-flex;
+  flex: 0 1 auto;
+  min-width: 0;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: 999px;
@@ -1437,21 +1444,12 @@ const FlyoverControl = styled.div`
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.34);
   backdrop-filter: blur(14px);
 
-  @media screen and (max-width: 800px) {
-    top: 1rem;
-    right: 4.75rem;
-  }
-
   @media screen and (max-width: 520px) {
-    right: 3.95rem;
-    transform: scale(0.94);
-    transform-origin: top right;
+    flex: 1 1 auto;
   }
 
   @media screen and (max-width: 420px) {
     border-radius: 14px;
-    right: 3.75rem;
-    transform: scale(0.9);
   }
 `;
 
@@ -1494,11 +1492,24 @@ const FlyoverButton = styled.button`
     flex: 0 0 auto;
   }
 
+  @media screen and (max-width: 520px) {
+    min-height: 2.55rem;
+    gap: 0.28rem;
+    padding: 0 0.55rem;
+    font-size: 0.74rem;
+
+    svg {
+      width: 0.92rem;
+      height: 0.92rem;
+    }
+  }
+
   @media screen and (max-width: 420px) {
-    margin-bottom: 1rem;
-    width: 3.45rem;
-    min-height: 2rem;
-    padding: 1px;
+    flex: 1 1 2.55rem;
+    min-width: 2.4rem;
+    min-height: 2.45rem;
+    padding: 0;
+    font-size: 0.68rem;
   }
 `;
 
@@ -1516,13 +1527,13 @@ const FlyoverSpeedValue = styled.span`
   text-align: center;
 
   @media screen and (max-width: 420px) {
-    min-width: 2.85rem;
-    font-size: 0.72rem;
+    min-width: 2.55rem;
+    font-size: 0.68rem;
   }
 `;
 
 const FlyoverLabel = styled.span`
-  @media screen and (max-width: 420px) {
+  @media screen and (max-width: 520px) {
     position: absolute;
     width: 1em;
     height: 2em;
@@ -1923,36 +1934,6 @@ const MapStyleButtonLabel = styled.span`
     overflow: hidden;
     clip: rect(0 0 0 0);
     white-space: nowrap;
-  }
-`;
-
-const MapStyleButton = styled.button`
-  min-width: 0;
-  min-height: 2.55rem;
-  padding: 0 0.9rem;
-  color: ${(props) => (props.$active ? '#111827' : '#ffffff')};
-  background: ${(props) => (props.$active ? '#ffffff' : 'rgba(255, 255, 255, 0.1)')};
-  border: 0;
-  border-radius: 6px;
-  font-size: 0.86rem;
-  font-weight: 800;
-  cursor: pointer;
-  text-align: left;
-  transition:
-    background 160ms ease,
-    color 160ms ease,
-    transform 160ms ease;
-
-  &:hover,
-  &:focus-visible {
-    background: ${(props) => (props.$active ? '#ffffff' : 'rgba(255, 255, 255, 0.18)')};
-    outline: none;
-    transform: translateY(-1px);
-  }
-
-  @media screen and (max-width: 420px) {
-    min-height: 2.45rem;
-    font-size: 0.82rem;
   }
 `;
 
