@@ -379,27 +379,6 @@ const getChartDatasets = (profilePoints, isCycling = false) => {
       order: 1,
     },
   ];
-  // const hasPerformanceData = profilePoints.some((point) =>
-  //   Number.isFinite(point.performance),
-  // );
-
-  // if (hasPerformanceData) {
-  //   datasets.push({
-  //     type: 'line',
-  //     label: isCycling ? 'Speed' : 'Pace',
-  //     data: profilePoints.map((point) => point.performance),
-  //     fill: false,
-  //     borderColor: '#ed3ae4',
-  //     backgroundColor: '#de16c0',
-  //     borderDash: [6, 4],
-  //     pointRadius: 0,
-  //     pointHoverRadius: 4,
-  //     tension: 0.28,
-  //     borderWidth: 2,
-  //     yAxisID: 'performance',
-  //     order: 2,
-  //   });
-  // }
 
   return datasets;
 };
