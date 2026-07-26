@@ -259,7 +259,7 @@ const AthleteActivities = () => {
               {isOnline && (
                 <BreakdownChart props={state.activities} onAuthError={handleAuthError} />
               )}
-              {isOnline && (
+              {state.activities.length > 0 && (
                 <DashboardChartArea>
                   <StravaMetricsChart activities={state.activities} />
                 </DashboardChartArea>
@@ -651,11 +651,15 @@ const DashboardMain = styled.main`
 `;
 
 const DashboardChartArea = styled.section`
+  width: 100%;
+  min-width: 0;
   margin-top: 1.25rem;
   margin-bottom: 1.5rem;
+  box-sizing: border-box;
 
   @media screen and (max-width: 980px) {
-    display: none;
+    margin-top: 1rem;
+    margin-bottom: 1.25rem;
   }
 `;
 
