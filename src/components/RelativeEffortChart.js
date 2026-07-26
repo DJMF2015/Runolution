@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -21,18 +21,28 @@ ChartJS.register(
   Filler,
 );
 
+const toFiniteNumber = (value) => {
+  if (value === null || value === undefined || value === '') return null;
+
+  const number = Number(value);
+
+  return Number.isFinite(number) ? number : null;
+};
+
 const speedToPace = (speed) => {
-  if (!speed || speed <= 0) return null;
+  const numericSpeed = toFiniteNumber(speed);
+
+  if (!numericSpeed || numericSpeed <= 0) return null;
 
   // Strava average_speed is metres per second.
-  const pace = 1000 / (speed * 60);
+  const pace = 1000 / (numericSpeed * 60);
 
   return Number(pace.toFixed(2));
 };
 
 const calculateEffortScore = (activity) => {
-  const elevation = activity.total_elevation_gain || 0;
-  const heartRate = activity.average_heartrate || 0;
+  const elevation = toFiniteNumber(activity.total_elevation_gain) ?? 0;
+  const heartRate = toFiniteNumber(activity.average_heartrate) ?? 0;
   const pace = speedToPace(activity.average_speed);
 
   const paceScore = pace ? (6 / pace) * 100 : 0;
@@ -64,37 +74,111 @@ const formatPace = (decimalPace) => {
   return `${minutes}:${String(seconds).padStart(2, '0')} /km`;
 };
 
-const StravaMetricsChart = ({ activities = [] }) => {
-  const recentActivities = [...activities]
-    .filter((activity) => activity.start_date)
-    .sort((a, b) => new Date(a.start_date) - new Date(b.start_date))
-    .slice(-30);
+const getRollingSixMonthCutoff = (referenceDate) => {
+  const cutoff = new Date(referenceDate);
+  const dayOfMonth = cutoff.getUTCDate();
 
-  const labels = recentActivities.map((activity) =>
-    new Date(activity.start_date).toLocaleDateString('en-GB', {
+  cutoff.setUTCDate(1);
+  cutoff.setUTCMonth(cutoff.getUTCMonth() - 6);
+
+  const lastDayOfCutoffMonth = new Date(
+    Date.UTC(cutoff.getUTCFullYear(), cutoff.getUTCMonth() + 1, 0),
+  ).getUTCDate();
+
+  cutoff.setUTCDate(Math.min(dayOfMonth, lastDayOfCutoffMonth));
+  cutoff.setUTCHours(0, 0, 0, 0);
+
+  return cutoff;
+};
+
+export const getActivityStartDate = (activity) => {
+  const rawDate = activity?.start_date ?? activity?.start_date_local;
+
+  if (rawDate === null || rawDate === undefined || rawDate === '') {
+    return null;
+  }
+
+  const normalizedDate =
+    typeof rawDate === 'number' && rawDate < 1000000000000
+      ? rawDate * 1000
+      : rawDate;
+  const activityDate = new Date(normalizedDate);
+
+  return Number.isNaN(activityDate.getTime()) ? null : activityDate;
+};
+
+export const getRollingSixMonthActivities = (
+  activities = [],
+  referenceDate = new Date(),
+) => {
+  const rangeEnd = new Date(referenceDate);
+
+  if (Number.isNaN(rangeEnd.getTime())) {
+    return [];
+  }
+
+  rangeEnd.setUTCHours(23, 59, 59, 999);
+  const rangeStart = getRollingSixMonthCutoff(rangeEnd);
+
+  return (Array.isArray(activities) ? activities : [])
+    .filter((activity) => {
+      const activityDate = getActivityStartDate(activity);
+
+      return (
+        activityDate &&
+        activityDate >= rangeStart &&
+        activityDate <= rangeEnd
+      );
+    })
+    .sort((first, second) => {
+      return getActivityStartDate(first) - getActivityStartDate(second);
+    });
+};
+
+export const buildMetricsChartData = (activities) => {
+  const labels = activities.map((activity) =>
+    getActivityStartDate(activity).toLocaleDateString('en-GB', {
       day: '2-digit',
       month: 'short',
     }),
   );
 
-  const elevationData = recentActivities.map(
-    (activity) => activity.total_elevation_gain || 0,
+  const elevationData = activities.map(
+    (activity) => toFiniteNumber(activity.total_elevation_gain) ?? 0,
   );
 
   const heartRateData = movingAverage(
-    recentActivities.map((activity) => activity.average_heartrate || null),
+    activities.map((activity) => toFiniteNumber(activity.average_heartrate)),
     3,
   );
 
   const paceData = movingAverage(
-    recentActivities.map((activity) => speedToPace(activity.average_speed)),
+    activities.map((activity) => speedToPace(activity.average_speed)),
     3,
   );
 
   const effortData = movingAverage(
-    recentActivities.map((activity) => calculateEffortScore(activity)),
+    activities.map((activity) => calculateEffortScore(activity)),
     3,
   );
+
+  return {
+    labels,
+    elevationData,
+    heartRateData,
+    paceData,
+    effortData,
+  };
+};
+
+const StravaMetricsChart = ({ activities = [], referenceDate = new Date() }) => {
+  const referenceTime = new Date(referenceDate).getTime();
+  const recentActivities = useMemo(
+    () => getRollingSixMonthActivities(activities, new Date(referenceTime)),
+    [activities, referenceTime],
+  );
+  const { labels, elevationData, heartRateData, paceData, effortData } =
+    useMemo(() => buildMetricsChartData(recentActivities), [recentActivities]);
 
   const data = {
     labels,
@@ -143,7 +227,7 @@ const StravaMetricsChart = ({ activities = [] }) => {
         pointRadius: 2,
         pointHoverRadius: 5,
         borderWidth: 2,
-        yAxisID: 'y3 ',
+        yAxisID: 'y',
       },
     ],
   };
@@ -227,7 +311,7 @@ const StravaMetricsChart = ({ activities = [] }) => {
       <div style={styles.header}>
         <h3 style={styles.title}>Performance Over Time</h3>
         <p style={styles.subtitle}>
-          Distance, heart rate, pace and effort score across recent Strava activities
+          Distance, heart rate, pace and effort score across the last six months
         </p>
       </div>
 
@@ -247,7 +331,9 @@ const styles = {
     padding: '20px',
     boxShadow: '0 8px 24px rgba(15, 23, 42, 0.06)',
     width: '100%',
-    maxWidth: '900px',
+    maxWidth: 'none',
+    minWidth: 0,
+    overflow: 'hidden',
     boxSizing: 'border-box',
   },
   header: {
@@ -265,8 +351,10 @@ const styles = {
     color: '#6b7280',
   },
   chartWrapper: {
-    height: '300px',
+    position: 'relative',
+    height: 'clamp(300px, 48vw, 380px)',
     width: '100%',
+    minWidth: 0,
   },
 };
 
