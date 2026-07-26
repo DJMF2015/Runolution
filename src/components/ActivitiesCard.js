@@ -1406,6 +1406,7 @@ const TopFlyoverControlBar = styled.div`
   z-index: 1030;
   right: 5rem;
   display: flex;
+  width: max-content;
   align-items: stretch;
   justify-content: flex-end;
   gap: 0.55rem;
@@ -1417,9 +1418,9 @@ const TopFlyoverControlBar = styled.div`
   }
 
   @media screen and (max-width: 640px) {
-    left: 1rem;
-    right: 1rem;
-    max-width: none;
+    left: auto;
+    right: 4.75rem;
+    max-width: calc(100vw - 5.5rem);
   }
 
   @media screen and (max-width: 520px) {
@@ -1427,15 +1428,18 @@ const TopFlyoverControlBar = styled.div`
   }
 
   @media screen and (max-width: 420px) {
-    left: 0.75rem;
-    right: 0.75rem;
+    left: auto;
+    right: 4.5rem;
     gap: 0.35rem;
+    max-width: calc(100vw - 5.25rem);
   }
 `;
 
 const FlyoverControl = styled.div`
   display: inline-flex;
-  flex: 0 1 auto;
+  flex: 0 0 auto;
+  width: max-content;
+  max-width: 100%;
   min-width: 0;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.3);
@@ -1445,7 +1449,7 @@ const FlyoverControl = styled.div`
   backdrop-filter: blur(14px);
 
   @media screen and (max-width: 520px) {
-    flex: 1 1 auto;
+    flex: 0 0 auto;
   }
 
   @media screen and (max-width: 420px) {
@@ -1505,7 +1509,7 @@ const FlyoverButton = styled.button`
   }
 
   @media screen and (max-width: 420px) {
-    flex: 1 1 2.55rem;
+    flex: 0 0 2.4rem;
     min-width: 2.4rem;
     min-height: 2.45rem;
     padding: 0;
