@@ -34,6 +34,10 @@ const renderWithTheme = (ui) =>
 
 beforeEach(() => {
   localStorage.clear();
+  Object.defineProperty(window.navigator, 'onLine', {
+    configurable: true,
+    value: true,
+  });
 });
 
 test('renders the Strava login screen when unauthenticated', () => {
@@ -66,4 +70,33 @@ test('renders cached activities without an access token', async () => {
 
   expect(await screen.findByText('Cached morning run')).toBeInTheDocument();
   expect(screen.queryByAltText(/strava connect button/i)).not.toBeInTheDocument();
+});
+
+test('renders metrics from cached activities while offline', async () => {
+  Object.defineProperty(window.navigator, 'onLine', {
+    configurable: true,
+    value: false,
+  });
+  localStorage.setItem(
+    'activities',
+    JSON.stringify([
+      {
+        id: 1,
+        name: 'Offline morning run',
+        sport_type: 'Run',
+        start_date_local: '2026-05-01T08:00:00',
+        distance: 5000,
+        moving_time: 1500,
+        total_elevation_gain: 50,
+        average_heartrate: 140,
+        average_speed: 3.5,
+        map: {},
+      },
+    ]),
+  );
+
+  renderWithTheme(<Activities />);
+
+  expect(await screen.findByText('Performance Over Time')).toBeInTheDocument();
+  expect(screen.getByTestId('line-chart')).toBeInTheDocument();
 });
