@@ -6,6 +6,7 @@ import Activities from '../src/pages/AthleteActivities';
 jest.mock('react-chartjs-2', () => ({
   Doughnut: () => <div data-testid="doughnut-chart" />,
   Line: () => <div data-testid="line-chart" />,
+  Chart: () => <div data-testid="performance-chart" />,
 }));
 
 const theme = {
@@ -37,6 +38,11 @@ beforeEach(() => {
   Object.defineProperty(window.navigator, 'onLine', {
     configurable: true,
     value: true,
+  });
+  Object.defineProperty(window, 'innerWidth', {
+    configurable: true,
+    writable: true,
+    value: 1024,
   });
 });
 
@@ -72,7 +78,7 @@ test('renders cached activities without an access token', async () => {
   expect(screen.queryByAltText(/strava connect button/i)).not.toBeInTheDocument();
 });
 
-test('renders metrics from cached activities while offline', async () => {
+test('renders cached stream metrics on desktop while offline', async () => {
   Object.defineProperty(window.navigator, 'onLine', {
     configurable: true,
     value: false,
@@ -94,9 +100,43 @@ test('renders metrics from cached activities while offline', async () => {
       },
     ]),
   );
+  localStorage.setItem(
+    'performance-effort-v1-1',
+    JSON.stringify({
+      effort: 112,
+      climbingShare: 24,
+      averageClimbingGrade: 6,
+      elevationGain: 120,
+      averageHeartRate: 145,
+    }),
+  );
 
   renderWithTheme(<Activities />);
 
   expect(await screen.findByText('Performance Over Time')).toBeInTheDocument();
-  expect(screen.getByTestId('line-chart')).toBeInTheDocument();
+  expect(await screen.findByTestId('performance-chart')).toBeInTheDocument();
+});
+
+test('hides the performance chart below the 700px desktop breakpoint', async () => {
+  window.innerWidth = 400;
+  localStorage.setItem(
+    'activities',
+    JSON.stringify([
+      {
+        id: 1,
+        name: 'Mobile morning run',
+        sport_type: 'Run',
+        start_date: '2026-05-01T08:00:00Z',
+        distance: 5000,
+        moving_time: 1500,
+        map: {},
+      },
+    ]),
+  );
+
+  renderWithTheme(<Activities />);
+
+  expect(await screen.findByText('Mobile morning run')).toBeInTheDocument();
+  expect(screen.queryByText('Performance Over Time')).not.toBeInTheDocument();
+  expect(screen.queryByTestId('performance-chart')).not.toBeInTheDocument();
 });
