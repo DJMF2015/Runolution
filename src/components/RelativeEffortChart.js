@@ -1,233 +1,90 @@
 import React, { useMemo } from 'react';
-import { Line } from 'react-chartjs-2';
+import { Chart } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
+  BarElement,
   LineElement,
   PointElement,
   CategoryScale,
   LinearScale,
   Tooltip,
   Legend,
-  Filler,
 } from 'chart.js';
+import { buildPerformancePeriods } from '../utils/performanceMetrics';
+
+export {
+  getActivityStartDate,
+  getRollingSixMonthActivities,
+} from '../utils/performanceMetrics';
 
 ChartJS.register(
+  BarElement,
   LineElement,
   PointElement,
   CategoryScale,
   LinearScale,
   Tooltip,
   Legend,
-  Filler,
 );
 
-const toFiniteNumber = (value) => {
-  if (value === null || value === undefined || value === '') return null;
-
-  const number = Number(value);
-
-  return Number.isFinite(number) ? number : null;
+const getEffortColor = (effort) => {
+  if (!Number.isFinite(effort)) return 'rgba(148, 163, 184, 0.35)';
+  if (effort >= 120) return 'rgba(220, 38, 38, 0.82)';
+  if (effort >= 105) return 'rgba(249, 115, 22, 0.84)';
+  return 'rgba(22, 163, 74, 0.8)';
 };
 
-const speedToPace = (speed) => {
-  const numericSpeed = toFiniteNumber(speed);
-
-  if (!numericSpeed || numericSpeed <= 0) return null;
-
-  // Strava average_speed is metres per second.
-  const pace = 1000 / (numericSpeed * 60);
-
-  return Number(pace.toFixed(2));
-};
-
-const calculateEffortScore = (activity) => {
-  const elevation = toFiniteNumber(activity.total_elevation_gain) ?? 0;
-  const heartRate = toFiniteNumber(activity.average_heartrate) ?? 0;
-  const pace = speedToPace(activity.average_speed);
-
-  const paceScore = pace ? (6 / pace) * 100 : 0;
-
-  return Number((elevation * 0.5 + heartRate * 0.3 + paceScore * 0.2).toFixed(2));
-};
-
-const movingAverage = (data, windowSize = 3) => {
-  return data.map((_, index) => {
-    const start = Math.max(0, index - windowSize + 1);
-    const values = data
-      .slice(start, index + 1)
-      .filter((value) => value !== null && value !== undefined);
-
-    if (!values.length) return null;
-
-    const average = values.reduce((sum, value) => sum + value, 0) / values.length;
-
-    return Number(average.toFixed(2));
-  });
-};
-
-const formatPace = (decimalPace) => {
-  if (!decimalPace) return 'N/A';
-
-  const minutes = Math.floor(decimalPace);
-  const seconds = Math.round((decimalPace - minutes) * 60);
-
-  return `${minutes}:${String(seconds).padStart(2, '0')} /km`;
-};
-
-const getRollingSixMonthCutoff = (referenceDate) => {
-  const cutoff = new Date(referenceDate);
-  const dayOfMonth = cutoff.getUTCDate();
-
-  cutoff.setUTCDate(1);
-  cutoff.setUTCMonth(cutoff.getUTCMonth() - 6);
-
-  const lastDayOfCutoffMonth = new Date(
-    Date.UTC(cutoff.getUTCFullYear(), cutoff.getUTCMonth() + 1, 0),
-  ).getUTCDate();
-
-  cutoff.setUTCDate(Math.min(dayOfMonth, lastDayOfCutoffMonth));
-  cutoff.setUTCHours(0, 0, 0, 0);
-
-  return cutoff;
-};
-
-export const getActivityStartDate = (activity) => {
-  const rawDate = activity?.start_date ?? activity?.start_date_local;
-
-  if (rawDate === null || rawDate === undefined || rawDate === '') {
-    return null;
-  }
-
-  const normalizedDate =
-    typeof rawDate === 'number' && rawDate < 1000000000000
-      ? rawDate * 1000
-      : rawDate;
-  const activityDate = new Date(normalizedDate);
-
-  return Number.isNaN(activityDate.getTime()) ? null : activityDate;
-};
-
-export const getRollingSixMonthActivities = (
+const StravaMetricsChart = ({
   activities = [],
+  error,
+  isLoading = false,
+  metricsByActivity = {},
   referenceDate = new Date(),
-) => {
-  const rangeEnd = new Date(referenceDate);
-
-  if (Number.isNaN(rangeEnd.getTime())) {
-    return [];
-  }
-
-  rangeEnd.setUTCHours(23, 59, 59, 999);
-  const rangeStart = getRollingSixMonthCutoff(rangeEnd);
-
-  return (Array.isArray(activities) ? activities : [])
-    .filter((activity) => {
-      const activityDate = getActivityStartDate(activity);
-
-      return (
-        activityDate &&
-        activityDate >= rangeStart &&
-        activityDate <= rangeEnd
-      );
-    })
-    .sort((first, second) => {
-      return getActivityStartDate(first) - getActivityStartDate(second);
-    });
-};
-
-export const buildMetricsChartData = (activities) => {
-  const labels = activities.map((activity) =>
-    getActivityStartDate(activity).toLocaleDateString('en-GB', {
-      day: '2-digit',
-      month: 'short',
-    }),
-  );
-
-  const elevationData = activities.map(
-    (activity) => toFiniteNumber(activity.total_elevation_gain) ?? 0,
-  );
-
-  const heartRateData = movingAverage(
-    activities.map((activity) => toFiniteNumber(activity.average_heartrate)),
-    3,
-  );
-
-  const paceData = movingAverage(
-    activities.map((activity) => speedToPace(activity.average_speed)),
-    3,
-  );
-
-  const effortData = movingAverage(
-    activities.map((activity) => calculateEffortScore(activity)),
-    3,
-  );
-
-  return {
-    labels,
-    elevationData,
-    heartRateData,
-    paceData,
-    effortData,
-  };
-};
-
-const StravaMetricsChart = ({ activities = [], referenceDate = new Date() }) => {
+}) => {
   const referenceTime = new Date(referenceDate).getTime();
-  const recentActivities = useMemo(
-    () => getRollingSixMonthActivities(activities, new Date(referenceTime)),
-    [activities, referenceTime],
+  const periods = useMemo(
+    () =>
+      buildPerformancePeriods(
+        activities,
+        metricsByActivity,
+        new Date(referenceTime),
+      ),
+    [activities, metricsByActivity, referenceTime],
   );
-  const { labels, elevationData, heartRateData, paceData, effortData } =
-    useMemo(() => buildMetricsChartData(recentActivities), [recentActivities]);
+  const populatedPeriods = periods.filter((period) => Number.isFinite(period.effort));
+  const latestPeriod = [...populatedPeriods].pop();
 
   const data = {
-    labels,
+    labels: periods.map((period) => period.label),
     datasets: [
       {
-        label: 'Elevation Gain (m)',
-        data: elevationData,
-        borderColor: '#22c55e',
-        backgroundColor: 'rgba(34, 197, 94, 0.12)',
-        tension: 0.4,
-        pointRadius: 2,
-        pointHoverRadius: 5,
-        borderWidth: 2,
-        yAxisID: 'y',
+        type: 'bar',
+        label: 'Grade-adjusted effort',
+        data: periods.map((period) => period.effort),
+        backgroundColor: periods.map((period) => getEffortColor(period.effort)),
+        borderColor: periods.map((period) => getEffortColor(period.effort)),
+        borderWidth: 1,
+        borderRadius: 4,
+        maxBarThickness: 76,
+        yAxisID: 'effort',
+        order: 2,
       },
       {
-        label: 'Avg Heart Rate (bpm)',
-        data: heartRateData,
-        borderColor: '#ef4444',
-        backgroundColor: 'rgba(239, 68, 68, 0.12)',
-        tension: 0.4,
-        pointRadius: 2,
-        pointHoverRadius: 5,
-        borderWidth: 2,
-        yAxisID: 'y1',
-      },
-      {
-        label: 'Pace (min/km)',
-        data: paceData,
-        borderColor: '#3b82f6',
-        backgroundColor: 'rgba(59, 130, 246, 0.12)',
-        tension: 0.4,
-        pointRadius: 2,
-        pointHoverRadius: 5,
-        borderWidth: 2,
-        yAxisID: 'y2',
-      },
-
-      {
-        label: 'Effort Score',
-        data: effortData,
-        borderColor: '#a855f7',
-        backgroundColor: 'rgba(168, 85, 247, 0.12)',
-        borderDash: [6, 6],
-        tension: 0.4,
-        pointRadius: 2,
-        pointHoverRadius: 5,
-        borderWidth: 2,
-        yAxisID: 'y',
+        type: 'line',
+        label: 'Climbing share',
+        data: periods.map((period) => period.climbingShare),
+        borderColor: '#0891b2',
+        backgroundColor: '#ecfeff',
+        pointBackgroundColor: '#ffffff',
+        pointBorderColor: '#0891b2',
+        pointBorderWidth: 2,
+        tension: 0.32,
+        pointRadius: 4,
+        pointHoverRadius: 6,
+        borderWidth: 2.5,
+        yAxisID: 'climbing',
+        spanGaps: true,
+        order: 1,
       },
     ],
   };
@@ -241,23 +98,44 @@ const StravaMetricsChart = ({ activities = [], referenceDate = new Date() }) => 
     },
     plugins: {
       legend: {
-        position: 'top',
+        position: 'bottom',
         labels: {
-          boxWidth: 12,
+          color: '#334155',
+          boxWidth: 10,
           usePointStyle: true,
+          padding: 18,
+          font: {
+            size: 12,
+            weight: '600',
+          },
         },
       },
       tooltip: {
+        backgroundColor: 'rgba(15, 23, 42, 0.96)',
+        borderColor: 'rgba(148, 163, 184, 0.35)',
+        borderWidth: 1,
+        padding: 12,
         callbacks: {
           label: (context) => {
-            const label = context.dataset.label;
-            const value = context.parsed.y;
-
-            if (label === 'Pace (min/km)') {
-              return `${label}: ${formatPace(value)}`;
+            if (context.dataset.yAxisID === 'climbing') {
+              return `Climbing share: ${context.parsed.y}%`;
             }
 
-            return `${label}: ${value}`;
+            return `Grade-adjusted effort: ${context.parsed.y}`;
+          },
+          afterBody: (items) => {
+            const period = periods[items[0]?.dataIndex];
+
+            if (!period?.activityCount) return [];
+
+            return [
+              `${period.activityCount} streamed activities`,
+              `Average climbing grade: ${period.averageClimbingGrade}%`,
+              `Elevation gain sampled: ${Math.round(period.elevationGain)} m`,
+              period.averageHeartRate
+                ? `Average heart rate: ${Math.round(period.averageHeartRate)} bpm`
+                : '',
+            ].filter(Boolean);
           },
         },
       },
@@ -267,41 +145,53 @@ const StravaMetricsChart = ({ activities = [], referenceDate = new Date() }) => 
         ticks: {
           maxRotation: 0,
           autoSkip: true,
-          maxTicksLimit: 8,
+          maxTicksLimit: 6,
+          color: '#64748b',
+          font: {
+            size: 11,
+            weight: '600',
+          },
         },
         grid: {
           display: false,
         },
       },
-      y: {
+      effort: {
         type: 'linear',
         position: 'left',
+        suggestedMin: 80,
+        suggestedMax: 130,
         title: {
           display: true,
-          text: 'Elevation / Effort',
+          text: 'Effort index',
+          color: '#475569',
+        },
+        ticks: {
+          color: '#64748b',
+          maxTicksLimit: 6,
         },
         grid: {
-          color: 'rgba(0, 0, 0, 0.06)',
+          color: 'rgba(148, 163, 184, 0.18)',
         },
       },
-      y1: {
+      climbing: {
         type: 'linear',
         position: 'right',
+        min: 0,
+        max: 100,
         title: {
           display: true,
-          text: 'Heart Rate',
+          text: 'Climbing share',
+          color: '#475569',
+        },
+        ticks: {
+          color: '#64748b',
+          maxTicksLimit: 6,
+          callback: (value) => `${value}%`,
         },
         grid: {
           drawOnChartArea: false,
         },
-        min: 80,
-        max: 200,
-      },
-      y2: {
-        type: 'linear',
-        position: 'right',
-        display: false,
-        reverse: true,
       },
     },
   };
@@ -309,15 +199,53 @@ const StravaMetricsChart = ({ activities = [], referenceDate = new Date() }) => 
   return (
     <div style={styles.card}>
       <div style={styles.header}>
-        <h3 style={styles.title}>Performance Over Time</h3>
+        <div>
+          <span style={styles.eyebrow}>GRADE-ADJUSTED STREAM ANALYSIS</span>
+          <h3 style={styles.title}>Performance Over Time</h3>
+        </div>
         <p style={styles.subtitle}>
-          Distance, heart rate, pace and effort score across the last six months
+          Terrain, pace and heart-rate load across the latest six months
         </p>
       </div>
 
+      {populatedPeriods.length > 0 && (
+        <div style={styles.summary}>
+          <div>
+            <span style={styles.summaryLabel}>Latest effort</span>
+            <strong style={styles.summaryValue}>{latestPeriod.effort}</strong>
+          </div>
+          <div>
+            <span style={styles.summaryLabel}>Climbing share</span>
+            <strong style={styles.summaryValue}>
+              {latestPeriod.climbingShare ?? 0}%
+            </strong>
+          </div>
+          <div>
+            <span style={styles.summaryLabel}>Streamed activities</span>
+            <strong style={styles.summaryValue}>
+              {populatedPeriods.reduce(
+                (total, period) => total + period.activityCount,
+                0,
+              )}
+            </strong>
+          </div>
+        </div>
+      )}
+
       <div style={styles.chartWrapper}>
-        <Line data={data} options={options} />
+        {populatedPeriods.length ? (
+          <Chart type="bar" data={data} options={options} />
+        ) : (
+          <div style={styles.emptyState}>
+            {isLoading
+              ? 'Analysing grade-related activity streams...'
+              : error || 'No grade-related stream data is available yet.'}
+          </div>
+        )}
       </div>
+      {isLoading && populatedPeriods.length > 0 && (
+        <p style={styles.loadingNote}>Updating with additional activity streams...</p>
+      )}
     </div>
   );
 };
@@ -327,8 +255,8 @@ const styles = {
     marginTop: 0,
     background: '#ffffff',
     border: '1px solid #e5e7eb',
-    borderRadius: '14px',
-    padding: '20px',
+    borderRadius: '8px',
+    padding: '22px',
     boxShadow: '0 8px 24px rgba(15, 23, 42, 0.06)',
     width: '100%',
     maxWidth: 'none',
@@ -337,24 +265,66 @@ const styles = {
     boxSizing: 'border-box',
   },
   header: {
-    marginBottom: '12px',
+    marginBottom: '16px',
+  },
+  eyebrow: {
+    display: 'block',
+    marginBottom: '5px',
+    color: '#ea580c',
+    fontSize: '11px',
+    fontWeight: 800,
+    letterSpacing: 0,
   },
   title: {
     margin: 0,
-    fontSize: '18px',
-    fontWeight: 700,
-    color: '#111827',
+    fontSize: '21px',
+    fontWeight: 800,
+    color: '#0f172a',
   },
   subtitle: {
     margin: '4px 0 0',
     fontSize: '13px',
-    color: '#6b7280',
+    color: '#64748b',
+  },
+  summary: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '28px',
+    paddingBottom: '16px',
+    borderBottom: '1px solid #e2e8f0',
+    marginBottom: '12px',
+  },
+  summaryLabel: {
+    display: 'block',
+    marginBottom: '2px',
+    color: '#64748b',
+    fontSize: '11px',
+    fontWeight: 700,
+  },
+  summaryValue: {
+    color: '#0f172a',
+    fontSize: '18px',
+    fontWeight: 800,
   },
   chartWrapper: {
     position: 'relative',
-    height: 'clamp(300px, 48vw, 380px)',
+    height: 'clamp(330px, 38vw, 430px)',
     width: '100%',
     minWidth: 0,
+  },
+  emptyState: {
+    display: 'grid',
+    placeItems: 'center',
+    width: '100%',
+    height: '100%',
+    color: '#64748b',
+    fontSize: '14px',
+    textAlign: 'center',
+  },
+  loadingNote: {
+    margin: '4px 0 0',
+    color: '#64748b',
+    fontSize: '12px',
   },
 };
 

@@ -2,6 +2,7 @@ import React, { useCallback, useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { useGetWindowWidth } from '../hooks/useWindowWidth';
 import { useLocalStorageState } from '../hooks/useLocalStorageState';
+import { usePerformanceStreams } from '../hooks/usePerformanceStreams';
 import { useScroll } from '../hooks/useScroll';
 import {
   clearStravaAuth,
@@ -41,6 +42,7 @@ const AthleteActivities = () => {
   const [searchTxt, setSearchTxt] = useState('');
   const [state, setState] = useState(initialState);
   const [authError, setAuthError] = useState(null);
+  const [metricsReferenceDate, setMetricsReferenceDate] = useState(() => new Date());
   const [isOnline, setIsOnline] = useState(() =>
     typeof navigator === 'undefined' ? true : navigator.onLine,
   );
@@ -70,6 +72,18 @@ const AthleteActivities = () => {
     };
   }, []);
 
+  useEffect(() => {
+    const updateMetricsDate = () => setMetricsReferenceDate(new Date());
+    const refreshInterval = window.setInterval(updateMetricsDate, 60 * 60 * 1000);
+
+    window.addEventListener('focus', updateMetricsDate);
+
+    return () => {
+      window.clearInterval(refreshInterval);
+      window.removeEventListener('focus', updateMetricsDate);
+    };
+  }, []);
+
   const handleAuthError = useCallback((error) => {
     if (!isUnauthorizedError(error)) {
       console.error(error);
@@ -86,6 +100,12 @@ const AthleteActivities = () => {
     }));
     return true;
   }, []);
+  const performanceStreams = usePerformanceStreams({
+    activities: state.activities,
+    enabled: windowWidth >= 700 && isOnline && activitiesLoaded,
+    onAuthError: handleAuthError,
+    referenceDate: metricsReferenceDate,
+  });
 
   useEffect(() => {
     if (!isOnline) {
@@ -259,9 +279,15 @@ const AthleteActivities = () => {
               {isOnline && (
                 <BreakdownChart props={state.activities} onAuthError={handleAuthError} />
               )}
-              {state.activities.length > 0 && (
+              {windowWidth >= 700 && state.activities.length > 0 && (
                 <DashboardChartArea>
-                  <StravaMetricsChart activities={state.activities} />
+                  <StravaMetricsChart
+                    activities={state.activities}
+                    error={performanceStreams.error}
+                    isLoading={performanceStreams.isLoading}
+                    metricsByActivity={performanceStreams.metricsByActivity}
+                    referenceDate={metricsReferenceDate}
+                  />
                 </DashboardChartArea>
               )}
 
@@ -657,9 +683,8 @@ const DashboardChartArea = styled.section`
   margin-bottom: 1.5rem;
   box-sizing: border-box;
 
-  @media screen and (max-width: 980px) {
-    margin-top: 1rem;
-    margin-bottom: 1.25rem;
+  @media screen and (max-width: 699px) {
+    display: none;
   }
 `;
 

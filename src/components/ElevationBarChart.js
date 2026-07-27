@@ -12,6 +12,10 @@ import {
   Legend,
 } from 'chart.js';
 import { Chart } from 'react-chartjs-2';
+import {
+  getGradeAdjustedEffort,
+  getStreamData,
+} from '../utils/gradeAdjustedEffort';
 
 ChartJS.register(
   CategoryScale,
@@ -26,32 +30,9 @@ ChartJS.register(
 
 const METRES_PER_KM = 1000;
 const MAX_PROFILE_POINTS = 260;
-const EFFORT_BASELINE = 100;
-const EFFORT_WEIGHTS = {
-  elevation: 0.4,
-  heartRate: 0.35,
-  velocity: 0.25,
-};
-
 const toNumber = (value, fallback = null) => {
   const number = Number(value);
   return Number.isFinite(number) ? number : fallback;
-};
-
-const clamp = (value, min, max) => {
-  return Math.min(Math.max(value, min), max);
-};
-
-const getStreamData = (streams, key) => {
-  if (Array.isArray(streams)) {
-    return streams.find((stream) => stream?.type === key)?.data || [];
-  }
-
-  if (Array.isArray(streams?.[key])) {
-    return streams[key];
-  }
-
-  return streams?.[key]?.data || streams?.streams?.[key]?.data || [];
 };
 
 const getAverage = (values) => {
@@ -97,39 +78,12 @@ const getPerformancePoint = (velocity, isCycling) => {
   return Number((METRES_PER_KM / (velocity * 60)).toFixed(2));
 };
 
-/**
- * Effort is calculated from a weighted formula: - elevation/climb load: 40%, - heart-rate load: 35%, - velocity strain: 25%
- * @param {number} grade point
- * @returns number
- */
-const getGradeAdjustedEffort = ({
-  averageHeartRate,
-  averageVelocity,
-  distanceDeltaMetres,
-  elevationDifference,
-  heartRate,
-  velocity,
-}) => {
-  const positiveGradePercent =
-    (Math.max(elevationDifference, 0) / Math.max(distanceDeltaMetres, 1)) * 100;
-  const elevationLoad = clamp(1 + positiveGradePercent / 10, 0.75, 2);
-  const heartRateLoad =
-    heartRate && averageHeartRate ? clamp(heartRate / averageHeartRate, 0.75, 1.5) : 1;
-  const velocityLoad =
-    velocity && averageVelocity ? clamp(averageVelocity / velocity, 0.75, 1.5) : 1;
-  const weightedLoad =
-    elevationLoad * EFFORT_WEIGHTS.elevation +
-    heartRateLoad * EFFORT_WEIGHTS.heartRate +
-    velocityLoad * EFFORT_WEIGHTS.velocity;
-
-  return Number((EFFORT_BASELINE * weightedLoad).toFixed(1));
-};
-
 const getProfilePoints = (streams, isCycling = false) => {
   const altitudeStream = getStreamData(streams, 'altitude');
   const distanceStream = getStreamData(streams, 'distance');
   const heartRateStream = getStreamData(streams, 'heartrate');
   const velocityStream = getStreamData(streams, 'velocity_smooth');
+  const gradeStream = getStreamData(streams, 'grade_smooth');
   const sampleStep = Math.max(1, Math.ceil(altitudeStream.length / MAX_PROFILE_POINTS));
   const averageHeartRate = getAverage(heartRateStream.map((value) => toNumber(value)));
   const averageVelocity = getAverage(velocityStream.map((value) => toNumber(value)));
@@ -168,6 +122,7 @@ const getProfilePoints = (streams, isCycling = false) => {
         averageVelocity,
         distanceDeltaMetres,
         elevationDifference,
+        gradePercent: toNumber(gradeStream[index]),
         heartRate,
         velocity,
       }),

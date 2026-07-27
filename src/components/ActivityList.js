@@ -134,6 +134,9 @@ const CACHEABLE_STREAM_KEYS = [
   'distance',
   'heartrate',
   'velocity_smooth',
+  'grade_smooth',
+  'moving',
+  'time',
   'watts',
 ];
 
