@@ -25,6 +25,7 @@ import {
   getFlyoverAltitude,
   getFlyoverCameraState,
   getFlyoverCameraTarget,
+  getFlyoverDistanceAtProgress,
   getFlyoverDuration,
   getFlyoverRouteCoordinateAtDistance,
   getPreparedFlyoverRouteLine,
@@ -36,13 +37,11 @@ import {
   setActivityRouteData,
   setFlyoverRouteGradient,
   setFlyoverRouteProgress,
-  smoothFlyoverProgress,
 } from '../utils/flyOverHelper';
 import { getRouteOverviewCamera } from '../utils/activityDetailMap';
 import { isCyclingActivity } from '../utils/activityTypes';
 
 const MAX_FLYOVER_FRAME_DELTA_MS = 250;
-const FLYOVER_INTRO_MARKER_OVERLAP_MS = 500;
 const FLYOVER_INTRO_START_BEARING = 0;
 const TERRAIN_CAMERA_CLEARANCE_METRES = 420;
 const TERRAIN_OCCLUSION_SAMPLE_RATIOS = [0.2, 0.4, 0.6, 0.8];
@@ -155,17 +154,6 @@ const getIntroStartCamera = ({ fallbackCenter, fallbackZoom, overviewCamera }) =
   pitch: overviewCamera?.pitch ?? FLYOVER_INTRO_PULLBACK_PITCH,
   zoom: overviewCamera?.zoom ?? fallbackZoom,
 });
-
-const getMapCameraSnapshot = (map, fallbackCenter, fallbackZoom) => {
-  const center = typeof map?.getCenter === 'function' ? map.getCenter() : null;
-
-  return {
-    bearing: typeof map?.getBearing === 'function' ? map.getBearing() : 0,
-    center: center ? [center.lng, center.lat] : fallbackCenter,
-    pitch: typeof map?.getPitch === 'function' ? map.getPitch() : 0,
-    zoom: typeof map?.getZoom === 'function' ? map.getZoom() : fallbackZoom,
-  };
-};
 
 const getDroneCameraPadding = () => {
   return getIsMobileViewport()
@@ -737,11 +725,7 @@ export const useFlyoverAnimation = ({
     setShowFlyoverSummary(false);
     setFlyoverTilePrefetch(map);
     setFlyoverRouteGradient(map, currentMapStyleRef?.current);
-    if (flyoverCameraSettingsRef.current.mode === DRONE_FLYOVER_CAMERA_MODE) {
-      setActivityRouteData(map, routeLine);
-    } else {
-      setFlyoverRouteProgress(map, routeLine, 0, routeDistanceKm);
-    }
+    setActivityRouteData(map, routeLine);
     const marker = new mapboxgl.Marker({
       element: createFlyoverMarkerElement(currentMapStyleRef?.current),
       anchor: 'center',
@@ -808,14 +792,11 @@ export const useFlyoverAnimation = ({
       isThreeDimensional,
       isActivityNavCollapsedRef.current,
     );
-    const introStartCamera =
-      initialCameraSettings.mode === DRONE_FLYOVER_CAMERA_MODE
-        ? getIntroStartCamera({
-            fallbackCenter: initialCameraTarget.center,
-            fallbackZoom: introTargetZoom,
-            overviewCamera,
-          })
-        : getMapCameraSnapshot(map, initialCameraTarget.center, introTargetZoom);
+    const introStartCamera = getIntroStartCamera({
+      fallbackCenter: initialCameraTarget.center,
+      fallbackZoom: introTargetZoom,
+      overviewCamera,
+    });
     setIntroCamera({
       bearing: introStartCamera.bearing,
       center: introStartCamera.center,
@@ -859,7 +840,7 @@ export const useFlyoverAnimation = ({
       });
     };
 
-    const advanceFlyoverFrame = (timestamp, { updateCamera = true } = {}) => {
+    const advanceFlyoverFrame = (timestamp) => {
       if (!flyoverPreviousTimestamp) {
         flyoverPreviousTimestamp = timestamp;
       }
@@ -874,8 +855,10 @@ export const useFlyoverAnimation = ({
         1,
       );
 
-      const easedProgress = smoothFlyoverProgress(flyoverProgress);
-      const distanceKm = routeDistanceKm * easedProgress;
+      const distanceKm = getFlyoverDistanceAtProgress(
+        routeDistanceKm,
+        flyoverProgress,
+      );
       if (
         timestamp - lastRouteProgressTimestamp > FLYOVER_PROGRESS_UPDATE_MS ||
         flyoverProgress >= 1
@@ -949,10 +932,6 @@ export const useFlyoverAnimation = ({
               zoom: droneFrame.zoom,
             };
 
-        if (!updateCamera) {
-          return flyoverProgress;
-        }
-
         setTerrainAwareDroneCamera({
           droneFrame: terrainAwareDroneFrame,
           map,
@@ -964,10 +943,6 @@ export const useFlyoverAnimation = ({
           pitch: FLYOVER_PITCH,
           zoom: flyoverZoom,
         };
-
-        if (!updateCamera) {
-          return flyoverProgress;
-        }
 
         setFlyoverFreeCamera({
           altitude: flyoverAltitude,
@@ -1019,14 +994,6 @@ export const useFlyoverAnimation = ({
       const easedIntroProgress = easeCubicInOut(introProgress);
       const isDroneIntro =
         initialCameraSettings.mode === DRONE_FLYOVER_CAMERA_MODE;
-
-      if (
-        !isDroneIntro &&
-        timestamp - introStartTimestamp >=
-          FLYOVER_INTRO_DURATION_MS - FLYOVER_INTRO_MARKER_OVERLAP_MS
-      ) {
-        advanceFlyoverFrame(timestamp, { updateCamera: false });
-      }
 
       const introCenter = interpolateCoordinate(
         introStartCamera.center,

@@ -1081,12 +1081,13 @@ export const setFlyoverRouteGradient = (map, mapStyle) => {
 };
 
 /**
- * Applies an ease-in/ease-out curve to linear flyover progress.
+ * Converts elapsed playback progress into a constant distance along the route.
  */
-export const smoothFlyoverProgress = (progress) => {
-  const clampedProgress = clamp(progress, 0, 1);
+export const getFlyoverDistanceAtProgress = (routeDistanceKm, progress) => {
+  const safeRouteDistanceKm = Math.max(Number(routeDistanceKm) || 0, 0);
+  const linearProgress = clamp(Number(progress) || 0, 0, 1);
 
-  return 0.5 - Math.cos(clampedProgress * Math.PI) / 2;
+  return safeRouteDistanceKm * linearProgress;
 };
 
 const getBearingDelta = (currentBearing, targetBearing) => {

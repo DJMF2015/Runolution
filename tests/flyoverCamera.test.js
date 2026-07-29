@@ -13,6 +13,7 @@ import {
   getFlyoverAltitude,
   getFlyoverZoom,
   formatFlyoverStreamAveragePace,
+  getFlyoverDistanceAtProgress,
   getFlyoverRouteGradient,
   getFlyoverRouteDistanceKm,
   getPreparedFlyoverRouteLine,
@@ -191,6 +192,18 @@ describe('flyover camera framing', () => {
     expect(getFlyoverRouteGradient()).toBe('#fb0707');
     expect(getFlyoverRouteGradient('street')).toBe('#ff0000');
     expect(getFlyoverRouteGradient('satellite')).toBe('#e1ff00');
+  });
+
+  test('advances route distance at a constant rate through the endpoint', () => {
+    const distances = [0, 0.25, 0.5, 0.75, 1].map((progress) =>
+      getFlyoverDistanceAtProgress(10, progress),
+    );
+    const distanceSteps = distances.slice(1).map((distance, index) => {
+      return distance - distances[index];
+    });
+
+    expect(distances).toEqual([0, 2.5, 5, 7.5, 10]);
+    expect(distanceSteps).toEqual([2.5, 2.5, 2.5, 2.5]);
   });
 
   test('smooths bearing changes without snapping to large turns', () => {
