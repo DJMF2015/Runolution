@@ -147,7 +147,9 @@ const AthleteStats = ({ activities = [], athlete, onAuthError }) => {
             {athlete.firstname} {athlete.lastname}
           </AthleteName>
           <ProfileMeta>Followers: {athlete.follower_count || 0}</ProfileMeta>
-          <ProfileMeta>Clubs: {athlete.clubs?.length || 0}</ProfileMeta>
+          <ProfileMeta>
+            Clubs name: {athlete.clubs?.map((club) => club.name).join(', ') || 0}
+          </ProfileMeta>
         </ProfileText>
       </ProfileCard>
 
@@ -229,7 +231,7 @@ const ProfileCard = styled.div`
   align-items: center;
   gap: 1rem;
   margin-bottom: 1.25rem;
-  margin-top: -1rem;
+  margin-top: 1rem;
   padding: 1rem;
   background: rgba(17, 24, 39, 0.78);
   border: 1px solid rgba(148, 163, 184, 0.18);

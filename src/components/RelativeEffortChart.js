@@ -1,15 +1,17 @@
 import React, { useMemo } from 'react';
-import { Chart } from 'react-chartjs-2';
+import styled from 'styled-components';
 import {
-  Chart as ChartJS,
-  BarElement,
-  LineElement,
-  PointElement,
-  CategoryScale,
-  LinearScale,
-  Tooltip,
+  Area,
+  CartesianGrid,
+  ComposedChart,
   Legend,
-} from 'chart.js';
+  Line,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 import { buildPerformancePeriods } from '../utils/performanceMetrics';
 
 export {
@@ -17,21 +19,66 @@ export {
   getRollingSixMonthActivities,
 } from '../utils/performanceMetrics';
 
-ChartJS.register(
-  BarElement,
-  LineElement,
-  PointElement,
-  CategoryScale,
-  LinearScale,
-  Tooltip,
-  Legend,
-);
+const EFFORT_BASELINE = 100;
+const EFFORT_COLOR = '#ff6b35';
+const CLIMBING_COLOR = '#42d3c9';
 
-const getEffortColor = (effort) => {
-  if (!Number.isFinite(effort)) return 'rgba(148, 163, 184, 0.35)';
-  if (effort >= 120) return 'rgba(220, 38, 38, 0.82)';
-  if (effort >= 105) return 'rgba(249, 115, 22, 0.84)';
-  return 'rgba(22, 163, 74, 0.8)';
+const getEffortDomain = (periods) => {
+  const effortValues = periods.map((period) => period.effort).filter(Number.isFinite);
+
+  if (!effortValues.length) {
+    return [80, 130];
+  }
+
+  const minimum = Math.min(EFFORT_BASELINE, ...effortValues);
+  const maximum = Math.max(EFFORT_BASELINE, ...effortValues);
+
+  return [
+    Math.max(0, Math.floor((minimum - 8) / 10) * 10),
+    Math.ceil((maximum + 8) / 10) * 10,
+  ];
+};
+
+const getShortPeriodLabel = (label) => label.split(' - ')[0];
+
+const PerformanceTooltip = ({ active, payload }) => {
+  if (!active || !payload?.length) {
+    return null;
+  }
+
+  const period = payload[0].payload;
+
+  return (
+    <TooltipPanel>
+      <TooltipPeriod>{period.label}</TooltipPeriod>
+      <TooltipMetric>
+        <TooltipMetricLabel>
+          <TooltipSwatch $color={EFFORT_COLOR} />
+          Effort index
+        </TooltipMetricLabel>
+        <strong>{Number.isFinite(period.effort) ? period.effort : 'No data'}</strong>
+      </TooltipMetric>
+      <TooltipMetric>
+        <TooltipMetricLabel>
+          <TooltipSwatch $color={CLIMBING_COLOR} />
+          Climbing share
+        </TooltipMetricLabel>
+        <strong>
+          {Number.isFinite(period.climbingShare) ? `${period.climbingShare}%` : 'No data'}
+        </strong>
+      </TooltipMetric>
+      {period.activityCount > 0 && (
+        <TooltipDetails>
+          <span>{period.activityCount} streamed activities</span>
+          <span>Average climbing grade: {period.averageClimbingGrade}%</span>
+          <span>Elevation gain sampled: {Math.round(period.elevationGain)} m</span>
+          {period.averageHeartRate && (
+            <span>Average heart rate: {Math.round(period.averageHeartRate)} bpm</span>
+          )}
+        </TooltipDetails>
+      )}
+    </TooltipPanel>
+  );
 };
 
 const StravaMetricsChart = ({
@@ -43,289 +90,354 @@ const StravaMetricsChart = ({
 }) => {
   const referenceTime = new Date(referenceDate).getTime();
   const periods = useMemo(
-    () =>
-      buildPerformancePeriods(
-        activities,
-        metricsByActivity,
-        new Date(referenceTime),
-      ),
+    () => buildPerformancePeriods(activities, metricsByActivity, new Date(referenceTime)),
     [activities, metricsByActivity, referenceTime],
   );
+  const chartData = useMemo(
+    () =>
+      periods.map((period) => ({
+        ...period,
+        shortLabel: getShortPeriodLabel(period.label),
+      })),
+    [periods],
+  );
+  const effortDomain = useMemo(() => getEffortDomain(periods), [periods]);
   const populatedPeriods = periods.filter((period) => Number.isFinite(period.effort));
-  const latestPeriod = [...populatedPeriods].pop();
-
-  const data = {
-    labels: periods.map((period) => period.label),
-    datasets: [
-      {
-        type: 'bar',
-        label: 'Grade-adjusted effort',
-        data: periods.map((period) => period.effort),
-        backgroundColor: periods.map((period) => getEffortColor(period.effort)),
-        borderColor: periods.map((period) => getEffortColor(period.effort)),
-        borderWidth: 1,
-        borderRadius: 4,
-        maxBarThickness: 76,
-        yAxisID: 'effort',
-        order: 2,
-      },
-      {
-        type: 'line',
-        label: 'Climbing share',
-        data: periods.map((period) => period.climbingShare),
-        borderColor: '#0891b2',
-        backgroundColor: '#ecfeff',
-        pointBackgroundColor: '#ffffff',
-        pointBorderColor: '#0891b2',
-        pointBorderWidth: 2,
-        tension: 0.32,
-        pointRadius: 4,
-        pointHoverRadius: 6,
-        borderWidth: 2.5,
-        yAxisID: 'climbing',
-        spanGaps: true,
-        order: 1,
-      },
-    ],
-  };
-
-  const options = {
-    responsive: true,
-    maintainAspectRatio: false,
-    interaction: {
-      mode: 'index',
-      intersect: false,
-    },
-    plugins: {
-      legend: {
-        position: 'bottom',
-        labels: {
-          color: '#334155',
-          boxWidth: 10,
-          usePointStyle: true,
-          padding: 18,
-          font: {
-            size: 12,
-            weight: '600',
-          },
-        },
-      },
-      tooltip: {
-        backgroundColor: 'rgba(15, 23, 42, 0.96)',
-        borderColor: 'rgba(148, 163, 184, 0.35)',
-        borderWidth: 1,
-        padding: 12,
-        callbacks: {
-          label: (context) => {
-            if (context.dataset.yAxisID === 'climbing') {
-              return `Climbing share: ${context.parsed.y}%`;
-            }
-
-            return `Grade-adjusted effort: ${context.parsed.y}`;
-          },
-          afterBody: (items) => {
-            const period = periods[items[0]?.dataIndex];
-
-            if (!period?.activityCount) return [];
-
-            return [
-              `${period.activityCount} streamed activities`,
-              `Average climbing grade: ${period.averageClimbingGrade}%`,
-              `Elevation gain sampled: ${Math.round(period.elevationGain)} m`,
-              period.averageHeartRate
-                ? `Average heart rate: ${Math.round(period.averageHeartRate)} bpm`
-                : '',
-            ].filter(Boolean);
-          },
-        },
-      },
-    },
-    scales: {
-      x: {
-        ticks: {
-          maxRotation: 0,
-          autoSkip: true,
-          maxTicksLimit: 6,
-          color: '#64748b',
-          font: {
-            size: 11,
-            weight: '600',
-          },
-        },
-        grid: {
-          display: false,
-        },
-      },
-      effort: {
-        type: 'linear',
-        position: 'left',
-        suggestedMin: 80,
-        suggestedMax: 130,
-        title: {
-          display: true,
-          text: 'Effort index',
-          color: '#475569',
-        },
-        ticks: {
-          color: '#64748b',
-          maxTicksLimit: 6,
-        },
-        grid: {
-          color: 'rgba(148, 163, 184, 0.18)',
-        },
-      },
-      climbing: {
-        type: 'linear',
-        position: 'right',
-        min: 0,
-        max: 100,
-        title: {
-          display: true,
-          text: 'Climbing share',
-          color: '#475569',
-        },
-        ticks: {
-          color: '#64748b',
-          maxTicksLimit: 6,
-          callback: (value) => `${value}%`,
-        },
-        grid: {
-          drawOnChartArea: false,
-        },
-      },
-    },
-  };
+  const latestPeriod = populatedPeriods[populatedPeriods.length - 1];
+  const streamedActivityCount = populatedPeriods.reduce(
+    (total, period) => total + period.activityCount,
+    0,
+  );
 
   return (
-    <div style={styles.card}>
-      <div style={styles.header}>
+    <ChartCard data-testid="performance-card">
+      <ChartHeader>
         <div>
-          <span style={styles.eyebrow}>GRADE-ADJUSTED STREAM ANALYSIS</span>
-          <h3 style={styles.title}>Performance Over Time</h3>
+          <Eyebrow>GRADE-ADJUSTED STREAM ANALYSIS</Eyebrow>
+          <ChartTitle>Performance Over Time</ChartTitle>
         </div>
-        <p style={styles.subtitle}>
+        <ChartSubtitle>
           Terrain, pace and heart-rate load across the latest six months
-        </p>
-      </div>
+        </ChartSubtitle>
+      </ChartHeader>
 
       {populatedPeriods.length > 0 && (
-        <div style={styles.summary}>
-          <div>
-            <span style={styles.summaryLabel}>Latest effort</span>
-            <strong style={styles.summaryValue}>{latestPeriod.effort}</strong>
-          </div>
-          <div>
-            <span style={styles.summaryLabel}>Climbing share</span>
-            <strong style={styles.summaryValue}>
-              {latestPeriod.climbingShare ?? 0}%
-            </strong>
-          </div>
-          <div>
-            <span style={styles.summaryLabel}>Streamed activities</span>
-            <strong style={styles.summaryValue}>
-              {populatedPeriods.reduce(
-                (total, period) => total + period.activityCount,
-                0,
-              )}
-            </strong>
-          </div>
-        </div>
+        <Summary>
+          <SummaryItem>
+            <SummaryLabel>Latest effort</SummaryLabel>
+            <SummaryValue>{latestPeriod.effort}</SummaryValue>
+          </SummaryItem>
+          <SummaryItem>
+            <SummaryLabel>Climbing share</SummaryLabel>
+            <SummaryValue>{latestPeriod.climbingShare ?? 0}%</SummaryValue>
+          </SummaryItem>
+          <SummaryItem>
+            <SummaryLabel>Streamed activities</SummaryLabel>
+            <SummaryValue>{streamedActivityCount}</SummaryValue>
+          </SummaryItem>
+        </Summary>
       )}
 
-      <div style={styles.chartWrapper}>
+      <ChartFrame
+        data-testid="performance-chart"
+        data-period-count={periods.length}
+        data-populated-count={populatedPeriods.length}
+      >
         {populatedPeriods.length ? (
-          <Chart type="bar" data={data} options={options} />
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart
+              accessibilityLayer
+              data={chartData}
+              margin={{ top: 8, right: 10, bottom: 2, left: 4 }}
+            >
+              <defs>
+                <linearGradient id="effortArea" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={EFFORT_COLOR} stopOpacity={0.48} />
+                  <stop offset="100%" stopColor={EFFORT_COLOR} stopOpacity={0.04} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid
+                stroke="rgba(148, 163, 184, 0.16)"
+                strokeDasharray="3 5"
+                vertical={false}
+              />
+              <XAxis
+                dataKey="shortLabel"
+                axisLine={{ stroke: 'rgba(203, 213, 225, 0.35)' }}
+                tick={{ fill: '#b8c4ce', fontSize: 11, fontWeight: 600 }}
+                tickLine={false}
+                tickMargin={10}
+                minTickGap={14}
+              />
+              <YAxis
+                yAxisId="effort"
+                domain={effortDomain}
+                tickCount={5}
+                allowDecimals={false}
+                axisLine={false}
+                tickLine={false}
+                tick={{ fill: '#b8c4ce', fontSize: 11 }}
+                tickMargin={8}
+                width={56}
+                label={{
+                  value: 'Effort index',
+                  angle: -90,
+                  position: 'insideLeft',
+                  fill: '#94a3b8',
+                  fontSize: 10,
+                }}
+              />
+              <YAxis
+                yAxisId="climbing"
+                orientation="right"
+                domain={[0, 100]}
+                tickCount={5}
+                allowDecimals={false}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={(value) => `${value}%`}
+                tick={{ fill: '#b8c4ce', fontSize: 11 }}
+                tickMargin={8}
+                width={60}
+                label={{
+                  value: 'Climbing share',
+                  angle: 90,
+                  position: 'insideRight',
+                  fill: '#94a3b8',
+                  fontSize: 10,
+                }}
+              />
+              <Tooltip content={<PerformanceTooltip />} cursor={{ fill: '#ffffff08' }} />
+              <Legend
+                align="center"
+                verticalAlign="top"
+                height={34}
+                iconSize={9}
+                wrapperStyle={{ color: '#dbe5ed', fontSize: 11, fontWeight: 600 }}
+              />
+              <ReferenceLine
+                yAxisId="effort"
+                y={EFFORT_BASELINE}
+                stroke="rgba(226, 232, 240, 0.45)"
+                strokeDasharray="5 5"
+                label={{
+                  value: 'Baseline 100',
+                  position: 'insideTopLeft',
+                  fill: '#aab7c2',
+                  fontSize: 10,
+                }}
+              />
+              <Area
+                yAxisId="effort"
+                type="monotone"
+                dataKey="effort"
+                name="Grade-adjusted effort"
+                stroke={EFFORT_COLOR}
+                strokeWidth={3}
+                fill="url(#effortArea)"
+                connectNulls
+                activeDot={{
+                  r: 5,
+                  fill: EFFORT_COLOR,
+                  stroke: '#071018',
+                  strokeWidth: 2,
+                }}
+                animationDuration={650}
+              />
+              <Line
+                yAxisId="climbing"
+                type="monotone"
+                dataKey="climbingShare"
+                name="Climbing share"
+                stroke={CLIMBING_COLOR}
+                strokeWidth={2.5}
+                connectNulls
+                dot={{ r: 3, fill: '#071018', stroke: CLIMBING_COLOR, strokeWidth: 2 }}
+                activeDot={{
+                  r: 5,
+                  fill: CLIMBING_COLOR,
+                  stroke: '#071018',
+                  strokeWidth: 2,
+                }}
+                animationDuration={650}
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
         ) : (
-          <div style={styles.emptyState}>
+          <EmptyState>
             {isLoading
               ? 'Analysing grade-related activity streams...'
               : error || 'No grade-related stream data is available yet.'}
-          </div>
+          </EmptyState>
         )}
-      </div>
+      </ChartFrame>
       {isLoading && populatedPeriods.length > 0 && (
-        <p style={styles.loadingNote}>Updating with additional activity streams...</p>
+        <LoadingNote>Updating with additional activity streams...</LoadingNote>
       )}
-    </div>
+    </ChartCard>
   );
 };
 
-const styles = {
-  card: {
-    marginTop: 0,
-    background: '#ffffff',
-    border: '1px solid #e5e7eb',
-    borderRadius: '8px',
-    padding: '22px',
-    boxShadow: '0 8px 24px rgba(15, 23, 42, 0.06)',
-    width: '100%',
-    maxWidth: 'none',
-    minWidth: 0,
-    overflow: 'hidden',
-    boxSizing: 'border-box',
-  },
-  header: {
-    marginBottom: '16px',
-  },
-  eyebrow: {
-    display: 'block',
-    marginBottom: '5px',
-    color: '#ea580c',
-    fontSize: '11px',
-    fontWeight: 800,
-    letterSpacing: 0,
-  },
-  title: {
-    margin: 0,
-    fontSize: '21px',
-    fontWeight: 800,
-    color: '#0f172a',
-  },
-  subtitle: {
-    margin: '4px 0 0',
-    fontSize: '13px',
-    color: '#64748b',
-  },
-  summary: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: '28px',
-    paddingBottom: '16px',
-    borderBottom: '1px solid #e2e8f0',
-    marginBottom: '12px',
-  },
-  summaryLabel: {
-    display: 'block',
-    marginBottom: '2px',
-    color: '#64748b',
-    fontSize: '11px',
-    fontWeight: 700,
-  },
-  summaryValue: {
-    color: '#0f172a',
-    fontSize: '18px',
-    fontWeight: 800,
-  },
-  chartWrapper: {
-    position: 'relative',
-    height: 'clamp(330px, 38vw, 430px)',
-    width: '100%',
-    minWidth: 0,
-  },
-  emptyState: {
-    display: 'grid',
-    placeItems: 'center',
-    width: '100%',
-    height: '100%',
-    color: '#64748b',
-    fontSize: '14px',
-    textAlign: 'center',
-  },
-  loadingNote: {
-    margin: '4px 0 0',
-    color: '#64748b',
-    fontSize: '12px',
-  },
-};
+const ChartCard = styled.section`
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+  padding: 1.05rem 1.15rem 0.9rem;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 8px;
+  background: #111827c7;
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.24);
+
+  @media screen and (max-width: 699px) {
+    display: none;
+  }
+`;
+
+const ChartHeader = styled.header`
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1.25rem;
+  margin-bottom: 0.75rem;
+
+  @media screen and (max-width: 840px) {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+`;
+
+const Eyebrow = styled.span`
+  display: block;
+  margin-bottom: 0.2rem;
+  color: #ff7a45;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0;
+`;
+
+const ChartTitle = styled.h3`
+  margin: 0;
+  color: #f8fafc;
+  font-size: 1.12rem;
+  font-weight: 800;
+  letter-spacing: 0;
+`;
+
+const ChartSubtitle = styled.p`
+  max-width: 27rem;
+  margin: 0;
+  color: #9fadb9;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  text-align: right;
+
+  @media screen and (max-width: 840px) {
+    max-width: none;
+    text-align: left;
+  }
+`;
+
+const Summary = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.65rem;
+  margin-bottom: 0.6rem;
+  padding-bottom: 0.65rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+`;
+
+const SummaryItem = styled.div`
+  min-width: 6.5rem;
+`;
+
+const SummaryLabel = styled.span`
+  display: block;
+  margin-bottom: 0.05rem;
+  color: #94a3b8;
+  font-size: 0.65rem;
+  font-weight: 700;
+`;
+
+const SummaryValue = styled.strong`
+  color: #f8fafc;
+  font-size: 1rem;
+  font-weight: 800;
+`;
+
+const ChartFrame = styled.div`
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  height: clamp(230px, 27vw, 300px);
+`;
+
+const EmptyState = styled.div`
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  color: #aab7c2;
+  font-size: 0.82rem;
+  text-align: center;
+`;
+
+const LoadingNote = styled.p`
+  margin: 0.25rem 0 0;
+  color: #94a3b8;
+  font-size: 0.7rem;
+`;
+
+const TooltipPanel = styled.div`
+  min-width: 13rem;
+  padding: 0.7rem 0.75rem;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 6px;
+  background: rgba(5, 12, 18, 0.97);
+  color: #e2e8f0;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.38);
+`;
+
+const TooltipPeriod = styled.strong`
+  display: block;
+  margin-bottom: 0.55rem;
+  color: #ffffff;
+  font-size: 0.76rem;
+`;
+
+const TooltipMetric = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 0.3rem;
+  font-size: 0.72rem;
+`;
+
+const TooltipMetricLabel = styled.span`
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: #cbd5e1;
+`;
+
+const TooltipSwatch = styled.span`
+  width: 0.45rem;
+  height: 0.45rem;
+  flex: 0 0 0.45rem;
+  border-radius: 50%;
+  background: ${(props) => props.$color};
+`;
+
+const TooltipDetails = styled.div`
+  display: grid;
+  gap: 0.15rem;
+  margin-top: 0.6rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.2);
+  color: #9fadb9;
+  font-size: 0.67rem;
+`;
 
 export default StravaMetricsChart;

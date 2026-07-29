@@ -9,16 +9,17 @@ import {
   selectBalancedStreamActivities,
 } from '../src/utils/performanceMetrics';
 
-jest.mock('react-chartjs-2', () => ({
-  Chart: ({ data }) => (
-    <div
-      data-testid="performance-chart"
-      data-period-count={data.labels.length}
-      data-populated-count={data.datasets[0].data.filter(Number.isFinite).length}
-    >
-      {data.labels.join('|')}
-    </div>
-  ),
+jest.mock('recharts', () => ({
+  Area: ({ dataKey }) => <g data-testid="effort-series" data-key={dataKey} />,
+  CartesianGrid: () => null,
+  ComposedChart: ({ children }) => <svg>{children}</svg>,
+  Legend: () => null,
+  Line: ({ dataKey }) => <g data-testid="climbing-series" data-key={dataKey} />,
+  ReferenceLine: ({ y }) => <g data-testid="effort-baseline" data-value={y} />,
+  ResponsiveContainer: ({ children }) => <div>{children}</div>,
+  Tooltip: () => null,
+  XAxis: ({ dataKey }) => <g data-testid="metrics-x-axis" data-key={dataKey} />,
+  YAxis: ({ yAxisId }) => <g data-testid="metrics-y-axis" data-axis={yAxisId} />,
 }));
 
 const createActivity = (id, startDate) => ({
@@ -152,12 +153,18 @@ test('renders a responsive six-period grade effort chart', () => {
   );
 
   const chart = screen.getByTestId('performance-chart');
-  const card = screen.getByText('Performance Over Time').parentElement.parentElement
-    .parentElement;
+  const card = screen.getByTestId('performance-card');
 
   expect(chart).toHaveAttribute('data-period-count', '6');
   expect(chart).toHaveAttribute('data-populated-count', '2');
-  expect(card).toHaveStyle({ width: '100%', maxWidth: 'none', minWidth: 0 });
+  expect(card).toHaveStyle({ width: '100%', minWidth: 0, background: '#071018' });
+  expect(screen.getByTestId('effort-series')).toHaveAttribute('data-key', 'effort');
+  expect(screen.getByTestId('climbing-series')).toHaveAttribute(
+    'data-key',
+    'climbingShare',
+  );
+  expect(screen.getByTestId('effort-baseline')).toHaveAttribute('data-value', '100');
+  expect(screen.getAllByTestId('metrics-y-axis')).toHaveLength(2);
   expect(screen.getByText(/across the latest six months/i)).toBeInTheDocument();
   expect(screen.getByText('Latest effort')).toBeInTheDocument();
 });

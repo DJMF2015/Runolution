@@ -600,7 +600,7 @@ const DashboardSidebar = styled.aside`
   padding: 1rem;
   height: fit-content;
   position: sticky;
-  top: 6rem;
+  top: 1rem;
   box-shadow: 0 18px 36px rgba(0, 0, 0, 0.28);
   box-sizing: border-box;
 
@@ -852,7 +852,7 @@ const MobileActivitiesList = styled.div`
   display: flex;
   flex-direction: column;
   gap: 12px;
-  margin-top: 80px;
+  margin-top: 30px;
 `;
 
 const MobileActivityCard = styled.div`
