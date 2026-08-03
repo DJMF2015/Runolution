@@ -1,367 +1,322 @@
-import React from 'react';
+import { useMemo, useState } from 'react';
 import styled from 'styled-components';
 import {
-  Chart as ChartJS,
-  BarElement,
-  BarController,
-  LineController,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Filler,
+  CartesianGrid,
+  ComposedChart,
+  Line,
+  ResponsiveContainer,
   Tooltip,
-  Legend,
-} from 'chart.js';
-import { Chart } from 'react-chartjs-2';
+  XAxis,
+  YAxis,
+} from 'recharts';
+import { getStreamData, toStreamNumber } from '../utils/gradeAdjustedEffort';
 
-ChartJS.register(
-  BarElement,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  BarController,
-  LineController,
-  LineElement,
-  Tooltip,
-  Legend,
-  Filler,
-);
+const MAX_CHART_POINTS = 250;
+const HEART_RATE_COLOR = '#f08b67';
+const PACE_COLOR = '#61b7e5';
 
-const HEART_RATE_AREA_COLOR = 'rgba(220, 38, 38, 0.16)';
-const HEART_RATE_BORDER_COLOR = '#111111';
-const HEART_RATE_POINT_COLOR = '#dc2626';
-
-const secondsToMinutes = (seconds) => {
-  return Number((Number(seconds || 0) / 60).toFixed(2));
-};
-
-const secondsToTimeLabel = (seconds) => {
-  const totalSeconds = Number(seconds || 0);
-  const minutes = Math.floor(totalSeconds / 60);
-  const remainder = Math.round(totalSeconds % 60);
-  return `${minutes}:${String(remainder).padStart(2, '0')}`;
-};
-
-const getPaceMinutesPerKm = (row) => {
-  const distanceMetres = Number(row?.distance);
-  const elapsedSeconds = Number(row?.elapsed_time);
-
-  if (
-    !Number.isFinite(distanceMetres) ||
-    !Number.isFinite(elapsedSeconds) ||
-    distanceMetres <= 0 ||
-    elapsedSeconds <= 0
-  ) {
+const getSampleValue = (stream, index, sampleCount) => {
+  if (!stream.length) {
     return null;
   }
 
-  return Number((elapsedSeconds / (distanceMetres / 1000) / 60).toFixed(2));
+  const streamIndex =
+    sampleCount <= 1 ? 0 : Math.round((index / (sampleCount - 1)) * (stream.length - 1));
+
+  return toStreamNumber(stream[streamIndex]);
 };
 
-const getPaceFromRow = (row) => {
-  return getPaceMinutesPerKm(row);
-};
-
-const getStreamData = (streams, key) => {
-  if (Array.isArray(streams)) {
-    return streams.find((stream) => stream?.type === key)?.data || [];
+const getSampleIndexes = (sampleCount, maxPoints) => {
+  if (sampleCount <= maxPoints) {
+    return Array.from({ length: sampleCount }, (_, index) => index);
   }
 
-  if (Array.isArray(streams?.[key])) {
-    return streams[key];
-  }
-
-  return streams?.[key]?.data || streams?.streams?.[key]?.data || [];
-};
-
-const sampleStreamToLength = (streamData, itemCount) => {
-  if (!Array.isArray(streamData) || !streamData.length || !itemCount) {
-    return [];
-  }
-
-  if (itemCount === 1) {
-    return [streamData[0]];
-  }
-
-  const lastStreamIndex = streamData.length - 1;
-
-  return Array.from({ length: itemCount }, (_, index) => {
-    const streamIndex = Math.round((index / (itemCount - 1)) * lastStreamIndex);
-
-    return streamData[streamIndex];
-  });
-};
-
-const getStreamSampleValue = (streams, key, index, itemCount, formatter = Number) => {
-  const samples = sampleStreamToLength(getStreamData(streams, key), itemCount);
-  const value = formatter(samples[index]);
-
-  return Number.isFinite(value) ? value : null;
-};
-
-const getSplitHeartRate = (streams, split, index, splitCount) => {
-  return (
-    getStreamSampleValue(streams, 'heartrate', index, splitCount, Math.round) ??
-    (split?.average_heartrate ? Math.round(split.average_heartrate) : null)
+  return Array.from({ length: maxPoints }, (_, index) =>
+    Math.round((index / (maxPoints - 1)) * (sampleCount - 1)),
   );
 };
 
-const getAxisRange = (values, fallbackMax, paddingRatio = 0.12) => {
-  const numericValues = values.filter((value) => Number.isFinite(value));
+const getPaceMinutesPerKm = (velocity) => {
+  if (!Number.isFinite(velocity) || velocity <= 0) {
+    return null;
+  }
 
-  if (!numericValues.length) {
+  const pace = 1000 / (velocity * 60);
+
+  return pace >= 0.5 && pace <= 30 ? Number(pace.toFixed(2)) : null;
+};
+
+export const buildActivityStreamChartData = (streams, maxPoints = MAX_CHART_POINTS) => {
+  const distance = getStreamData(streams, 'distance');
+  const heartRate = getStreamData(streams, 'heartrate');
+  const time = getStreamData(streams, 'time');
+  const velocity = getStreamData(streams, 'velocity_smooth');
+  const sampleCount = Math.max(
+    distance.length,
+    heartRate.length,
+    time.length,
+    velocity.length,
+  );
+
+  if (!sampleCount) {
     return {
-      min: 0,
-      max: fallbackMax,
+      data: [],
+      xAxisLabel: 'Distance (km)',
+      xValueSuffix: 'km',
     };
   }
 
-  const minValue = Math.min(...numericValues);
-  const maxValue = Math.max(...numericValues);
-  const spread = Math.max(maxValue - minValue, maxValue * 0.08, 1);
-  const padding = spread * paddingRatio;
+  const usesDistance = distance.length > 0;
+  const usesTime = !usesDistance && time.length > 0;
+  const data = getSampleIndexes(sampleCount, maxPoints)
+    .map((index) => {
+      const distanceMetres = getSampleValue(distance, index, sampleCount);
+      const elapsedSeconds = getSampleValue(time, index, sampleCount);
+      const sampleVelocity = getSampleValue(velocity, index, sampleCount);
+      const position = usesDistance
+        ? distanceMetres / 1000
+        : usesTime
+          ? elapsedSeconds / 60
+          : sampleCount === 1
+            ? 0
+            : (index / (sampleCount - 1)) * 100;
+
+      return {
+        position: Number(position.toFixed(2)),
+        heartRate: getSampleValue(heartRate, index, sampleCount),
+        pace: getPaceMinutesPerKm(sampleVelocity),
+      };
+    })
+    .filter(
+      (point) =>
+        Number.isFinite(point.position) &&
+        [point.heartRate, point.pace].some(Number.isFinite),
+    );
 
   return {
-    min: Math.max(0, Math.floor(minValue - padding)),
-    max: Math.ceil(maxValue + padding),
+    data,
+    xAxisLabel: usesDistance
+      ? 'Distance (km)'
+      : usesTime
+        ? 'Elapsed time (min)'
+        : 'Activity progress (%)',
+    xValueSuffix: usesDistance ? 'km' : usesTime ? 'min' : '%',
   };
 };
 
-const getChartOptions = (paces, heartRates, velocities, hasHeartRate, hasVelocity) => {
-  const paceRange = getAxisRange(paces, 6, 0.16);
-  const heartRateRange = getAxisRange(heartRates, 180, 0.18);
+const getAxisDomain = (values, fallback, minimumPadding) => {
+  const numericValues = values.filter(Number.isFinite);
 
-  return {
-    indexAxis: 'y',
-    responsive: true,
-    maintainAspectRatio: false,
-    interaction: {
-      mode: 'index',
-      intersect: false,
-    },
-    plugins: {
-      legend: {
-        position: 'bottom',
-        labels: {
-          color: '#0f0f0f',
-          boxWidth: 12,
-          usePointStyle: true,
-          padding: 14,
-          font: {
-            size: 12,
-            weight: '700',
-          },
-        },
-      },
-      tooltip: {
-        backgroundColor: 'rgba(15, 23, 42, 0.96)',
-        borderColor: 'rgba(252, 82, 0, 0.45)',
-        borderWidth: 1,
-        titleColor: '#ffffff',
-        bodyColor: '#e5e7eb',
-        padding: 12,
-        displayColors: true,
-        callbacks: {
-          label: (context) => {
-            if (context.dataset.xAxisID === 'heartRate') {
-              return `Heart rate: ${context.parsed.x || 0} bpm`;
-            }
-            return `Pace: ${secondsToTimeLabel((context.parsed.x || 0) * 60)} /km`;
-          },
-        },
-      },
-    },
-    scales: {
-      y: {
-        type: 'category',
-        position: 'left',
-        ticks: {
-          color: '#0b0b0b',
-          autoSkip: true,
-          maxTicksLimit: 10,
-          font: {
-            size: 11,
-            weight: '700',
-          },
-        },
-        grid: {
-          display: false,
-        },
-      },
-      pace: {
-        type: 'linear',
-        position: 'bottom',
-        min: paceRange.min,
-        suggestedMax: paceRange.max,
-        ticks: {
-          color: '#fc5200',
-          maxTicksLimit: 6,
-          callback: (value) => `${secondsToTimeLabel(Number(value) * 60)}`,
-        },
-        grid: {
-          color: 'rgba(252, 82, 0, 0.13)',
-        },
-        title: {
-          display: true,
-          text: 'Pace /km',
-          color: '#fc5200',
-          font: {
-            size: 12,
-            weight: '800',
-          },
-        },
-      },
-      heartRate: {
-        type: 'linear',
-        position: 'top',
-        display: hasHeartRate,
-        min: heartRateRange.min,
-        suggestedMax: heartRateRange.max,
-        ticks: {
-          color: HEART_RATE_BORDER_COLOR,
-          maxTicksLimit: 5,
-          callback: (value) => `${value}`,
-        },
-        grid: {
-          drawOnChartArea: false,
-        },
-        title: {
-          display: true,
-          text: 'Heart rate (bpm)',
-          color: HEART_RATE_BORDER_COLOR,
-          font: {
-            size: 12,
-            weight: '800',
-          },
-        },
-      },
-    },
-  };
+  if (!numericValues.length) {
+    return fallback;
+  }
+
+  const minimum = Math.min(...numericValues);
+  const maximum = Math.max(...numericValues);
+  const padding = Math.max((maximum - minimum) * 0.1, minimumPadding);
+
+  return [
+    Math.max(0, Number((minimum - padding).toFixed(1))),
+    Number((maximum + padding).toFixed(1)),
+  ];
 };
 
-const getMileSplits = (activity, streams) => {
-  const splits = activity?.splits_standard || [];
-
-  if (splits.length) {
-    return splits.map((split, index) => ({
-      label: `Mile ${split.split || index + 1}`,
-      elapsedTime: secondsToMinutes(split.elapsed_time),
-      pace: getPaceFromRow(split),
-      heartRate: getSplitHeartRate(streams, split, index, splits.length),
-    }));
+export const formatPace = (pace) => {
+  if (!Number.isFinite(Number(pace))) {
+    return '—';
   }
 
-  const metricSplits = activity?.splits_metric || [];
+  const totalSeconds = Math.round(Number(pace) * 60);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
 
-  if (metricSplits.length) {
-    return metricSplits.map((split, index) => ({
-      label: `Km ${split.split || index + 1}`,
-      elapsedTime: secondsToMinutes(split.elapsed_time),
-      pace: getPaceFromRow(split),
-      heartRate: getSplitHeartRate(streams, split, index, metricSplits.length),
-    }));
-  }
-
-  const laps = activity?.laps || [];
-
-  if (laps.length) {
-    return laps.map((lap, index) => ({
-      label: `Lap ${lap.split || index + 1}`,
-      elapsedTime: secondsToMinutes(lap.elapsed_time),
-      pace: getPaceFromRow(lap),
-      heartRate: getSplitHeartRate(streams, lap, index, laps.length),
-    }));
-  }
-
-  const bestEfforts = activity?.best_efforts || [];
-
-  return bestEfforts.map((effort, index) => ({
-    label: effort.name || `Mile ${index + 1}`,
-    elapsedTime: secondsToMinutes(effort.elapsed_time),
-    pace: getPaceFromRow(effort),
-    heartRate: getSplitHeartRate(streams, effort, index, bestEfforts.length),
-  }));
+  return `${minutes}:${String(seconds).padStart(2, '0')}`;
 };
 
-export default function BestEffortsChart({ props, streams }) {
-  const mileSplits = getMileSplits(props, streams);
-
-  if (!mileSplits.length) {
-    return <EmptyChart>No mile split data available for this activity.</EmptyChart>;
+const StreamTooltip = ({ active, payload, xValueSuffix }) => {
+  if (!active || !payload?.length) {
+    return null;
   }
 
-  const labels = mileSplits.map((split) => split.label);
-  const paces = mileSplits.map((split) => split.pace);
-  const heartRates = mileSplits.map((split) => split.heartRate);
-  const velocities = mileSplits.map((split) => split.velocity);
-  const hasPace = paces.some((pace) => Number.isFinite(pace));
-  const hasHeartRate = heartRates.some((heartRate) => Number.isFinite(heartRate));
-  const hasVelocity = velocities.some((velocity) => Number.isFinite(velocity));
-  const options = getChartOptions(
-    paces,
-    heartRates,
-    velocities,
-    hasHeartRate,
-    hasVelocity,
+  const point = payload[0]?.payload;
+
+  if (!point) {
+    return null;
+  }
+
+  return (
+    <TooltipPanel>
+      <TooltipPosition>
+        {point.position} {xValueSuffix}
+      </TooltipPosition>
+      {Number.isFinite(point.heartRate) && (
+        <TooltipValue $color={HEART_RATE_COLOR}>
+          Heart rate: {Math.round(point.heartRate)} bpm
+        </TooltipValue>
+      )}
+      {Number.isFinite(point.pace) && (
+        <TooltipValue $color={PACE_COLOR}>
+          Pace: {formatPace(point.pace)} /km
+        </TooltipValue>
+      )}
+    </TooltipPanel>
   );
+};
 
-  const data = {
-    labels,
-    datasets: [
-      {
-        label: 'Split pace (/km)',
-        type: 'bar',
-        data: paces,
-        xAxisID: 'pace',
-        yAxisID: 'y',
-        borderColor: 'rgba(194, 65, 12, 0.9)',
-        backgroundColor: 'rgba(252, 82, 0, 0.96)',
-        hoverBackgroundColor: 'rgba(255, 106, 36, 1)',
-        borderWidth: 1,
-        borderRadius: 5,
-        barPercentage: 0.7,
-        categoryPercentage: 0.74,
-        order: 1,
-        hidden: !hasPace,
-      },
-      {
-        label: 'Heart rate from stream (bpm)',
-        type: 'line',
-        data: heartRates,
-        xAxisID: 'heartRate',
-        yAxisID: 'y',
-        borderColor: HEART_RATE_BORDER_COLOR,
-        backgroundColor: HEART_RATE_AREA_COLOR,
-        pointBackgroundColor: HEART_RATE_POINT_COLOR,
-        pointBorderColor: HEART_RATE_BORDER_COLOR,
-        pointBorderWidth: 2,
-        pointHoverRadius: 6,
-        pointRadius: 3.5,
-        tension: 0.38,
-        borderWidth: 2,
-        fill: 'origin',
-        order: 2,
-        spanGaps: true,
-        hidden: !hasHeartRate,
-      },
-    ],
+const SeriesToggle = ({ active, color, disabled, label, onClick }) => (
+  <ToggleButton
+    type="button"
+    aria-pressed={active}
+    disabled={disabled}
+    $active={active}
+    $color={color}
+    onClick={onClick}
+  >
+    <ToggleSwatch $color={color} />
+    {label}
+  </ToggleButton>
+);
+
+export default function ActivityStreamChart({ streams }) {
+  const [visibleSeries, setVisibleSeries] = useState({
+    elevation: true,
+    heartRate: true,
+    pace: true,
+  });
+  const { data, xAxisLabel, xValueSuffix } = useMemo(
+    () => buildActivityStreamChartData(streams),
+    [streams],
+  );
+  const availableSeries = {
+    elevation: data.some((point) => Number.isFinite(point.elevation)),
+    heartRate: data.some((point) => Number.isFinite(point.heartRate)),
+    pace: data.some((point) => Number.isFinite(point.pace)),
+  };
+
+  if (!data.length) {
+    return <EmptyChart>No activity stream data is available for this chart.</EmptyChart>;
+  }
+
+  const heartRateDomain = getAxisDomain(
+    data.map((point) => point.heartRate),
+    [80, 180],
+    5,
+  );
+  const paceDomain = getAxisDomain(
+    data.map((point) => point.pace),
+    [3, 8],
+    0.25,
+  );
+  const toggleSeries = (series) => {
+    setVisibleSeries((current) => ({
+      ...current,
+      [series]: !current[series],
+    }));
   };
 
   return (
     <ChartPanel>
       <ChartHeader>
-        <ChartTitle>Mile Splits</ChartTitle>
-        <ChartSubtitle>Pace by split with heart rate and velocity overlays</ChartSubtitle>
+        <ChartSubtitle>
+          Compare cardiovascular response, and pace across the activity.
+        </ChartSubtitle>
+        <ToggleGroup aria-label="Chart series">
+          <SeriesToggle
+            active={visibleSeries.heartRate}
+            color={HEART_RATE_COLOR}
+            disabled={!availableSeries.heartRate}
+            label="Heart rate"
+            onClick={() => toggleSeries('heartRate')}
+          />
+          <SeriesToggle
+            active={visibleSeries.pace}
+            color={PACE_COLOR}
+            disabled={!availableSeries.pace}
+            label="Pace"
+            onClick={() => toggleSeries('pace')}
+          />
+        </ToggleGroup>
       </ChartHeader>
-      <ChartWrapper $rowCount={mileSplits.length}>
-        <Chart
-          type="bar"
-          data={data}
-          options={options}
-          role="img"
-          aria-label="Mile splits chart showing split pace, heart rate and velocity"
-        />
+
+      <ChartWrapper>
+        <ResponsiveContainer width="100%" height="100%">
+          <ComposedChart
+            data={data}
+            margin={{ top: 12, right: 2, left: 0, bottom: 20 }}
+            accessibilityLayer
+            aria-label="Elevation heart rate and pace by distance"
+          >
+            <CartesianGrid stroke="#29372f" strokeDasharray="2 4" vertical={false} />
+            <XAxis
+              dataKey="position"
+              type="number"
+              domain={['dataMin', 'dataMax']}
+              stroke="#819087"
+              tick={{ fill: '#9aa89f', fontSize: 11 }}
+              tickLine={false}
+              minTickGap={24}
+              label={{
+                value: xAxisLabel,
+                position: 'insideBottom',
+                offset: -12,
+                fill: '#9aa89f',
+                fontSize: 11,
+              }}
+            />
+            <YAxis
+              yAxisId="heartRate"
+              orientation="right"
+              domain={heartRateDomain}
+              stroke={HEART_RATE_COLOR}
+              tick={{ fill: HEART_RATE_COLOR, fontSize: 10 }}
+              tickLine={false}
+              tickCount={5}
+              width={42}
+              unit="bpm"
+            />
+            <YAxis
+              yAxisId="pace"
+              orientation="right"
+              domain={paceDomain}
+              reversed
+              stroke={PACE_COLOR}
+              tick={{ fill: PACE_COLOR, fontSize: 10 }}
+              tickFormatter={formatPace}
+              tickLine={false}
+              tickCount={5}
+              width={38}
+            />
+            <Tooltip
+              content={<StreamTooltip xValueSuffix={xValueSuffix} />}
+              cursor={{ stroke: '#aab8af', strokeDasharray: '3 3' }}
+            />
+            {visibleSeries.heartRate && availableSeries.heartRate && (
+              <Line
+                yAxisId="heartRate"
+                type="monotone"
+                dataKey="heartRate"
+                stroke={HEART_RATE_COLOR}
+                strokeWidth={2}
+                dot={false}
+                connectNulls
+                isAnimationActive={false}
+              />
+            )}
+            {visibleSeries.pace && availableSeries.pace && (
+              <Line
+                yAxisId="pace"
+                type="monotone"
+                dataKey="pace"
+                stroke={PACE_COLOR}
+                strokeWidth={2}
+                strokeDasharray="5 4"
+                dot={false}
+                connectNulls
+                isAnimationActive={false}
+              />
+            )}
+          </ComposedChart>
+        </ResponsiveContainer>
       </ChartWrapper>
     </ChartPanel>
   );
@@ -371,78 +326,133 @@ const ChartPanel = styled.div`
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  padding: 1rem;
   box-sizing: border-box;
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  border-radius: 12px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 247, 249, 0.96)),
-    radial-gradient(circle at top right, rgba(252, 82, 0, 0.14), transparent 34%);
-  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.18);
-
-  @media screen and (max-width: 700px) {
-    padding: 0.85rem;
-    border-radius: 12px;
-  }
+  color: #eef3ee;
 `;
 
 const ChartHeader = styled.div`
-  margin-bottom: 0.85rem;
-`;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.8rem;
 
-const ChartTitle = styled.h3`
-  margin: 0;
-  color: #111827;
-  font-size: 1rem;
-  line-height: 1.2;
+  @media screen and (max-width: 520px) {
+    flex-direction: column;
+  }
 `;
 
 const ChartSubtitle = styled.p`
-  margin: 0.25rem 0 0;
-  color: #4b5563;
-  font-size: 0.82rem;
-  line-height: 1.35;
+  max-width: 31rem;
+  margin: 0;
+  color: #aab7af;
+  font-size: 0.78rem;
+  line-height: 1.45;
+`;
+
+const ToggleGroup = styled.div`
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.4rem;
+
+  @media screen and (max-width: 520px) {
+    width: 100%;
+    justify-content: flex-start;
+  }
+`;
+
+const ToggleButton = styled.button`
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 30px;
+  padding: 0.3rem 0.55rem;
+  border: 1px solid ${({ $active, $color }) => ($active ? $color : '#3b4941')};
+  border-radius: 999px;
+  background: ${({ $active, $color }) => ($active ? `${$color}18` : 'transparent')};
+  color: ${({ $active, $color }) => ($active ? $color : '#7f8c84')};
+  font: inherit;
+  font-size: 0.7rem;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid #ffffff;
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.35;
+  }
+
+  @media screen and (max-width: 380px) {
+    min-height: 28px;
+    padding: 0.25rem 0.42rem;
+    font-size: 0.65rem;
+  }
+`;
+
+const ToggleSwatch = styled.span`
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: ${({ $color }) => $color};
 `;
 
 const ChartWrapper = styled.div`
   width: 100%;
-  max-width: 100%;
-  height: ${({ $rowCount }) =>
-    `${Math.min(Math.max(Number($rowCount || 0) * 42 + 150, 340), 680)}px`};
+  height: clamp(300px, 38vw, 390px);
   min-width: 0;
-  position: relative;
   overflow: hidden;
-
-  canvas {
-    max-width: 100%;
-  }
+  border: 1px solid #26372d;
+  border-radius: 8px;
+  background: #111a15;
 
   @media screen and (max-width: 700px) {
-    height: ${({ $rowCount }) =>
-      `${Math.min(Math.max(Number($rowCount || 0) * 38 + 145, 320), 620)}px`};
+    height: 330px;
   }
 
   @media screen and (max-width: 420px) {
-    height: ${({ $rowCount }) =>
-      `${Math.min(Math.max(Number($rowCount || 0) * 36 + 140, 320), 580)}px`};
+    height: 310px;
   }
+`;
+
+const TooltipPanel = styled.div`
+  min-width: 150px;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid #3a4d42;
+  border-radius: 8px;
+  background: rgba(22, 34, 27, 0.97);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.3);
+  color: #eef3ee;
+  font-size: 0.74rem;
+`;
+
+const TooltipPosition = styled.div`
+  margin-bottom: 0.35rem;
+  color: #aab7af;
+`;
+
+const TooltipValue = styled.div`
+  color: ${({ $color }) => $color};
+  line-height: 1.55;
 `;
 
 const EmptyChart = styled.div`
   width: 100%;
-  max-width: 100%;
-  height: 300px;
+  min-height: 300px;
   display: grid;
   place-items: center;
   padding: 1rem;
   box-sizing: border-box;
+  border: 1px solid #26372d;
+  border-radius: 8px;
+  background: #111a15;
+  color: #aab7af;
   text-align: center;
-  color: #020202;
-  background: rgba(15, 23, 42, 0.94);
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  border-radius: 14px;
-
-  @media screen and (max-width: 700px) {
-    height: 250px;
-  }
 `;

@@ -5,7 +5,7 @@ import { getAthleteStreams, getDetailedAthleteData } from '../utils/functions';
 import { fetchTokenInfo, getNewAccessToken, isUnauthorizedError } from '../utils/helpers';
 import { hasCyclingPowerData, isCyclingActivity } from '../utils/activityTypes';
 import { useScroll } from '../hooks/useScroll';
-import PaceZoneBarChart from './BestEffortsChart';
+import ActivityStreamChart from './BestEffortsChart';
 import ElevationChart from './ElevationBarChart';
 import { useEffect, useState } from 'react';
 import { ArrowUpCircleFill } from '@styled-icons/bootstrap/ArrowUpCircleFill';
@@ -416,21 +416,20 @@ export default function ActivityList() {
       </HeaderCard>
 
       <ChartsGrid>
-        <ChartCard>
-          <ChartHeading>Best Efforts</ChartHeading>
-          {isDetailLoading ? (
-            <DetailLoading>Loading best efforts...</DetailLoading>
-          ) : detailedActivity ? (
-            <PaceZoneBarChart props={detailedActivity} streams={activityStreams} />
+        <DarkChartCard>
+          <DarkChartHeading>Heart Rate & Pace</DarkChartHeading>
+          {isStreamLoading ? (
+            <DarkDetailLoading>Loading activity streams...</DarkDetailLoading>
+          ) : activityStreams ? (
+            <ActivityStreamChart streams={activityStreams} />
           ) : (
-            <DetailLoading>{detailError}</DetailLoading>
+            <DarkDetailLoading>{streamError}</DarkDetailLoading>
           )}
-        </ChartCard>
+        </DarkChartCard>
 
-        <ChartCard>
-          <ChartHeading>Elevation & Effort</ChartHeading>
+        <DarkChartCard>
           {isDetailLoading ? (
-            <DetailLoading>Loading elevation data...</DetailLoading>
+            <DarkDetailLoading>Loading elevation data...</DarkDetailLoading>
           ) : detailedActivity ? (
             <ElevationChart
               streams={activityStreams}
@@ -439,9 +438,9 @@ export default function ActivityList() {
               isCycling={isCycling}
             />
           ) : (
-            <DetailLoading>{detailError}</DetailLoading>
+            <DarkDetailLoading>{detailError}</DarkDetailLoading>
           )}
-        </ChartCard>
+        </DarkChartCard>
       </ChartsGrid>
 
       <ResponsiveSection>
@@ -670,10 +669,19 @@ const ChartCard = styled.section`
   }
 `;
 
+const DarkChartCard = styled(ChartCard)`
+  background: #0b100d;
+  border-color: #26372d;
+`;
+
 const ChartHeading = styled.h2`
   margin: 0 0 1rem;
   color: #111;
   font-size: 1rem;
+`;
+
+const DarkChartHeading = styled(ChartHeading)`
+  color: #eef3ee;
 `;
 
 const DetailLoading = styled.div`
@@ -685,6 +693,10 @@ const DetailLoading = styled.div`
   color: #111827;
   text-align: center;
   font-weight: 700;
+`;
+
+const DarkDetailLoading = styled(DetailLoading)`
+  color: #aab7af;
 `;
 
 const ResponsiveSection = styled.section`

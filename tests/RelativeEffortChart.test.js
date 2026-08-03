@@ -146,7 +146,12 @@ test('renders a responsive six-period grade effort chart', () => {
       activities={activities}
       metricsByActivity={{
         1: { effort: 102, climbingShare: 12, averageClimbingGrade: 4, elevationGain: 80 },
-        2: { effort: 118, climbingShare: 32, averageClimbingGrade: 7, elevationGain: 220 },
+        2: {
+          effort: 118,
+          climbingShare: 32,
+          averageClimbingGrade: 7,
+          elevationGain: 220,
+        },
       }}
       referenceDate={new Date('2026-07-27T12:00:00Z')}
     />,
@@ -157,7 +162,10 @@ test('renders a responsive six-period grade effort chart', () => {
 
   expect(chart).toHaveAttribute('data-period-count', '6');
   expect(chart).toHaveAttribute('data-populated-count', '2');
-  expect(card).toHaveStyle({ width: '100%', minWidth: 0, background: '#071018' });
+  expect(card).toHaveStyle({
+    width: '100%',
+    background: 'rgba(17, 24, 39, 0.78)',
+  });
   expect(screen.getByTestId('effort-series')).toHaveAttribute('data-key', 'effort');
   expect(screen.getByTestId('climbing-series')).toHaveAttribute(
     'data-key',
