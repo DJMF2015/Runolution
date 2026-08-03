@@ -10,26 +10,42 @@ jest.mock('../src/utils/functions', () => ({
 }));
 
 jest.mock('../src/utils/helpers', () => {
-  const actual = jest.requireActual('../src/utils/helpers');
-
   return {
-    ...actual,
     fetchTokenInfo: jest.fn(),
     getNewAccessToken: jest.fn(),
+    isUnauthorizedError: (error) =>
+      error?.status === 401 || error?.response?.status === 401,
   };
 });
 
 jest.mock('react-chartjs-2', () => ({
   Chart: ({ data }) => (
     <div
-      data-testid={
-        data?.datasets?.some((dataset) => dataset.label === 'Grade adjusted effort')
-          ? 'elevation-chart'
-          : 'best-efforts-chart'
-      }
+      data-testid="elevation-chart"
     />
   ),
   Line: () => <div data-testid="elevation-chart" />,
+}));
+
+jest.mock('recharts', () => ({
+  ResponsiveContainer: ({ children }) => <div>{children}</div>,
+  ComposedChart: ({ children, 'aria-label': ariaLabel }) => (
+    <svg
+      data-testid={
+        ariaLabel === 'Elevation and grade adjusted effort by distance'
+          ? 'elevation-chart'
+          : 'activity-stream-chart'
+      }
+    >
+      {children}
+    </svg>
+  ),
+  Area: () => null,
+  CartesianGrid: () => null,
+  Line: () => null,
+  Tooltip: () => null,
+  XAxis: () => null,
+  YAxis: () => null,
 }));
 
 const summaryActivity = {
@@ -144,10 +160,11 @@ test('renders charts and tables from detailed activity passed in route state', a
     athleteStreams: activityStreams,
   });
 
-  expect(await screen.findByText('Mile Splits')).toBeInTheDocument();
-  expect(screen.getByText('Elevation & Effort')).toBeInTheDocument();
-  expect(screen.getByText('Elevation & Grade Adjusted Effort')).toBeInTheDocument();
-  expect(screen.getByTestId('best-efforts-chart')).toBeInTheDocument();
+  expect(await screen.findByText('Heart Rate & Pace')).toBeInTheDocument();
+  expect(
+    await screen.findByText('Elevation & Grade Adjusted Effort'),
+  ).toBeInTheDocument();
+  expect(await screen.findByTestId('activity-stream-chart')).toBeInTheDocument();
   expect(screen.getByTestId('elevation-chart')).toBeInTheDocument();
   expect(screen.getByText('Lap 1')).toBeInTheDocument();
   expect(screen.getByText('Hill Segment')).toBeInTheDocument();
@@ -167,7 +184,7 @@ test('shows cycling power metrics for ride splits and segment efforts', async ()
     athleteStreams: activityStreams,
   });
 
-  expect(await screen.findByText('Mile Splits')).toBeInTheDocument();
+  expect(await screen.findByText('Heart Rate & Pace')).toBeInTheDocument();
   expect(screen.getByText('Ride Lap 1')).toBeInTheDocument();
   expect(screen.getByText('Climb Segment')).toBeInTheDocument();
   expect(screen.getAllByText('Avg Watts').length).toBeGreaterThan(0);
@@ -188,10 +205,11 @@ test('fetches full activity details when only summary activity is routed', async
 
   renderActivityList({ from: summaryActivity });
 
-  expect(await screen.findByText('Mile Splits')).toBeInTheDocument();
-  expect(screen.getByText('Elevation & Effort')).toBeInTheDocument();
-  expect(screen.getByText('Elevation & Grade Adjusted Effort')).toBeInTheDocument();
-  expect(screen.getByTestId('best-efforts-chart')).toBeInTheDocument();
+  expect(await screen.findByText('Heart Rate & Pace')).toBeInTheDocument();
+  expect(
+    await screen.findByText('Elevation & Grade Adjusted Effort'),
+  ).toBeInTheDocument();
+  expect(screen.getByTestId('activity-stream-chart')).toBeInTheDocument();
   expect(await screen.findByTestId('elevation-chart')).toBeInTheDocument();
   expect(screen.getByText('Lap 1')).toBeInTheDocument();
   expect(screen.getByText('Hill Segment')).toBeInTheDocument();
@@ -211,9 +229,10 @@ test('refreshes and retries when the detailed activity request is unauthorized',
 
   renderActivityList({ from: summaryActivity });
 
-  expect(await screen.findByText('Mile Splits')).toBeInTheDocument();
-  expect(screen.getByText('Elevation & Effort')).toBeInTheDocument();
-  expect(screen.getByText('Elevation & Grade Adjusted Effort')).toBeInTheDocument();
+  expect(await screen.findByText('Heart Rate & Pace')).toBeInTheDocument();
+  expect(
+    await screen.findByText('Elevation & Grade Adjusted Effort'),
+  ).toBeInTheDocument();
   expect(screen.getByText('Lap 1')).toBeInTheDocument();
   expect(screen.getByText('Hill Segment')).toBeInTheDocument();
   expect(getDetailedAthleteData).toHaveBeenNthCalledWith(1, 123, 'stale-token');
@@ -227,10 +246,9 @@ test('renders cached full activity details when no token is available', async ()
 
   renderActivityList({ from: summaryActivity });
 
-  expect(await screen.findByText('Mile Splits')).toBeInTheDocument();
-  expect(screen.getByText('Elevation & Effort')).toBeInTheDocument();
+  expect(await screen.findByText('Heart Rate & Pace')).toBeInTheDocument();
   expect(screen.getByText('Elevation & Grade Adjusted Effort')).toBeInTheDocument();
-  expect(screen.getByTestId('best-efforts-chart')).toBeInTheDocument();
+  expect(screen.getByTestId('activity-stream-chart')).toBeInTheDocument();
   expect(screen.getByTestId('elevation-chart')).toBeInTheDocument();
   expect(screen.getByText('Lap 1')).toBeInTheDocument();
   expect(screen.getByText('Hill Segment')).toBeInTheDocument();

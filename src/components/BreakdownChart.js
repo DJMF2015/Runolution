@@ -344,7 +344,7 @@ const ChartGrid = styled.div`
 const ChartCanvasWrap = styled.div`
   position: relative;
   width: min(100%, 360px);
-  height: 300px;
+  height: 350px;
   margin: 0 auto;
 
   canvas {
