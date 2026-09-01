@@ -1,6 +1,4 @@
-const {
-  migrateLegacyMiddlewareHooks,
-} = require('../scripts/start');
+const { migrateLegacyMiddlewareHooks } = require('../scripts/start');
 
 test('migrates CRA middleware hooks without changing their order', () => {
   const beforeMiddleware = jest.fn();
@@ -20,10 +18,7 @@ test('migrates CRA middleware hooks without changing their order', () => {
     name: 'webpack-dev-middleware',
     middleware: jest.fn(),
   };
-  const middlewares = config.setupMiddlewares(
-    [builtInMiddleware],
-    { app },
-  );
+  const middlewares = config.setupMiddlewares([builtInMiddleware], { app });
 
   expect(config.onBeforeSetupMiddleware).toBeUndefined();
   expect(config.onAfterSetupMiddleware).toBeUndefined();

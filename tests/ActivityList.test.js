@@ -19,11 +19,7 @@ jest.mock('../src/utils/helpers', () => {
 });
 
 jest.mock('react-chartjs-2', () => ({
-  Chart: ({ data }) => (
-    <div
-      data-testid="elevation-chart"
-    />
-  ),
+  Chart: ({ data }) => <div data-testid="elevation-chart" />,
   Line: () => <div data-testid="elevation-chart" />,
 }));
 

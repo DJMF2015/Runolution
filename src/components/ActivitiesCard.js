@@ -1384,7 +1384,7 @@ const MapStyleControl = styled.div`
   justify-items: end;
   gap: 0.6rem;
 
-  @media screen and (max-width: 800px) {
+  @media screen and (max-width: 1023px) {
     right: 0.75rem;
     bottom: ${(props) =>
       props.$navCollapsed
@@ -1432,6 +1432,12 @@ const TopFlyoverControlBar = styled.div`
     right: 4.5rem;
     gap: 0.35rem;
     max-width: calc(100vw - 5.25rem);
+  }
+
+  @media screen and (max-width: 340px) {
+    top: 4.5rem;
+    right: 0.75rem;
+    max-width: calc(100vw - 1.5rem);
   }
 `;
 
@@ -1497,23 +1503,10 @@ const FlyoverButton = styled.button`
   }
 
   @media screen and (max-width: 520px) {
-    min-height: 2.55rem;
-    gap: 0.28rem;
-    padding: 0 0.55rem;
-    font-size: 0.74rem;
-
-    svg {
-      width: 0.92rem;
-      height: 0.92rem;
-    }
-  }
-
-  @media screen and (max-width: 420px) {
-    flex: 0 0 2.4rem;
-    min-width: 2.4rem;
-    min-height: 2.45rem;
+    flex: 0 0 2.75rem;
+    min-width: 2.75rem;
+    min-height: 2.75rem;
     padding: 0;
-    font-size: 0.68rem;
   }
 `;
 
@@ -1529,11 +1522,6 @@ const FlyoverSpeedValue = styled.span`
   font-size: 0.78rem;
   font-weight: 900;
   text-align: center;
-
-  @media screen and (max-width: 420px) {
-    min-width: 2.55rem;
-    font-size: 0.68rem;
-  }
 `;
 
 const FlyoverLabel = styled.span`
@@ -1572,7 +1560,7 @@ const FlyoverLiveStats = styled.div`
     left: ${(props) => (props.$navCollapsed ? '5.1rem' : 'calc(260px + 1rem)')};
   }
 
-  @media screen and (max-width: 800px) {
+  @media screen and (max-width: 1023px) {
     left: 1rem;
     bottom: ${(props) =>
       props.$navCollapsed
@@ -1956,7 +1944,7 @@ const ScrollToTop = styled(ArrowUpCircleFill)`
   cursor: pointer;
   filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.45));
 
-  @media screen and (max-width: 750px) {
+  @media screen and (max-width: 1023px) {
     width: 2.75rem;
     height: 2.75rem;
     right: 0.85rem;
@@ -2006,7 +1994,7 @@ const SideNavigation = styled.aside`
     padding: ${(props) => (props.$collapsed ? '0.58rem' : '0.9rem')};
   }
 
-  @media screen and (max-width: 800px) {
+  @media screen and (max-width: 1023px) {
     top: auto;
     left: 0.75rem;
     right: 0.75rem;
@@ -2091,7 +2079,7 @@ const ActivityNavToggle = styled.button`
     transform: translateY(-1px);
   }
 
-  @media screen and (max-width: 800px) {
+  @media screen and (max-width: 1023px) {
     position: relative;
     min-height: 2.8rem;
     margin-bottom: ${(props) => (props.$collapsed ? 0 : '0.7rem')};
